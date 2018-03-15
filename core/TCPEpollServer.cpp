@@ -1,0 +1,891 @@
+#include <netinet/in.h>
+#include <sys/resource.h>
+#include <arpa/inet.h>
+#include <sys/epoll.h>
+#include <sys/socket.h>
+#include <sys/stat.h>
+#include <sys/sysinfo.h>
+#include <sys/types.h>
+//#include <netinet/tcp.h>  //-- for TCP_NODELAY
+#include <unistd.h>
+#include <fcntl.h>
+#include <string.h>
+#include <errno.h>
+#include <set>
+#include "hex.h"
+#include "HostLookup.h"
+#include "FPLog.h"
+#include "NetworkUtility.h"
+#include "TCPEpollServer.h"
+#include "msec.h"
+#include "Config.h"
+#include "TimeUtil.h"
+#include "StringUtil.h"
+
+using namespace fpnn;
+
+std::mutex TCPEpollServer::_sendQueueMutex[FPNN_SEND_QUEUE_MUTEX_COUNT];
+uint16_t TCPEpollServer::_THREAD_MIN = 2;
+uint16_t TCPEpollServer::_THREAD_MAX = 256;
+ServerPtr TCPEpollServer::_server = nullptr;
+std::atomic<bool> TCPEpollServer::_stopSignalTriggered(false);
+
+
+void TCPEpollServer::install_signal(){
+	if(!Setting::getBool("FPNN.server.preset.signal", true))
+		return;
+	signal(SIGXFSZ, SIG_IGN);  
+	signal(SIGPIPE, SIG_IGN);
+	signal(SIGALRM, SIG_IGN);
+	signal(SIGINT, &TCPEpollServer::stop_handler);
+	signal(SIGTERM, &TCPEpollServer::stop_handler);
+	signal(SIGQUIT, &TCPEpollServer::stop_handler);
+	signal(SIGUSR1, &TCPEpollServer::stop_handler);
+	signal(SIGUSR2, &TCPEpollServer::stop_handler);
+}
+
+void TCPEpollServer::stop_handler(int sig){ // should a static function
+	LOG_WARN("Got signal:%d.", sig);
+	bool status = _stopSignalTriggered.exchange(true);
+	if(_server && status == false)
+	{
+		//std::thread(&TCPEpollServer::stop, _server).detach();
+		_server->_stopSignalThread = std::thread(&TCPEpollServer::stop, _server);
+	}
+}
+
+
+bool TCPEpollServer::initSystemVaribles(){
+	Config::initSystemVaribles();
+    return true;
+}
+
+bool TCPEpollServer::initServerVaribles(){
+	Config::initServerVaribles();
+
+	_backlog = Setting::getInt("FPNN.server.backlog.size", FPNN_DEFAULT_SOCKET_BACKLOG);
+
+	_ip = Setting::getString("FPNN.server.listening.ip", "");
+	if(_ip == "*") _ip = "";//listen all ip
+
+	int port = Setting::getInt("FPNN.server.listening.port", 0);
+	if(port <= 1024 || port > 65535){
+		throw FPNN_ERROR_CODE_FMT(FpnnCoreError, FPNN_EC_CORE_UNKNOWN_ERROR, "Invalide port(%d), should between(1024~~65535)", port);
+	}
+	_port = port;
+
+	_listenIPv6 = Setting::getBool("FPNN.server.ipv6.listening.enable", false);
+	if (_listenIPv6)
+	{
+		_ipv6 = Setting::getString("FPNN.server.ipv6.listening.ip", "");
+		if(_ipv6 == "*") _ipv6 = "";//listen all ip
+
+		int port6 = Setting::getInt("FPNN.server.ipv6.listening.port", 0);
+		if(port6 <= 1024 || port6 > 65535){
+			throw FPNN_ERROR_CODE_FMT(FpnnCoreError, FPNN_EC_CORE_UNKNOWN_ERROR, "Invalide port(%d) for IPv6, should between(1024~~65535)", port6);
+		}
+		_port6 = port6;
+	}
+
+	_timeoutQuest = Setting::getInt("FPNN.server.quest.timeout", FPNN_DEFAULT_QUEST_TIMEOUT) * 1000;
+
+	_timeoutIdle = Setting::getInt("FPNN.server.idle.timeout", FPNN_DEFAULT_IDLE_TIMEOUT) * 1000;
+
+	_ioBufferChunkSize = Setting::getInt("FPNN.server.iobuffer.chunk.size", FPNN_DEFAULT_IO_BUFFER_CHUNK_SIZE);
+
+	_max_events = Setting::getInt("FPNN.server.max.event", FPNN_DEFAULT_MAX_EVENT);
+
+	_maxWorkerPoolQueueLength = Setting::getInt("FPNN.server.work.queue.max.size", FPNN_DEFAULT_WORK_POOL_QUEUE_SIZE);
+
+	_workThreadMin = Setting::getInt("FPNN.server.work.thread.min.size", _cpuCount);
+	_workThreadMax = Setting::getInt("FPNN.server.work.thread.max.size", _cpuCount);
+
+	_ioThreadMin = Setting::getInt("FPNN.global.io.thread.min.size", _cpuCount);
+	_ioThreadMax = Setting::getInt("FPNN.global.io.thread.max.size", _cpuCount);
+
+	_duplexThreadMin = Setting::getInt("FPNN.server.duplex.thread.min.size", 0);
+	_duplexThreadMax = Setting::getInt("FPNN.server.duplex.thread.max.size", 0);
+
+	if(_workThreadMin == 0) _workThreadMin = _THREAD_MIN;
+	else if(_workThreadMin > _THREAD_MAX) _workThreadMin = _THREAD_MAX;
+
+	if(_workThreadMax == 0) _workThreadMax = _THREAD_MIN;
+	else if(_workThreadMax > _THREAD_MAX) _workThreadMax = _THREAD_MAX;
+
+	if(_ioThreadMin == 0) _ioThreadMin = _THREAD_MIN;
+	else if(_ioThreadMin > _THREAD_MAX) _ioThreadMin = _THREAD_MAX;
+
+	if(_ioThreadMax == 0) _ioThreadMax = _THREAD_MIN;
+	else if(_ioThreadMax > _THREAD_MAX) _ioThreadMax = _THREAD_MAX;
+
+	if(_workThreadMin > _workThreadMax) _workThreadMin = _workThreadMax;
+	if(_ioThreadMin > _ioThreadMax) _ioThreadMin = _ioThreadMax;
+	if(_duplexThreadMin > _duplexThreadMax) _duplexThreadMin = _duplexThreadMax;
+
+	//-- ECC-AES encryption
+	_encryptEnabled = Setting::getBool("FPNN.server.security.ecdh.enable", false);
+	if (_encryptEnabled)
+	{
+		if (_keyExchanger.init() == false)
+		{
+			throw FPNN_ERROR_CODE_FMT(FpnnCoreError, FPNN_EC_CORE_UNKNOWN_ERROR, "Auto config ECC-AES failed.");
+		}
+	}
+
+	return true;
+}
+
+void TCPEpollServer::enableForceEncryption()
+{
+	Config::_server_user_methods_force_encrypted = true;
+}
+
+bool TCPEpollServer::prepare()
+{
+	if (_serverMasterProcessor->checkQuestProcessor() == false)
+	{
+		LOG_FATAL("Invalide Quest Processor.");
+		return false;
+	}
+
+	const size_t minIOBufferChunkSize = 64;
+	if (_ioBufferChunkSize < minIOBufferChunkSize)
+		_ioBufferChunkSize = minIOBufferChunkSize;
+	
+	if (!_connectionMap.inited())
+		setEstimateMaxConnections(Config::_server_perfect_connections);
+
+	_serverMasterProcessor->setServer(this);
+
+	if (_workerPool == nullptr)
+		configWorkerThreadPool(_workThreadMin, 1, _workThreadMin, _workThreadMax, _maxWorkerPoolQueueLength);
+
+	if (!_ioWorker)
+	{
+		_ioWorker.reset(new TCPServerIOWorker);
+		_ioWorker->setWorkerPool(_workerPool);
+		_ioWorker->setServer(this);
+	}
+	if (_ioPool == nullptr)
+	{
+		_ioPool = GlobalIOPool::instance();
+		_ioPool->setServerIOWorker(_ioWorker);
+		/** 
+			Just ensure io Pool is inited. If is inited, it will not reconfig or reinit. */
+		_ioPool->init(_ioThreadMin, 1, _ioThreadMin, _ioThreadMax);
+
+		/**
+			Ensure helodLogger is newset.
+			Because ClientEngine maybe startup before server created. If in that case, the ioPool is inited by ClientEngine,
+			then, the FPlog is reinited in constructor of server. So, the held logger need to be refreshed.
+		*/
+		_ioPool->updateHeldLogger();
+	}
+
+	if(_answerCallbackPool == nullptr && _duplexThreadMin > 0 && _duplexThreadMax > 0)
+		enableAnswerCallbackThreadPool(_duplexThreadMin, 1, _duplexThreadMin, _duplexThreadMax);
+
+	if (!_ip.empty())
+		_ip = HostLookup::get(_ip);
+	//if (!_ipv6.empty())
+	//	_ipv6 = HostLookup::get(_ipv6);
+
+	return true;
+}
+
+void TCPEpollServer::fatalFailClean(const char* fail_info)
+{
+	close(_socket);
+	close(_epoll_fd);
+
+	//if (_socket6 > 0)
+	//	close(_socket6);
+
+	_socket = 0;
+	_epoll_fd = 0;
+
+	if (_epollEvents)
+	{
+		delete [] _epollEvents;
+		_epollEvents = NULL;
+	}
+
+	if (fail_info)
+		LOG_FATAL(fail_info);
+}
+
+bool TCPEpollServer::init()
+{
+	struct sockaddr_in serverAddr;
+
+	memset(&serverAddr, 0, sizeof(serverAddr));
+	serverAddr.sin_family = AF_INET; 
+	serverAddr.sin_port = htons(_port);
+
+	if (_ip.empty())
+		serverAddr.sin_addr.s_addr = htonl(INADDR_ANY);
+	else
+		serverAddr.sin_addr.s_addr = inet_addr(_ip.c_str());
+	
+	if (serverAddr.sin_addr.s_addr == INADDR_NONE)
+	{
+		LOG_FATAL("Invalid IP address: %s", _ip.c_str());
+		return false;
+	}
+	
+	//-- Initialize epoll.
+	const int epoll_size = 1000000; //-- Since Linux 2.6.8, the size argument is ignored, but must be greater than zero.
+	_epoll_fd = epoll_create(epoll_size);
+	if (_epoll_fd == -1)
+	{
+		_epoll_fd = 0;
+		LOG_FATAL("Create epoll failed.");
+		return false;
+	}
+
+	_socket = socket(AF_INET, SOCK_STREAM, 0);
+	if (_socket == -1)
+	{
+		fatalFailClean("Create socket failed.");
+		return false;
+	}
+
+	int reuse_addr = 1;
+	if (-1 == setsockopt(_socket, SOL_SOCKET, SO_REUSEADDR, (void*)&(reuse_addr), sizeof(reuse_addr)))
+	{
+		fatalFailClean("Socket resuing failed.");
+		return false;
+	}
+
+	if (!nonblockedFd(_socket))
+	{
+		fatalFailClean("Change socket to non-blocked failed.");
+		return false;
+	}
+
+	//-- Add Listening Socket to epoll
+	struct epoll_event ev;
+	ev.data.fd = _socket;
+	ev.events = EPOLLIN | EPOLLERR | EPOLLHUP | EPOLLET | EPOLLRDHUP;
+
+	if (-1 == epoll_ctl(_epoll_fd, EPOLL_CTL_ADD, _socket, &ev))
+	{
+		fatalFailClean("Add listening socket to epoll failed.");
+		return false;
+	}
+
+	//if (-1 == bind(_socket, (struct sockaddr *)(&serverAddr), sizeof(struct sockaddr))) 
+	if (-1 == bind(_socket, (struct sockaddr *)(&serverAddr), sizeof(serverAddr))) 
+	{
+		fatalFailClean("Bind listening socket failed.");
+		return false;
+	} 
+
+	if (-1 == listen(_socket, _backlog)) 
+	{
+		fatalFailClean("Listening failed.");
+		return false;
+	}
+
+	_epollEvents = new(std::nothrow) epoll_event[_max_events];
+	if (_epollEvents == NULL)
+	{
+		fatalFailClean("Create events matrix failed.");
+		return false;
+	}
+
+	_running = true;
+	return true;
+}
+
+bool TCPEpollServer::initIPv6()
+{
+	struct sockaddr_in6 serverAddr;
+
+	memset(&serverAddr, 0, sizeof(serverAddr));
+	serverAddr.sin6_family = AF_INET6; 
+	serverAddr.sin6_port = htons(_port6);
+
+	if (_ipv6.empty())
+		serverAddr.sin6_addr = in6addr_any;
+	else if (inet_pton(AF_INET6, _ipv6.c_str(), &serverAddr.sin6_addr) != 1)
+	{
+		LOG_FATAL("Invalid IPv6 address: %s", _ipv6.c_str());
+		return false;
+	}
+
+	_socket6 = socket(AF_INET6, SOCK_STREAM, 0);
+	if (_socket6 == -1)
+	{
+		_socket6 = 0;
+		LOG_FATAL("Create PIv6 sokcet failed.");
+		return false;
+	}
+
+	int reuse_addr = 1;
+	if (-1 == setsockopt(_socket6, SOL_SOCKET, SO_REUSEADDR, (void*)&(reuse_addr), sizeof(reuse_addr)))
+	{
+		::close(_socket6);
+		_socket6 = 0;
+		LOG_FATAL("Resuing IPv6 socket failed.");
+		return false;
+	}
+
+	if (!nonblockedFd(_socket6))
+	{
+		::close(_socket6);
+		_socket6 = 0;
+		LOG_FATAL("Change IPv6 socket to non-blocked failed.");
+		return false;
+	}
+
+	//-- Add Listening Socket to epoll
+	struct epoll_event ev;
+	ev.data.fd = _socket6;
+	ev.events = EPOLLIN | EPOLLERR | EPOLLHUP | EPOLLET | EPOLLRDHUP;
+
+	if (-1 == epoll_ctl(_epoll_fd, EPOLL_CTL_ADD, _socket6, &ev))
+	{
+		::close(_socket6);
+		_socket6 = 0;
+		LOG_FATAL("Add IPv6 listening socket to epoll failed.");
+		return false;
+	}
+
+	if (-1 == bind(_socket6, (struct sockaddr *)(&serverAddr), sizeof(serverAddr))) 
+	{
+		ev.events = 0;
+		epoll_ctl(_epoll_fd, EPOLL_CTL_DEL, _socket6, &ev);
+
+		::close(_socket6);
+		_socket6 = 0;
+		LOG_FATAL("Bind IPv6 listening socket failed.");
+		return false;
+	} 
+
+	if (-1 == listen(_socket6, _backlog)) 
+	{
+		ev.events = 0;
+		epoll_ctl(_epoll_fd, EPOLL_CTL_DEL, _socket6, &ev);
+
+		::close(_socket6);
+		_socket6 = 0;
+		LOG_FATAL("IPv6 listening failed.");
+		return false;
+	}
+
+	return true;
+}
+
+void TCPEpollServer::run()
+{
+	_stopped = false;
+	while (true)
+	{
+		int readyfdsCount = epoll_wait(_epoll_fd, _epollEvents, _max_events, -1);
+		if (!_running)
+		{
+			clean();
+			return;
+		}
+
+		if (readyfdsCount == -1)
+		{
+			if (errno == EINTR || errno == EFAULT)
+				continue;
+
+			if (errno == EBADF || errno == EINVAL)
+			{
+				LOG_ERROR("Invalid epoll fd.");
+			}
+			else
+			{
+				LOG_ERROR("Unknown Error when epoll_wait() errno: %d", errno);
+			}
+
+			clean();
+			return;
+		}
+
+		for (int i = 0; i < readyfdsCount; i++)
+		{
+			if (_epollEvents[i].data.fd == _socket)
+			{
+				acceptIPv4Connection();
+			}
+			else if (_epollEvents[i].data.fd == _socket6)
+			{
+				acceptIPv6Connection();
+			}
+			else
+				processEvent(_epollEvents[i]);
+		}
+	}
+}
+
+void TCPEpollServer::acceptIPv4Connection()
+{
+	while (true)
+	{
+		struct sockaddr_in	clientAddr;
+		size_t addrlen = sizeof(struct sockaddr_in);
+		int newSocket = accept(_socket, (struct sockaddr *)(&clientAddr), (socklen_t *)&addrlen);
+		if (newSocket == -1)
+		{
+			if (errno == EAGAIN || errno == EWOULDBLOCK)
+				return;
+			else
+				continue;
+		}
+		if (_stopping)
+		{
+			close(newSocket);
+			continue;
+		}
+		if (_enableIPWhiteList && !_ipWhiteList.exist(clientAddr.sin_addr.s_addr))
+		{
+			close(newSocket);
+			LOG_ERROR("Refuse connection from %s:%d", IPV4ToString(clientAddr.sin_addr.s_addr).c_str(), (int)ntohs(clientAddr.sin_port));
+			continue;
+		}
+		ConnectionInfoPtr ci(new ConnectionInfo(newSocket, ntohs(clientAddr.sin_port), IPV4ToString(clientAddr.sin_addr.s_addr), true));
+		newConnection(newSocket, ci);
+	}
+}
+
+void TCPEpollServer::acceptIPv6Connection()
+{
+	while (true)
+	{
+		struct sockaddr_in6	clientAddr;
+		size_t addrlen = sizeof(struct sockaddr_in6);
+		int newSocket = accept(_socket6, (struct sockaddr *)(&clientAddr), (socklen_t *)&addrlen);
+		if (newSocket == -1)
+		{
+			if (errno == EAGAIN || errno == EWOULDBLOCK)
+				return;
+			else
+				continue;
+		}
+		if (_stopping)
+		{
+			close(newSocket);
+			continue;
+		}
+
+		char buf[INET6_ADDRSTRLEN + 4];
+		const char *rev = inet_ntop(AF_INET6, &(clientAddr.sin6_addr), buf, sizeof(buf));
+		if (rev == NULL)
+		{
+			close(newSocket);
+			char hex[32 + 1];
+			hexlify(hex, &(clientAddr.sin6_addr), 16);
+			LOG_ERROR("Format IPv6 address for socket %d failed. clientAddr.sin6_addr: %s", newSocket, hex);
+			continue;
+		}
+		if (_enableIPWhiteList && !_ipWhiteList.exist(clientAddr.sin6_addr))
+		{
+			close(newSocket);
+			LOG_ERROR("Refuse connection from [%s]:%d", buf, (int)ntohs(clientAddr.sin6_port));
+			continue;
+		}
+		ConnectionInfoPtr ci(new ConnectionInfo(newSocket, ntohs(clientAddr.sin6_port), buf, false));
+		newConnection(newSocket, ci);
+	}
+}
+
+void TCPEpollServer::newConnection(int newSocket, ConnectionInfoPtr ci)
+{
+	if (_connectionCount >= _maxConnections)
+	{
+		close(newSocket);
+		LOG_ERROR("New connection is closed cause by max connection limitation caught. Socket: %d, address: %s:%d. Current connections count: %d, Max connections: %d",
+			newSocket, ci->ip.c_str(), ci->port, _connectionCount.load(), _maxConnections);
+		return;
+	}
+	else
+		_connectionCount++;
+
+	//-- non-blocked
+	if (!nonblockedFd(newSocket))
+	{
+		close(newSocket);
+		_connectionCount--;
+		LOG_ERROR("Change new accepted fd to non-blocked failed. Socket: %d, address: %s:%d",
+			newSocket, ci->ip.c_str(), ci->port);
+		return;
+	}
+
+	/*int flag = 1;
+	if (-1 == setsockopt(_socket, IPPROTO_TCP, TCP_NODELAY, (void*)&flag, sizeof(flag)))
+	{
+		close(newSocket);
+		_connectionCount--;
+		LOG_ERROR("TCP-Nodelay: disable Nagle failed. Socket: %d, address: %s:%d",
+			newSocket, ci->ip.c_str(), ci->port);
+		return;
+	}*/
+
+	//-- Server Connection
+	int idx = newSocket % FPNN_SEND_QUEUE_MUTEX_COUNT;
+	TCPServerConnection* connection = new(std::nothrow) TCPServerConnection(_epoll_fd, &_sendQueueMutex[idx], _ioBufferChunkSize, ci);
+	if (!connection)
+	{
+		close(newSocket);
+		_connectionCount--;
+		LOG_ERROR("Alloc TCPServerConnection for new connection failed. Socket: %d, address: %s:%d", newSocket, ci->ip.c_str(), ci->port);
+		return;
+	}
+
+	//-- Request Package
+	RequestPackage* requestPackage = new(std::nothrow) RequestPackage(IOEventType::Connected, connection->_connectionInfo, connection);
+	if (!requestPackage)
+	{
+		cleanForNewConnectionError(connection, NULL, "Alloc Event package for new connection failed.", false);
+		return;
+	}
+	
+	if (!_connectionMap.insert(newSocket, connection))
+	{
+		cleanForNewConnectionError(connection, requestPackage, "Insert TCPServerConnection to cache failed.", false);
+		return;
+	}
+
+	if (_workerPool->priorWakeUp(requestPackage) == false) //-- for internal cmd canbe prior executed, connecting event must priored.
+	{
+		cleanForNewConnectionError(connection, requestPackage, "Worker pool wake up for new connection event failed. Server is exiting.", true);
+		return;
+	}
+}
+
+void TCPEpollServer::cleanForNewConnectionError(TCPServerConnection* connection, RequestPackage* requestPackage, const char* log_info, bool connectionInCache)
+{
+	if (connectionInCache)
+		takeConnection(connection->_connectionInfo->socket);
+	
+	close(connection->_connectionInfo->socket);
+	_connectionCount--;
+	LOG_ERROR("%s %s",log_info, connection->_connectionInfo->str().c_str());
+
+	if (requestPackage)
+		delete requestPackage;
+
+	delete connection;
+}
+
+void TCPEpollServer::cleanForExistConnectionError(TCPServerConnection* connection, RequestPackage* requestPackage, const char* log_info)
+{
+	LOG_ERROR("%s %s",log_info, connection->_connectionInfo->str().c_str());
+
+	if (requestPackage)
+		delete requestPackage;
+
+	TCPServerConnectionPtr autoRelease(connection);
+	_connectionCount--;
+	_reclaimer->reclaim(autoRelease);
+}
+
+void TCPEpollServer::processEvent(struct epoll_event & event)
+{
+	int socket = event.data.fd;
+
+	int errorCode = FPNN_EC_OK;
+
+	TCPServerConnection* connection;
+	RequestPackage* requestPackage;
+	//-- Please care the order.
+	if (event.events & EPOLLRDHUP || event.events & EPOLLHUP)
+	{
+		//-- close event processor
+		connection = takeConnection(socket);
+		if (connection == NULL)
+			return;
+
+		connection->exitEpoll();
+		errorCode = FPNN_EC_CORE_CONNECTION_CLOSED;
+		requestPackage = new(std::nothrow) RequestPackage(IOEventType::Closed, connection->_connectionInfo, connection);
+		if (!requestPackage)
+		{
+			cleanForExistConnectionError(connection, NULL, "Alloc Event package for closing connection failed.");
+			return;
+		}
+	}
+	else if (event.events & EPOLLERR)
+	{
+		//-- error event processor
+		connection = takeConnection(socket);
+		if (connection == NULL)
+			return;
+
+		connection->exitEpoll();
+		errorCode = FPNN_EC_CORE_UNKNOWN_ERROR;
+		requestPackage = new(std::nothrow) RequestPackage(IOEventType::Error, connection->_connectionInfo, connection);
+		if (!requestPackage)
+		{
+			cleanForExistConnectionError(connection, NULL, "Alloc Event package for connection error failed.");
+			return;
+		}
+	}
+
+	if (errorCode != FPNN_EC_OK)
+	{
+		clearConnectionQuestCallbacks(connection, errorCode);
+		if (_workerPool->forceWakeUp(requestPackage) == false)
+			cleanForExistConnectionError(connection, requestPackage, "Worker pool wake up for error or close event failed. Server is exiting.");
+
+		return;
+	}
+	
+	TCPServerConnection* conn = (TCPServerConnection*)_connectionMap.signConnection(socket, event.events);
+	if (conn)
+		_ioPool->wakeUp(conn);
+}
+
+void TCPEpollServer::clearConnectionQuestCallbacks(TCPServerConnection* connection, int errorCode)
+{
+	for (auto callbackPair: connection->_callbackMap)
+	{
+		BasicAnswerCallback* callback = callbackPair.second;
+		if (callback->syncedCallback())		//-- check first, then fill result.
+			callback->fillResult(NULL,  errorCode);
+		else
+		{
+			if (_answerCallbackPool)
+			{
+				callback->fillResult(NULL, errorCode);
+
+				BasicAnswerCallbackPtr task(callback);
+				_answerCallbackPool->wakeUp(task);
+			}
+			else
+			{
+				delete callback;
+				LOG_ERROR("CallbackMap of server connection is enabled, but process answers is desiabled. Answer will be dropped.");
+			}
+		}
+	}
+	// connection->_callbackMap.clear(); //-- If necessary.
+}
+
+void TCPEpollServer::stop()
+{
+	if(!_running) return;
+
+	_stopping = true;
+	_ioWorker->serverWillStop();
+
+	//call user defined function before server exit
+	_serverMasterProcessor->getQuestProcessor()->serverWillStop();
+
+	_running = false;
+	_timeoutChecker.join();
+
+	{
+		pipe(_closeNotifyFds);
+
+		nonblockedFd(_closeNotifyFds[0]);
+		struct epoll_event      ev;
+
+		ev.data.fd = _closeNotifyFds[1];
+		ev.events = EPOLLIN | EPOLLOUT | EPOLLERR | EPOLLHUP | EPOLLET | EPOLLRDHUP | EPOLLONESHOT;
+
+		epoll_ctl(_epoll_fd, EPOLL_CTL_ADD, _closeNotifyFds[1], &ev);
+		write(_closeNotifyFds[1], this, 4);
+	}
+
+	LOG_INFO("Server is stopping ...");
+
+	while (!_stopped)
+		usleep(20000);
+
+	//-- I/O Thread pool is runnng. It will be free when server destroy.
+	//-- or need to release at this point?
+}
+
+void TCPEpollServer::clean()
+{
+	close(_socket);
+	_socket = 0;
+
+	if (_socket6 > 0)
+	{
+		close(_socket6);
+		_socket6 = 0;
+	}
+
+	close(_closeNotifyFds[1]);
+	close(_closeNotifyFds[0]);
+	_closeNotifyFds[0] = 0;
+	_closeNotifyFds[1] = 0;
+	
+	sendCloseEvent();
+
+	_connectionMap.waitForEmpty();
+	_workerPool->release();
+	if (_answerCallbackPool)
+		_answerCallbackPool->release();
+
+	close(_epoll_fd);
+	_epoll_fd = 0;
+
+	if (_epollEvents)
+	{
+		delete [] _epollEvents;
+		_epollEvents = NULL;
+	}
+
+	_stopped = true;
+	if (_stopSignalThread.joinable())
+		_stopSignalThread.join();
+
+	LOG_INFO("Server stopped.");
+
+	//call user defined function after server exit
+	_serverMasterProcessor->getQuestProcessor()->serverStopped();
+}
+
+void TCPEpollServer::sendCloseEvent()
+{
+	std::set<int> fdSet;
+	_connectionMap.getAllSocket(fdSet);
+	
+	for (int socket: fdSet)
+	{
+		struct epoll_event	ev;
+		ev.data.fd = socket;
+		ev.events = EPOLLHUP | EPOLLRDHUP;
+		processEvent(ev);
+	}
+}
+
+void TCPEpollServer::sendData(int socket, uint64_t token, std::string* data)
+{
+	if (!_connectionMap.sendData(socket, token, data))
+	{
+		delete data;
+		LOG_ERROR("Data not send at socket %d. socket maybe closed.", socket);
+	}
+}
+
+void TCPEpollServer::dealAnswer(int socket, FPAnswerPtr answer)
+{
+	BasicAnswerCallback* callback = _connectionMap.takeCallback(socket, answer->seqNumLE());
+	if (!callback)
+	{
+		LOG_ERROR("Received error answer seq is %u at socket %d", answer->seqNumLE(), socket);
+		return;
+	}
+	if (callback->syncedCallback())		//-- check first, then fill result.
+	{
+		SyncedAnswerCallback* sac = (SyncedAnswerCallback*)callback;
+		sac->fillResult(answer,  FPNN_EC_OK);
+		return;
+	}
+
+	if (_answerCallbackPool)
+	{
+		callback->fillResult(answer,  FPNN_EC_OK);
+
+		BasicAnswerCallbackPtr task(callback);
+		_answerCallbackPool->wakeUp(task);
+	}
+	else
+	{
+		delete callback;
+		LOG_ERROR("Server received an answer, but process answers is desiabled. Answer will be dropped. socket: %d", socket);
+	}
+}
+
+void TCPEpollServer::closeConnection(const ConnectionInfo* ci)
+{
+	TCPServerConnection* connection = takeConnection(ci);
+	if (connection == NULL)
+		return;
+
+	connection->exitEpoll();
+	RequestPackage* requestPackage = new(std::nothrow) RequestPackage(IOEventType::Closed, connection->_connectionInfo, connection);
+	if (!requestPackage)
+	{
+		cleanForExistConnectionError(connection, NULL, "Alloc Event package for closing connection failed.");
+		return;
+	}
+
+	clearConnectionQuestCallbacks(connection, FPNN_EC_CORE_CONNECTION_CLOSED);
+	if (_workerPool->forceWakeUp(requestPackage) == false)
+		cleanForExistConnectionError(connection, requestPackage, "Worker pool wake up for error or close event failed. Server is exiting.");
+}
+
+void TCPEpollServer::timeoutCheckThread()
+{
+	int statusLogIntervalCount = 0;
+
+	while (_running)
+	{
+		sleep(1);
+
+		if (_checkQuestTimeout)
+		{
+			//-- Quest Timeout: process as milliseconds
+			int64_t current = slack_real_msec();
+			std::list<std::map<uint32_t, BasicAnswerCallback*> > timeouted;
+
+			_connectionMap.extractTimeoutedCallback(current, timeouted);
+			for (auto bacMap: timeouted)
+			{
+				for (auto bacPair: bacMap)
+				{
+					if (bacPair.second)
+					{
+						BasicAnswerCallback* callback = bacPair.second;
+						if (callback->syncedCallback())		//-- check first, then fill result.
+							callback->fillResult(NULL, FPNN_EC_CORE_TIMEOUT);
+						else
+						{
+							callback->fillResult(NULL, FPNN_EC_CORE_TIMEOUT);
+
+							BasicAnswerCallbackPtr task(callback);
+							_answerCallbackPool->wakeUp(task);
+						}
+					}
+				}
+			}
+		}
+
+		if (_timeoutIdle)
+		{
+			//-- Connection idle Timeout: process as seconds, not milliseconds.
+			int64_t threshold = slack_real_sec() - _timeoutIdle / 1000;
+			std::list<TCPBasicConnection*> timeouted;
+
+			_connectionMap.extractTimeoutedConnections(threshold, timeouted);
+			for (TCPBasicConnection* conn: timeouted)
+			{
+				TCPServerConnection* connection = (TCPServerConnection*)conn;
+				
+				LOG_INFO("[Idle Timeout] Connection will be closed by server. %s", connection->_connectionInfo->str().c_str());
+
+				clearConnectionQuestCallbacks(connection, FPNN_EC_CORE_CONNECTION_CLOSED);
+				RequestPackage* requestPackage = new(std::nothrow) RequestPackage(IOEventType::Closed, connection->_connectionInfo, connection);
+				if (!requestPackage)
+				{
+					cleanForExistConnectionError(connection, NULL, "Alloc Event package for closing idle connection failed.");
+					continue;
+				}
+				if (_workerPool->forceWakeUp(requestPackage) == false)
+				{
+					cleanForExistConnectionError(connection, requestPackage, "Worker pool wake up for idle connection failed. Server is exiting.");
+				}
+			}
+		}
+
+		if (_logServerStatusInfos && (fpLogLevel >= FP_LEVEL_WARN))
+		{
+			statusLogIntervalCount += 1;
+			if (statusLogIntervalCount >= _logStatusIntervalSeconds)	//-- _logStatusIntervalSeconds maybe tuned less.
+			{
+				_serverMasterProcessor->logStatus();
+				statusLogIntervalCount = 0;
+			}
+		}
+	}
+}

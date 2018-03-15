@@ -1,0 +1,146 @@
+=====================
+	测试工具
+=====================
+
+位置：<fpnn-folder>/core/test/
+
+*. asyncStressClient
+	异步压力测试客户端。
+	可作为业务服务器的压力测试模版使用。
+	一个实例可模拟指定数目的链接，和总的输出 QPS。
+	Usage: ./asyncStressClient ip port connections qps [client_work_thread]
+	Usage: ./asyncStressClient ip port connections qps client_work_thread [encryptConfigFile]
+
+	encryptConfigFile 模版请参见 clientEncrypt.conf
+	注：默认测试目标服务器请参见 serverTest
+
+
+*. clientAsyncOnewayTest
+	Oneway 消息功能／压力测试客户端。
+	注：默认测试目标服务器请参见 serverTest
+	Usage: ./clientAsyncOnewayTest ip port
+
+
+*. clientAsyncTest
+	单链接洪水压力测试工具。(建议使用 netAsyncTest)
+	注：默认测试目标服务器请参见 serverTest
+	Usage: ./clientAsyncTest ip port [client_work_thread]
+
+
+*. clientTest
+	功能&压力&稳定性测试工具。
+	注：默认测试目标服务器请参见 serverTest
+	Usage: ./clientTest ip port threadNum sendCount
+
+
+*. cmd
+	FPNN 通用测试客户端。可以发送任何 fpnn 命令，调用任何 fpnn 接口。
+	注：接口参数须以 json 形式表示。
+	注：该客户端不支持加密链接。
+	注：isTwoWay 与 isMsgPack 以 0 和 1 表示 false 和 true。
+	Usgae: ./cmd ip port method body(json) isTwoWay isMsgPack [timeoutInSecond]
+
+
+*. concurrentConnectionTesting
+	并发连接测试工具。
+	Usage: ./concurrentConnectionTesting ip port threadNum sendCount [encryptConfigFile]
+	encryptConfigFile 模版请参见 clientEncrypt.conf
+	注：默认测试目标服务器请参见 serverTest
+
+
+*. duplexClientTest
+	duple(双向双工)功能&压力测试工具。
+	注：默认测试目标服务器请参见 serverTest
+	Usage: ./duplexClientTest ip port threadNum sendCount
+
+
+*. massiveClientTest
+	最大链接数压测工具。
+	注：默认测试目标服务器请参见 serverTest
+	Usage: ./massiveClientTest ip port threadNum clientCount [interval_times_in_milliseconds] [timeout] [worker_threads]
+
+
+*. netAsyncTest
+	单链接洪水压力测试工具。
+	注：默认测试目标服务器请参见 serverTest
+	Usage: ./netAsyncTest ip port
+
+
+*. periodClientTest
+	周期性测试工具。
+	注：默认测试目标服务器请参见 serverTest
+	Usage: ./periodClientTest ip port quest_period(seconds)
+
+
+*. serverTest
+	目标测试服务器。
+	Usage: ./serverTest config
+
+
+*. shortConnectionTesting
+	短链接压力测试工具。
+	Usage: ./shortConnectionTesting ip port threadNum sendCount [encryptConfigFile]
+	encryptConfigFile 模版请参见 clientEncrypt.conf
+	注：默认测试目标服务器请参见 serverTest
+
+
+*. singleClientConcurrentTest
+	单一客户端多线程并发稳定性测试工具。
+	(配合框架修改后，可测试是否有并发建立的多余链接。)
+	Usage: ./singleClientConcurrentTest ip port [encryptConfigFile]
+	encryptConfigFile 模版请参见 clientEncrypt.conf
+	注：默认测试目标服务器请参见 serverTest
+
+
+*. test.php
+	PHP over HTTP 测试工具。
+
+
+*. testCloneAnswer
+	Clone Answer 功能测试服务器。
+	Usage: ./testCloneAnswer config
+
+*. testCloneQuest
+	Clone Quest 功能测试服务器。
+	Usage: ./testCloneQuest config
+
+
+*. timeoutTest
+	超时相关测试工具。
+	Usage: ./timeoutTest ip port delay_seconds engine_quest_timeout [client_quest_timeout]
+	注：默认测试目标服务器请参见 serverTest
+
+
+=====================
+	运维／管理 工具
+=====================
+
+位置：<fpnn-folder>/core/test/
+
+*. cmd
+	FPNN 通用测试客户端。可以发送任何 fpnn 命令，调用任何 fpnn 接口。
+	注：接口参数须以 json 形式表示。
+	注：该客户端不支持加密链接。
+	注：isTwoWay 与 isMsgPack 以 0 和 1 表示 false 和 true。
+	Usgae: ./cmd ip port method body(json) isTwoWay isMsgPack [timeoutInSecond]
+
+
+*. eccKeyMaker
+	FPNN 加密链接的秘钥对生成器。
+	运行后会在当前目录下产生两个二进制文件，一个公钥，一个私钥。
+	Usage: ./eccKeyMaker <ecc-curve> key-pair-name
+
+	ecc-curve 为：
+	secp192r1、secp224r1、secp256r1、secp256k1 四者之一。
+
+
+*. fss
+	FPNN Secure Shell，FPNN 加密交互式命令行终端。
+	支持加密链接和非加密链接。
+	Usage: ./fss ip port
+	Usage: ./fss ip port ecc-curve server-public-key-file [encrypt-mode-opt] [encrypt-strength-opt]
+
+	*. ecc-curve：
+	secp192r1、secp224r1、secp256r1、secp256k1 四者之一。
+	*. encrypt-mode-opt：stream 或 package
+	*. encrypt-strength-opt：128bits 或 256bits

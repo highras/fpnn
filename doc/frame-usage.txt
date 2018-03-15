@@ -1,0 +1,788 @@
+本文为 FPNN 框架使用说明及指导，API 请参考头文件。
+本使用说明为概要说明。具体细节，请参考 example，及相关部分代码。
+本说明分为基础使用说明、高级使用说明、扩展 三部分。高级使用说明针对高级用户，基础功能用户可以忽略。
+
+一、基础使用说明：
+	1. 服务端
+		a. 服务端组成
+			三个部分：配置文件 ＋ IQuestProcessor 类实例 ＋ server 实例
+		b. 使用介绍
+			1. 配置文件：
+				必须配置条目：FPNN.server.listening.port
+				其余配置可选。FPNN.server.listening.ip 默认为监听全部地址
+			2. 继承 IQuestProcessor 类，编写服务端方法实现
+				include "IQuestProcessor.h" 和必要的头文件，编写方法实现。
+
+				参考示例：
+				#include "IQuestProcessor.h"
+				using namespace fpnn;
+
+				class QuestProcessor: public IQuestProcessor
+				{
+					QuestProcessorClassPrivateFields(QuestProcessor)
+				public:
+					//-- oneway
+					FPAnswerPtr demoOneway(const FPReaderPtr args, const FPQuestPtr quest, const ConnectionInfo& ci)
+					{
+						//-- TODO
+						//-- You codes. 
+						return NULL;   //-- one way method will return NULL.
+					}
+					//-- twoway
+					FPAnswerPtr demoTwoway(const FPReaderPtr args, const FPQuestPtr quest, const ConnectionInfo& ci)
+					{
+						//-- TODO
+						//-- You codes.
+						return something;	//-- Two way method need to return a FPAnswerPtr.
+					}
+					QuestProcessor()
+					{
+						registerMethod("one way demo", &QuestProcessor::demoOneway);
+						registerMethod("two way demo", &QuestProcessor::demoTwoway);
+					}
+					~QuestProcessor(){
+					}
+					QuestProcessorClassBasicPublicFuncs
+				};
+
+				说明：
+				one way 和 two way 的方法签名均为 
+				FPAnswerPtr func_name(const FPReaderPtr args, const FPQuestPtr quest, const ConnectionInfo& ci)
+				所有的请求参数可以从 args 直接获取。
+				关于方法的返回值：
+				One way 方法，必须返回 NULL，two way 方法则必须返回有效的 FPAnswerPtr 对象。
+				registerMethod函数用于注册服务方法。字符串部分为方法名。
+				方法名支持任意有效合法的字符串。
+				所有以 * 星号开头的名称保留为框架内置方法名。
+				如果用户方法以 * 星号开头，且与框架内置方法名重名，则只有框架内置方法被调用，用户方法将被放弃。
+				未来所有以 * 星号开头的用户方法均可能被放弃。因此，不建议使用 * 星号，或其他特殊符号作为用户方法名。
+				从版本 1.0.2 开始，所有框架内置方法将优先于用户方法调用。
+				从版本 1.0.2 开始，当有请求被排队时，框架内置方法将以先进后出的顺序被调用，类似堆栈；所有用户方法将以正常的先进先出顺序被调用。
+				从版本 1.0.5 开始(及所有15年11月26日(含)之后编译的版本)，所有框架内置方法仅能从内网访问。
+				空字符串为合法方法名，但鉴于日志阅读和分析的需求，不建议使用空字符串作为方法名。创建空字符串为方法名的请求将自动抛出异常。
+ 
+				3. server 实例：
+				参考代码：
+				#include "Setting.h"
+ 
+				//-- QuestProcessor 定义代码
+				//-- 其他必要代码
+ 
+				int main(int argc, char* argv[])
+				{
+					if (argc != 2)
+					{
+						cout<<"Usage: "<<argv[0]<<" config"<<endl;
+						return 0;
+					}
+					if(!Setting::load(argv[1])){
+						cout<<"Config file error:"<< argv[1]<<endl;
+						return 1;
+					}
+					ServerPtr server = TCPEpollServer::create();
+					server->setQuestProcessor(std::make_shared<QuestProcessor>());
+					server->startup();
+					server->run();
+					return 0;
+				}
+
+				4. 编译参数
+					CPPFLAGS += -Ifpnn/core -Ifpnn/proto -Ifpnn/base -Ifpnn/proto/msgpack -Ifpnn/proto/rapidjson
+					LIBS += -Lfpnn/core -Lfpnn/proto -Lfpnn/base -lfpnn 
+					线上版本请使用 -O2 编译，运行效率才能达到最优。Debug 版本效率和 QPS 远低于 O2 版。
+
+			c. 参考
+				fpnn/core/example 目录下：
+				simpleServer.cpp
+				memcacheServer.cpp
+
+			d. 默认配置
+				链接空闲时间 60s
+
+	2.客户端
+		任何实现只要支持 FPNN 协议，均可作为 FPNN 服务的客户端。
+		FPNN 框架自带的客户端为针对大量并发连接进行优化。普通状态下，性能略低于良好实现的双线程客户端。
+		a. 基本使用流程
+			1. 创建 TCPClient 实例: std::shared_ptr<TCPClient> client = TCPClient::createClient(host, port);
+			2. client->connect(); (可以省略)
+			3. client->sendQuest(...);     //-- 如果没有执行第二步，该步将自动调用第二步。
+			4. client->close();
+
+		b. 参考
+			fpnn/core/example 目录下：
+			memcacheClient.cpp
+
+		c. 默认配置
+			Quest应答默认超时时间: 5s
+			TCPClient 默认自动重联
+
+		d. 注意事项
+			如果 sendQuest() 函数返回 false，需要开发者释放 callback 对象。如果返回 true，则由框架负责释放。
+
+二、高级使用说明：
+	1. 服务端
+		a. 提前返回
+			提前返回是指如下情况：
+			在 QuestProcessor 的请求处理函数内，函数返回前，需要返回的情况。
+
+			这种情况一般出现在，需要服务尽快响应，且请求的处理流程中，含有一些较为耗时，但不影响返回结果的操作时。
+			参考代码：
+			#include "IQuestProcessor.h"
+			using namespace fpnn;
+ 
+			class QuestProcessor: public IQuestProcessor
+			{    
+				... ...
+ 
+				FPAnswerPtr demoTwoway(const FPReaderPtr args, const FPQuestPtr quest, const ConnectionInfo& ci)
+				{
+					//-- some codes
+					... ...
+ 
+					//-- advance answer 
+					FPAnswerPtr answer = FPAWriter::emptyAnswer(quest);
+					bool sent = sendAnswer(quest, answer);
+					if (sent)
+						cout<<"answer advance quest success. "<<ci.str()<<endl;
+					else
+						cout<<"answer advance quest failed. "<<ci.str()<<endl;
+
+					//-- some codes
+					... ...
+
+					return NULL;
+				}
+    
+				... ...
+			};
+
+			说明：
+			FPAnswerPtr answer = FPAWriter::emptyAnswer(quest);
+			生成一个空的answer以供返回。可以是任意有效的answer。
+			bool sent = sendAnswer(quest, answer);
+			不退出函数，返回answer。
+
+			注意：
+				*. 一个请求处理流程中，sendAnswer 只能被成功调用一次。换句话说，一个 Answer 对应一个 Quest，一旦 sendAnswer 成功一次后，后续调用均会返回失败。
+				*. 在成功调用 sendAnswer 前，如果函数返回退出（包括可能的 catch 语句块中），函数均需要返回有效的 FPAnswerPtr。在成功调用 sendAnswer 后，函数返回退出，只能返回 NULL/nullptr，否则会被视为二次返回，引发错误。
+				*. 提前返回不能与 “延迟返回 & 异步返回” 同时使用。
+		
+		b. 延迟返回 & 异步返回
+			延迟返回是指如下情况：
+			Quest 对应的 Answer 不在 QuestProcessor 的请求处理函数返回，而在请求处理函数外，或者请求处理函数结束后，某个特定点返回的情况。
+
+			这种情况一般出现在请求处理包含IO操作等耗时处理，为了不让系统工作线程被占用阻塞时。
+			参考代码：
+			#include "IQuestProcessor.h"
+			#include "TaskThreadPool.h"
+			using namespace fpnn;
+
+			class QuestProcessor: public IQuestProcessor
+			{
+				TaskThreadPool _delayAnswerPool; 
+				... ...
+ 
+				FPAnswerPtr demoTwoway(const FPReaderPtr args, const FPQuestPtr quest, const ConnectionInfo& ci)
+				{
+					//-- some codes
+					... ...
+ 
+					//-- delay answer 
+					std::shared_ptr<IAsyncAnswer> async = genAsyncAnswer(quest);
+					_delayAnswerPool.wakeUp([async](){
+						//-- some codes
+						... ...
+						FPAnswerPtr answer = FPAWriter::emptyAnswer(async->getQuest()); 
+						async->sendAnswer(answer);
+ 
+						//-- some codes
+						... ...
+					});
+ 
+					//-- some codes
+					... ...
+
+					return NULL;
+				}
+    
+				... ...
+			};
+			说明：
+			std::shared_ptr<IAsyncAnswer> async = genAsyncAnswer(quest);
+			生成异步返回对象。
+ 
+			_delayAnswerPool.wakeUp([async](){
+				... ...
+			});
+			向自定义的线程池中压入异步任务。(示例代码中，异步任务为Lambda函数。实际情况可使用其他方式。)
+ 
+			async->sendAnswer(answer);
+			在异步任务中，使用异步返回对象返回answer。
+
+			注意：
+				*. 一个请求处理流程中，异步返回对象只能成功产生一次，即 genAsyncAnswer 只能被成功调用一次。一旦 genAsyncAnswer 成功一次后，后续调用均会返回失败。
+				*. 在成功调用 genAsyncAnswer 前，如果函数返回退出（包括可能的 catch 语句块中），函数均需要返回有效的 FPAnswerPtr。在成功调用 genAsyncAnswer 后，函数返回退出，只能返回 NULL/nullptr，否则会被视为二次返回，引发错误。
+				*. 异步返回对象的 sendAnswer 接口，仅允许成功调用一次。一旦 sendAnswer 调用成功后，后续调用均会返回失败。原因：一个 Quest 对应一个 Answer。
+				*. 延迟/异步返回不能与 “提前返回” 同时使用。
+
+		c. 链接事件
+			链接建立事件
+			virtual void connected(const ConnectionInfo&) {}
+			链接已经建立。在该函数返回前，链接将被阻塞，不能进行数据收发操作。
+
+			链接关闭事件 [new for FPNN.v2]
+			virtual void connectionWillClose(const ConnectionInfo&, bool closeByError) {}
+			链接将被关闭。进入该事件后，该链接上的收发操作将不再成功。
+			closeByError 标识链接是否因为错误而被关闭，还是主动／正常关闭。
+
+			链接关闭事件 [Deprecated in FPNN.v2, will removed in FPNN.v3.]
+			virtual void connectionClose(const ConnectionInfo&) {}
+			链接将被关闭。进入该事件后，该链接上的收发操作将不再成功。
+
+			链接错误(将被关闭)事件 [Deprecated in FPNN.v2, will removed in FPNN.v3.]
+			virtual void connectionErrorAndWillBeClosed(const ConnectionInfo&) {}
+			链接发生错误，将被关闭。进入该事件后，该链接上的收发操作将不再成功。
+ 
+			注意：
+				可能出现的状况：闪联。
+				此时，fpnn 框架保证 connected() 调用完成后，connectionClose() 或 connectionErrorAndWillBeClosed() 才会被调用。
+ 
+			请求方法错误
+			virtual FPAnswerPtr unknownMethod(const std::string& method_name, const FPReaderPtr args, const FPQuestPtr quest, const ConnectionInfo& connInfo)
+			当请求的方法不存在时，将进入该事件。默认返回 FPNN_EC_CORE_UNKNOWN_METHOD 错误。
+
+		d. 服务器事件
+			目前 IQuestProcessor 支持 hook 的服务器事件如下：
+			服务器启动事件
+			virtual void start() {}
+			服务器已经完全启动，尚未开始提供服务。
+			该函数返回后，服务器进入服务状态。
+
+			服务器即将停止
+			virtual void serverWillStop() {}
+			服务器即将停止。此时，服务器即将进入退出状态，该函数返回后，服务器将无法再收发信息。
+ 
+			当服务器使用 twoway 的 duplex 功能时，可使用该事件，向客户端主动发送关闭通知。
+			注意：在上述情况下使用时，该函数一旦退出，将无法获取客户端的返回。
+ 
+			服务器已经停止
+			virtual void serverStopped() {}
+			服务器已经停止完毕。
+			此时服务器的 worker 线程池已经停止运行。
+
+			服务状态查询
+			virtual bool status() { return true; }
+			目前运维使用，查询服务是否存活。
+
+			服务信息查询
+			virtual std::string infos() { return "{}"; }
+			返回一个包含信息(比如当前状态、配置参数等)的 JSON 字典。
+
+			服务参数调整
+			virtual void tune(const std::string& key, std::string& value) {}
+			输入需要调整的项目，和对应的目标值。
+		
+		e. server Push & duplex 双向通道
+			服务器默认支持 server 向 client 发送 oneway 消息。
+			如果服务器需要向 client 发送 two-way 消息，则需要执行以下两个操作中，任意一个：
+
+				i. 调用服务器 enableAnswerCallbackThreadPool() 接口，启用 answer callback 处理线程池。
+void enableAnswerCallbackThreadPool(int32_t initCount, int32_t perAppendCount, int32_t perfectCount, int32_t maxCount)
+
+				ii. 配置文件配置
+				FPNN.server.duplex.thread.min.size
+				FPNN.server.duplex.thread.max.size
+				两项，需大于 0。
+
+			Duplex 参考代码(在请求处理函数中)：
+			#include "IQuestProcessor.h"
+			using namespace fpnn;
+ 
+			class QuestProcessor: public IQuestProcessor
+			{
+				... ...
+				FPAnswerPtr duplexDemo(const FPReaderPtr args, const FPQuestPtr quest, const ConnectionInfo& ci)
+				{
+					//-- some codes
+					... ...
+
+					FPQuestPtr quest2 = QWriter("duplex quest", false, FPMessage::FP_PACK_MSGPACK);
+					FPAnswerPtr answer = sendQuest(ci, quest2);
+		
+					//-- some codes
+					... ...
+
+					return ...
+				}
+ 
+				... ...
+			};
+ 
+			说明：
+			FPQuestPtr quest2 = QWriter(...);
+			生成需要向客户端push/发送的请求。
+ 
+			FPAnswerPtr answer = sendQuest(ci, quest2);
+			向客户端发送请求，并获取结果。
+			本例发送的是同步请求，异步请求类似。
+ 
+			如果需要在请求处理函数外向客户端发送请求，方式如下：
+
+			异步Duplex参考代码：
+			#include "IQuestProcessor.h"
+			#include "TaskThreadPool.h"
+			using namespace fpnn;
+ 
+			class QuestProcessor: public IQuestProcessor
+			{
+				TaskThreadPool _delayAnswerPool; 
+				... ...
+				FPAnswerPtr duplexDemo(const FPReaderPtr args, const FPQuestPtr quest, const ConnectionInfo& ci)
+				{
+					//-- some codes
+					... ...
+
+					QuestSenderPtr sender = genQuestSender(ci);
+					_delayAnswerPool.wakeUp([sender](){
+					//-- some codes
+					... ...
+
+					FPQuestPtr quest2 = QWriter("duplex quest", false, FPMessage::FP_PACK_MSGPACK);
+					FPAnswerPtr answer = sender->sendQuest(quest2);
+				
+					//-- some codes
+					... ...
+					});
+		
+					//-- some codes
+					... ...
+
+					return ...
+				}
+
+				... ...
+			};
+ 
+			说明：
+			QuestSenderPtr sender = genQuestSender(ci);
+			生成异步请求发送对象。
+ 
+			_delayAnswerPool.wakeUp([sender](){
+					... ...
+					});
+			向自定义的线程池中压入异步任务。(示例代码中，异步任务为Lambda函数。实际情况可使用其他方式。)
+ 
+			FPAnswerPtr answer = sender->sendQuest(quest2);
+			在异步任务中，使用异步请求发送对象，向客户端发送请求，并获取应答。
+			本例演示的是在异步任务中，用异步请求发送对象同步发送请求。在异步任务中，用异步请求对象异步发送请求类似。
+			*. genQuestSender() 可以调用多次。异步请求发送对象可以生成多个，相互间除共用同一链接外，其余完全独立。
+			*. 异步请求对象支持并行发送请求。
+			*. 支持同一连接上多个异步请求对象并行发送请求。
+			
+		f. HTTP支持
+			FPNN 框架支持直接处理 HTTP POST 请求。
+			默认情况下，FPNN 框架只处理TCP请求。如果配置项
+			FPNN.server.http.supported
+			为 true，则在支持TCP请求的同时，支持 HTTP POST请求。请求URL为
+			http://<host>:<port>/service/<method name>
+			数据格式要求为JSON字典。
+ 
+			参考：
+			fpnn/core/test 目录下:
+			test.php
+			FPNN 框架允许(不赞同)在同一个链接上混合发送TCP和HTTP请求。
+			相关配置项：
+			FPNN.server.http.closeAfterAnswered
+			*. 当该配置项为 true 时，如果在该链接上有多个请求被发送，则当第一个HTTP请求接受完成后，后续其余请求将被忽略。
+			*. 当该配置项为 true 时，如果该链接的使用方式非一问一答，而是有多个请求等待应答，则有可能有请求的应答不会被发送（但至少有一个应答被发送）。
+
+			*. 当该配置项为 false 时，类似于 HTTP keep alive。可以在同一个链接上，发送多个请求/应答。
+			*. 当该配置项为 false 时，包含以下副作用：
+			1. TCP和HTTP请求/应答可以(不赞同)被混合发送；
+			2. HTTP 请求可以(不赞同)处于多问多答，而非一问一答模式。
+			
+			FPNN.server.http.cross.origin
+			跨域访问支持
+
+		g. 高级配置
+			完整的配置项列表，请参见“附录：完整的配置文件模版”。
+
+			FPNN.global.max.package.len
+			数据包大小限制
+
+			FPNN.global.io.thread.min.size
+			FPNN.global.io.thread.max.size
+			io线程池大小(与客户端共享)。默认为CPU核心数量。
+
+			FPNN.server.iobuffer.chunk.size
+			数据接收缓冲区内存链单块大小。
+			FPNN.server.work.queue.max.size
+			服务器请求队列最大长度。
+
+			FPNN.server.work.thread.min.size
+			FPNN.server.work.thread.max.size
+			请求处理线程池大小。默认为CPU核心数量。强烈建议根据具体服务适当调整，以获取最优性能。
+
+			FPNN.server.duplex.thread.min.size
+			FPNN.server.duplex.thread.max.size
+			duplex 模式下，请求回调处理线程池大小。默认关闭。如果需要在 duplex 模式下使用 twoway 消息，该线程池必须被配置。
+
+			FPNN.server.preset.signal
+			fpnn 服务是否处理退出/关闭等系统信号。
+
+			FPNN.server.perfect.connections
+			服务器同时处理的最佳链接数量。将影响管理链接的 hash map 的大小。
+
+		h. 注意事项
+			*. 从版本 1.0.2 开始，框架内置的方法和连接建立事件会优先于所有用户方法执行。
+			如果框架内置方法在任务队列中积压，则框架内置方法将以先进后出的顺序被调用，类似堆栈；所有用户方法将以正常的先进先出顺序被调用。
+
+
+	2. 客户端
+		a. 链接事件
+			客户端需要设置 QuestProcessor 才能处理链接事件。
+			
+			链接建立事件
+			virtual void connected(const ConnectionInfo&) {}
+			链接已经建立。在该函数返回前，链接将被阻塞，不能进行数据收发操作。
+
+			链接关闭事件 [new for FPNN.v2]
+			virtual void connectionWillClose(const ConnectionInfo&, bool closeByError) {}
+			链接将被关闭。进入该事件后，该链接上的收发操作将不再成功。
+			closeByError 标识链接是否因为错误而被关闭，还是主动／正常关闭。
+
+			链接关闭事件 [Deprecated in FPNN.v2, will removed in FPNN.v3.]
+			virtual void connectionClose(const ConnectionInfo&) {}
+			链接将被关闭。进入该事件后，该链接上的收发操作将不再成功。
+
+			链接错误(将被关闭)事件 [Deprecated in FPNN.v2, will removed in FPNN.v3.]
+			virtual void connectionErrorAndWillBeClosed(const ConnectionInfo&) {}
+			链接发生错误，将被关闭。进入该事件后，该链接上的收发操作将不再成功。
+ 
+			注意：
+			可能出现的状况：闪联。
+			此时，fpnn 框架保证 connected() 调用完成后，connectionClose() 或 connectionErrorAndWillBeClosed() 才会被调用。
+ 
+			请求方法错误
+			virtual FPAnswerPtr unknownMethod(const std::string& method_name, const FPReaderPtr args, const FPQuestPtr quest, const ConnectionInfo& connInfo)
+			当请求的方法不存在时，将进入该事件。默认返回 FPNN_EC_CORE_UNKNOWN_METHOD 错误。
+
+		b. client server & duplex 双向通道
+			客户端需要启用 duplex 模式，成为 client server 才能处理服务器发送/push过来的消息和请求。
+
+			客户端启用 duplex 模式需要以下两个步骤：
+				i. 客户端设置 QuestProcessor。QuestProcessor 包含服务器请求所对应的方法。
+				ii. 启动请求处理线程池。
+					启动请求处理线程池有三种方法：
+						1. 配置文件配置
+							FPNN.client.duplex.thread.min.size
+							FPNN.client.duplex.thread.max.size
+							两项，启动全局请求处理线程池。需大于 0。
+
+						2. 调用 ClientEngine::configQuestProcessThreadPool() 接口，启动全局请求处理线程池：
+							void ClientEngine::configQuestProcessThreadPool(int32_t initCount, int32_t perAppendCount, int32_t perfectCount, int32_t maxCount, size_t maxQueueSize);
+
+						3. 调用客户端 enableQuestProcessThreadPool() 接口，启动客户端私有请求处理线程池：
+							void enableQuestProcessThreadPool(int32_t initCount, int32_t perAppendCount, int32_t perfectCount, int32_t maxCount, size_t maxQueueSize);
+
+			Client duplex QuestProcessor 示例代码：
+			#include "IQuestProcessor.h"
+			using namespace fpnn;
+
+			class QuestProcessor: public IQuestProcessor
+			{
+				QuestProcessorClassPrivateFields(QuestProcessor)
+			public:
+				//-- oneway
+				FPAnswerPtr demoOneway(const FPReaderPtr args, const FPQuestPtr quest, const ConnectionInfo& ci)
+				{
+					//-- TODO
+					//-- You codes. 
+					return NULL;   //-- one way method will return NULL.
+				}
+				//-- twoway
+				FPAnswerPtr demoTwoway(const FPReaderPtr args, const FPQuestPtr quest, const ConnectionInfo& ci)
+				{
+					//-- TODO
+					//-- You codes.
+					return something;	//-- Two way method need to return a FPAnswerPtr.
+				}
+				QuestProcessor()
+				{
+					registerMethod("one way demo", &QuestProcessor::demoOneway);
+					registerMethod("two way demo", &QuestProcessor::demoTwoway);
+				}
+				~QuestProcessor(){
+				}
+				QuestProcessorClassBasicPublicFuncs
+			};
+
+			在 duplex client 的 QuestProcessor 里，以server端 QuestProcessor::sendQuest() 或 异步请求对象
+			QuestSenderPtr sender = genQuestSender(ci);
+			sender->sendQuest(quest);
+			的方式向服务器发送请求，本质等价于通过客户端 sendQuest() 接口发送请求，服务器端会按照标准客户端请求过来处理。
+
+			但这两种方式有一点不同：
+			使用 QuestProcessor::sendQuest() 或 异步请求对象，请求的超时由配置文件/ClientEngine 的全局超时控制；
+			使用客户端的 sendQuest() ，请求超时优先由客户端的设置控制。在客户端未设置的情况下，才由配置文件/ClientEngine 的全局超时控制。
+
+		c. duplex 提前返回
+			所有细节与服务器端的“提前返回”完全相同，请参考服务器端的“提前返回”。
+
+		d. duplex 延迟返回 & 异步返回
+			所有细节与服务器端的“延迟返回 & 异步返回”完全相同，请参考服务器端的“延迟返回 & 异步返回”。
+
+		e. 异步操作简化
+ 
+			该方法仅做优化参考，一般情况下不赞同使用。
+ 
+			当客户端空闲时，开发者可直接使用 ClientEngine::wakeUpAnswerCallbackThreadPool(std::shared_ptr<ITaskThreadPool::ITask> task) 应答回调线程池处理异步任务，而无需另外启动线程池。在启用了全局请求处理线程池时，亦可用 ClientEngine::wakeUpQuestProcessThreadPool(std::shared_ptr<ITaskThreadPool::ITask> task) 处理异步线程任务。
+
+			但若客户端业务繁忙，这样做将阻碍应答回调或服务器请求的快速处理。如果有耗时异步任务，这样做也将阻碍应答回调或服务器请求的及时处理。
+
+		f. 高级配置
+			完整的配置项列表，请参见“附录：完整的配置文件模版”。
+			FPNN.client.quest.log = false
+			client是否记录请求日志
+			FPNN.client.answer.log = false
+			client是否记录answer日志
+			FPNN.client.slow.log = false
+			client是否记录slow日志
+			FPNN.client.quest.timeout = 5
+			客户端请求超时。单位 秒
+
+			FPNN.global.max.package.len
+			数据包大小限制
+
+			FPNN.global.io.thread.min.size
+			FPNN.global.io.thread.max.size
+			io线程池大小(与客户端共享)。默认为CPU核心数量。
+
+			FPNN.client.iobuffer.chunk.size
+			数据接收缓冲区内存链单块大小(暂时忽略)。
+ 
+			FPNN.client.work.queue.max.size = 100000
+			duplex 客户端服务器请求接收队列最大长度。
+ 
+			FPNN.client.work.thread.min.size
+			FPNN.client.work.thread.max.size
+			answer回调处理线程池大小。默认为CPU核心数量。强烈建议根据具体服务适当调整，以获取最优性能。
+
+			FPNN.client.duplex.thread.min.size = 0
+			FPNN.client.duplex.thread.max.size = 0
+			duplex 模式下，服务器请求处理线程池大小。默认关闭。
+
+		g. 集群客户端
+			集群客户端，即以使用单一客户端的方式，对多服务器进行连接访问。
+			目前包含5类集群客户端：Carp Proxy，Prior Proxy，Rotatory Proxy，Random Proxy，Consistency Proxy。
+			具体内容请参考“三、扩展”的“2. Proxies”部分。
+
+		h. 注意事项
+			N/A
+
+三、扩展：
+	1. DBResultReader
+		DBProxy 服务 query 接口返回结果读取器。支持随机读取。
+
+		使用：
+		请参考源代码（很简单）。
+
+	2. Proxies
+		目前包含4类：Carp Proxy，Rotatory Proxy，Random Proxy，Consistency Proxy。
+		每类包含普通版本(无集群管理服务)和FPZK(Funplus Cluster Manager)版本。
+		以上8种Proxy均支持异步、同步、异步duplex独享QuestProcessor、异步duplex共享QuestProcessor、同步duplex独享QuestProcessor、同步duplex共享QuestProcessor 6种模式。
+
+		FPZK版本的 Rotatory Proxy、Random Proxy 会自动清除失效的endpoint信息，普通版本 Proxies 不会自动清除。
+
+		Consistency Proxy 可以指定一致性成功的条件：所有均成功才视为成功、半数成功、指定数目成功、任一成功。
+		Consistency Proxy 不支持 one way 的 quest，其余 proxies 没有该限制。
+		鉴于效率的考虑，Consistency Proxy 会引发广播风暴，且当其一致性成功条件不为全部成功才视为成功时，服务器端可能会产生大量的 answer 发送错误。
+
+			a. Proxy通用接口
+
+				设置proxy内，每个client私有QuestProcessor：
+				void enablePrivateQuestProcessor(IQuestProcessorFactoryPtr factory);
+
+				设置proxy内，所有client共享QuestProcessor：
+				void setSharedQuestProcessor(IQuestProcessorPtr sharedQuestProcessor);
+
+				以上两个接口互斥。
+
+				设置proxy独享，proxy内所有client共享QuestProcessThreadPool：
+				void setSharedQuestProcessThreadPool(TaskThreadPoolPtr questProcessPool); 
+				普通版本 Proxy 服务器更新接口：
+				void updateEndpoints(const std::vector<std::string>& newEndpoints);
+				该接口对 FPZK 版本同样有效，但 FPZK 版本通过 FPZKClient 进行更新，因此不建议 FPZK 版本使用该接口。
+
+
+			b. TCPCarpProxy & TCPFPZKCarpProxy
+				一致性哈希集群代理。
+
+				通用接口参见“Proxy通用接口”部分。
+
+				获取 client：
+					TCPClientPtr getClient(int64_t key, bool connect);
+					TCPClientPtr getClient(const std::string& key, bool connect);
+
+				发送消息：
+					FPAnswerPtr sendQuest(int64_t key, FPQuestPtr quest);
+					bool sendQuest(int64_t key, FPQuestPtr quest, AnswerCallback* callback);
+					bool sendQuest(int64_t key, FPQuestPtr quest, std::function<void (FPAnswerPtr answer, int errorCode)> task);
+
+					FPAnswerPtr sendQuest(const std::string& key, FPQuestPtr quest);
+					bool sendQuest(const std::string& key, FPQuestPtr quest, AnswerCallback* callback);
+					bool sendQuest(const std::string& key, FPQuestPtr quest, std::function<void (FPAnswerPtr answer, int errorCode)> task);
+ 
+ 
+			c. TCPRotatoryProxy & TCPFPZKRotatoryProxy
+				轮转集群代理。
+				TCPFPZKRotatoryProxy 会自动删除失效的endpoints, TCPRotatoryProxy 不会。
+
+				通用接口参见“Proxy通用接口”部分。
+
+				获取 client：
+					TCPClientPtr getClient(bool connect);
+
+				发送消息：
+					FPAnswerPtr sendQuest(FPQuestPtr quest);
+					bool sendQuest(FPQuestPtr quest, AnswerCallback* callback);
+					bool sendQuest(FPQuestPtr quest, std::function<void (FPAnswerPtr answer, int errorCode)> task);
+
+
+			d. TCPRandomProxy & TCPFPZKRandomProxy
+				随机集群代理。
+				TCPFPZKRandomProxy 会自动删除失效的endpoints, TCPRandomProxy 不会。
+
+				通用接口参见“Proxy通用接口”部分。
+
+				获取 client：
+					TCPClientPtr getClient(bool connect);
+
+				发送消息：
+					FPAnswerPtr sendQuest(FPQuestPtr quest);
+					bool sendQuest(FPQuestPtr quest, AnswerCallback* callback);
+					bool sendQuest(FPQuestPtr quest, std::function<void (FPAnswerPtr answer, int errorCode)> task);
+
+
+			e. TCPConsistencyProxy & TCPFPZKConsistencyProxy
+				强一致性集群代理。
+
+				强一致性类型：
+					ConsistencySuccessCondition::AllQuestsSuccess：全部成功
+					ConsistencySuccessCondition::HalfQuestsSuccess：半数或以上成功
+					ConsistencySuccessCondition::CountedQuestsSuccess：至少指定数量成功
+					ConsistencySuccessCondition::OneQuestSuccess：任一成功
+
+				通用接口参见“Proxy通用接口”部分。
+
+				发送消息：
+					FPAnswerPtr sendQuest(FPQuestPtr quest);
+					bool sendQuest(FPQuestPtr quest, AnswerCallback* callback);
+					bool sendQuest(FPQuestPtr quest, std::function<void (FPAnswerPtr answer, int errorCode)> task);
+
+					FPAnswerPtr sendQuest(FPQuestPtr quest, ConsistencySuccessCondition condition, int requiredCount = 0);
+					bool sendQuest(FPQuestPtr quest, AnswerCallback* callback, ConsistencySuccessCondition condition, int requiredCount = 0);
+					bool sendQuest(FPQuestPtr quest, std::function<void (FPAnswerPtr answer, int errorCode)> task, ConsistencySuccessCondition condition, int requiredCount = 0);
+
+四、附录：
+	1. 完整的配置文件模版
+
+		#当前server 名字
+		FPNN.server.name = 
+		#Listen IP,为空则listen所有IP
+		FPNN.server.listening.ip = 
+		#Listen Port
+		FPNN.server.listening.port = 
+		#Listen backlog大小
+		FPNN.server.backlog.size = 
+		#server 是否监听 IPv6 地址
+		FPNN.server.ipv6.listening.enable = false
+		FPNN.server.ipv6.listening.ip = 
+		FPNN.server.ipv6.listening.port = 
+		
+		# 是否启用 ECC-AES 加密
+		FPNN.server.security.ecdh.enable = false
+		# curve 取值: secp256k1, secp256r1, secp224r1, secp192r1
+		FPNN.server.security.ecdh.curve = 
+		# privateKey 指向 privateKey (binary format, not Hex) 的文件路径
+		FPNN.server.security.ecdh.privateKey = 
+		#所有用户接口，是否只允许加密访问
+		FPNN.server.security.forceEncrypt.userMethods = false
+
+		#server 是否支持http Post请求
+		FPNN.server.http.supported = false
+		#Server 是否支持统计,包括请求数,QPS等等,开启本项 会影响性能
+		FPNN.server.stat = true
+		#是否记录Server 收到的quest请求日志
+		FPNN.server.quest.log = false
+		#是否记录Server 的answer 日志
+		FPNN.server.answer.log = false
+		#是否记录server的slow日志,毫秒为单位
+		FPNN.server.slow.log = 0
+		#作为client的时候,是否记录请求日志
+		FPNN.client.quest.log = false
+		#作为client的时候,是否记录answer日志
+		FPNN.client.answer.log = false
+		#作为client的时候,是否记录 slow 日志
+		FPNN.client.slow.log = false
+		#是否将状态信息定时写入日志(1.0.2版后生效。1.0.2版为INFO级别，1.0.3版及之后为WARN级别)
+		FPNN.server.status.logStatusInfos = false
+		#状态信息间隔多长时间写入一次(单位：秒。1.0.2版后生效)
+		FPNN.server.status.logStatusInterval = 60
+		#最大可打开句柄数
+		FPNN.server.rlimit.max.nofile = 100000
+		#Core 文件大小
+		FPNN.server.rlimit.core.size = 0
+		#线程堆栈大小, M 为单位
+		FPNN.server.rlimit.stack.size = 8
+		#Server 给client push 请求 超时时间,秒为单位
+		FPNN.server.quest.timeout = 5
+		#Connection idle 时间,秒为单位
+		FPNN.server.idle.timeout = 60
+		#作为client 使用的时候,请求其他server 超时时间,单位 秒
+		FPNN.client.quest.timeout = 5
+		#日志服务器endpoint
+		FPNN.server.log.endpoint = 
+		#日志服务器route,即本服务器标示
+		FPNN.server.log.route = 
+		#日志级别, DEBUG,INFO,WARN,ERROR
+		FPNN.server.log.level = INFO
+
+		#显示指定机器信息
+		FP.server.domain =
+		FP.server.zone.name =
+		FP.server.region.name = 
+		FP.server.local.ip4 =
+		FP.server.public.ip4 =
+		FP.server.local.ip6 =
+		FP.server.public.ip6 =
+		#指定机器所属平台,目前仅有aws,qingcloud, 默认aws
+		FP.server.host.platform = 
+
+		###############################################
+		#  以下参数除非你知道什么意思,请不要随便配置  #
+		###############################################
+		FPNN.global.max.package.len = 
+		FPNN.global.io.thread.min.size = cpuCount
+		FPNN.global.io.thread.max.size = cpuCount
+		FPNN.client.iobuffer.chunk.size = 256
+		FPNN.client.max.event = 1000
+		FPNN.client.work.queue.max.size = 100000
+		FPNN.client.work.thread.min.size = cpuCount
+		FPNN.client.work.thread.max.size = cpuCount
+		FPNN.client.duplex.thread.min.size = 0
+		FPNN.client.duplex.thread.max.size = 0
+		FPNN.server.iobuffer.chunk.size = 256
+		FPNN.server.max.event = 10000
+		FPNN.server.work.queue.max.size = 2000000
+		FPNN.server.work.thread.min.size = cpuCount
+		FPNN.server.work.thread.max.size = cpuCount
+		FPNN.server.duplex.thread.min.size = 0
+		FPNN.server.duplex.thread.max.size = 0
+		FPNN.server.user = infras
+		FPNN.server.group = infras
+		FPNN.server.preset.signal = true
+		FPNN.server.max.connections = 500000
+		FPNN.server.perfect.connections = 100000
+		FPNN.server.http.closeAfterAnswered = true
+

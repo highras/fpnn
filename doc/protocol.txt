@@ -1,0 +1,62 @@
+ 0 1 2 3 4 5 6 7 8 9 a b c d e f 0 1 2 3 4 5 6 7 8 9 a b c d e f
+ +----------------------------------------------------------------+
+ |                             MAGIC                              |
+ +----------------------------------------------------------------+
+ |      VERSION  |       FLAG     |      Mtype    | Size o Status |
+ +----------------------------------------------------------------+
+ |                     PAYLOAD Size                               |
+ +----------------------------------------------------------------+ 
+ |                    ?SEQUENCE NUMBER                            |
+ +----------------------------------------------------------------+                
+ |                      ?Method Name                              |
+ |                      AND                                       |
+ |                      ?PAYLOAD                                  |
+ +----------------------------------------------------------------+
+
+
+ 1, MAGIC
+	1) FPNN
+	2) POST
+
+2, VERSION
+	Max 255
+
+3, FLAG
+	first 2 bits: 10, msgpack, 01 raw json, 11 not used
+	3: 0 not zipped, 1 zipped
+	4: 0 not encrypt, 1 encrypt
+
+4, Mtype
+	1) oneway: 0
+	2) twoway: 1
+	3) answer: 2
+
+5, Size OR Status
+	if reqeust or oneway, this field mean method name length
+	if answer message, this field mean status, 0 is ok, other is error.
+
+6, PAYLOAD Size(little endian byte order)
+	PAYLOAD length
+
+7, SEQUENCE NUMBER(little endian byte order)
+	only valid for twoway and answer, if oneway, do not have this field
+	range: 0– 4294967296，some language not support unsigned
+	one server have unique seq id, atomic<uint32_t>, start with 1
+	!!!!should not have the same id.
+
+8, Method name
+	max length is 255, if answer, do not have this field
+
+9, PAYLOAD  (We will not unpack data until you require the field)
+	1) raw json
+	2) msgpack data
+
+10, 
+	This format only for FPNN, if POST, then think it as HTTP protocol.
+
+11, HTTP
+	only support raw json,  set flags in header or cookie to identify it.
+
+12, TCP
+	support msgpack, raw json.
+
