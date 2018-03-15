@@ -12,6 +12,9 @@
 
 [frame usage](doc/frame-usage.txt)
 
-system required:
-centos >= 7.0
-g++ >= 4.8.5
+
+## system required: ##  
+**centos >= 7.0**  
+**g++ >= 4.8.5**  
+
+
