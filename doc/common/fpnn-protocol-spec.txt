@@ -17,14 +17,13 @@
  1, MAGIC
 	1) FPNN
 	2) POST
+	3) GET
 
 2, VERSION
 	Max 255
 
 3, FLAG
 	first 2 bits: 10, msgpack, 01 raw json, 11 not used
-	3: 0 not zipped, 1 zipped
-	4: 0 not encrypt, 1 encrypt
 
 4, Mtype
 	1) oneway: 0
@@ -48,15 +47,15 @@
 	max length is 255, if answer, do not have this field
 
 9, PAYLOAD  (We will not unpack data until you require the field)
-	1) raw json
+	1) raw json (UTF-8)
 	2) msgpack data
 
 10, 
-	This format only for FPNN, if POST, then think it as HTTP protocol.
+	This format only for FPNN, if POST or GET, then think it as HTTP protocol.
 
 11, HTTP
-	only support raw json,  set flags in header or cookie to identify it.
+	only support raw json (UTF-8),  set flags in header or cookie to identify it.
 
 12, TCP
-	support msgpack, raw json.
+	support msgpack, raw json (UTF-8).
 
