@@ -49,14 +49,13 @@
 
 1. FPNN v1.x 性能测试
 
-    请参考 [v.1.0.2性能纪录](v.1.0.2性能纪录.numbers) (**MacOS Numbers 格式**)
+    请参考 <fpnn-folder>/doc/ 目录下 v.1.0.2性能纪录.numbers (**MacOS Numbers 格式**)
 
 1. FPNN v2.0.0 性能测试
 
-    请参考
-
-    [v.2.0.0性能纪录](v.2.0.0性能纪录.numbers)
-
-    [v.2.0.0 massiveStressRecords](v.2.0.0 massiveStressRecords.numbers)
+    请参考 <fpnn-folder>/doc/ 目录下
+        
+    + v.2.0.0性能纪录.numbers
+    + v.2.0.0 massiveStressRecords.numbers
 
     **以上均为 MacOS Numbers 格式**
