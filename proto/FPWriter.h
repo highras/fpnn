@@ -225,16 +225,26 @@ class FPAWriter : public FPWriter{
 
 		FPAnswerPtr take();
 	public:
-		static FPAnswerPtr errorAnswer(const FPQuestPtr quest, int code = 0, const std::string& ex = "", const std::string& raiser = "");
-		static FPAnswerPtr errorAnswer(const FPQuestPtr quest, int code = 0, const char* ex = "", const char* raiser = "");
+		static FPAnswerPtr errorAnswer(const FPQuestPtr quest, int32_t code = 0, const std::string& ex = "", const std::string& raiser = "");
+		static FPAnswerPtr errorAnswer(const FPQuestPtr quest, int32_t code = 0, const char* ex = "", const char* raiser = "");
 		static FPAnswerPtr emptyAnswer(const FPQuestPtr quest);
-	private:
+	public:
 		FPAWriter(size_t size, uint16_t status, const FPQuestPtr quest)
 			: FPWriter(size), _answer(new FPAnswer(status, quest)){
 		}
 	private:
 		FPAnswerPtr _answer;
 };
+
+#define FpnnErrorAnswer(quest, code, ex) \
+	({  \
+	std::string exx(ex); \
+	FPAWriter aw(2, FPAnswer::FP_ST_ERROR, quest); \
+	aw.param("code", (int32_t)code); \
+	aw.param("ex", exx); \
+	LOG_ERROR("ERROR ANSWER: code(%d), exception(%s), QUEST(%s)", code, exx.c_str(), quest->info().c_str()); \
+	aw.take(); \
+	})
 
 }
 

@@ -181,7 +181,7 @@ void QReaderPayload(const char* payload, size_t len){
 
 FPAnswerPtr AWriter(FPQuestPtr quest, int status = 0){
 	if(status!=0 && status!=200){
-		return FPAWriter::errorAnswer(quest, 300, "exceptions", "raiser");
+		return FpnnErrorAnswer(quest, 300, "exceptions");
 	}
 	FPAWriter aw(6, quest);
 	aw.param("answer", "one");
@@ -213,7 +213,7 @@ FPAnswerPtr AWriter(FPQuestPtr quest, int status = 0){
 
 FPAnswerPtr AHTTPWriter(FPQuestPtr quest, int status = 0){
 	if(status!=0 && status!=200){
-		return FPAWriter::errorAnswer(quest, 400, "http test exceptions", "raiser");
+		return FpnnErrorAnswer(quest, 400, "http test exceptions");
 	}
 	FPAWriter aw(6, quest);
 	aw.param("answer", "one");

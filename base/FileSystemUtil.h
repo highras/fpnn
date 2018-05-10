@@ -29,6 +29,14 @@ namespace fpnn
 		bool getFileNameAndExt(const std::string& file, std::string& name, std::string& ext);
 
 		bool readFileAndAttrs(const std::string& file, FileAttrs& attrs);
+
+
+		bool createDirectory(const char* path);
+		bool createDirectories(const char* path);
+		std::string getSelfExectuedFilePath();
+		
+		/* Only normal file, or symbolic which point a normal file, or sub-directories when excludeSubDirectories == false. */
+		std::vector<std::string> getFilesInDirectory(const char* directoryPath, bool excludeSubDirectories = true);
 	}
 }
 

@@ -104,12 +104,12 @@ namespace fpnn
 		int _socket;
 		uint64_t _token;
 		std::mutex* _mutex;
-		bool _forceJsonFormat;
+		// bool _forceJsonFormat;
 		IConcurrentSender* _concurrentSender;
 
 	public:
 		QuestSender(IConcurrentSender* concurrentSender, const ConnectionInfo& ci, std::mutex* mutex):
-			_socket(ci.socket), _token(ci.token), _mutex(mutex), _forceJsonFormat(ci.isWebSocket()),
+			_socket(ci.socket), _token(ci.token), _mutex(mutex), // _forceJsonFormat(ci.isWebSocket()),
 			_concurrentSender(concurrentSender) {}
 
 		virtual ~QuestSender() {}
@@ -120,33 +120,33 @@ namespace fpnn
 		*/
 		virtual FPAnswerPtr sendQuest(FPQuestPtr quest, int timeout = 0)
 		{
-			if (_forceJsonFormat)
+			/*if (_forceJsonFormat)
 			{
 				quest->unsetFlag(FPMessage::FP_FLAG_MSGPACK);
 				quest->setFlag(FPMessage::FP_FLAG_JSON);
-			}
+			}*/
 
 			return _concurrentSender->sendQuest(_socket, _token, _mutex, quest, timeout * 1000);
 		}
 	
 		virtual bool sendQuest(FPQuestPtr quest, AnswerCallback* callback, int timeout = 0)
 		{
-			if (_forceJsonFormat)
+			/*if (_forceJsonFormat)
 			{
 				quest->unsetFlag(FPMessage::FP_FLAG_MSGPACK);
 				quest->setFlag(FPMessage::FP_FLAG_JSON);
-			}
+			}*/
 
 			return _concurrentSender->sendQuest(_socket, _token, quest, callback, timeout * 1000);
 		}
 	
 		virtual bool sendQuest(FPQuestPtr quest, std::function<void (FPAnswerPtr answer, int errorCode)> task, int timeout = 0)
 		{
-			if (_forceJsonFormat)
+			/*if (_forceJsonFormat)
 			{
 				quest->unsetFlag(FPMessage::FP_FLAG_MSGPACK);
 				quest->setFlag(FPMessage::FP_FLAG_JSON);
-			}
+			}*/
 
 			return _concurrentSender->sendQuest(_socket, _token, quest, std::move(task), timeout * 1000);
 		}
@@ -174,12 +174,12 @@ namespace fpnn
 
 		virtual bool sendErrorAnswer(int code = 0, const std::string& ex = "", const std::string& raiser = "")
 		{
-			FPAnswerPtr answer = FPAWriter::errorAnswer(getQuest(), code, ex, raiser);
+			FPAnswerPtr answer = FpnnErrorAnswer(getQuest(), code, ex + ", " + raiser);
 			return sendAnswer(answer);
 		}
 		virtual bool sendErrorAnswer(int code = 0, const char* ex = "", const char* raiser = "")
 		{
-			FPAnswerPtr answer = FPAWriter::errorAnswer(getQuest(), code, ex, raiser);
+			FPAnswerPtr answer = FpnnErrorAnswer(getQuest(), code, std::string(ex) + ", " + std::string(raiser));
 			return sendAnswer(answer);
 		}
 		virtual bool sendEmptyAnswer()
@@ -248,33 +248,33 @@ namespace fpnn
 		*/
 		virtual FPAnswerPtr sendQuest(const ConnectionInfo& connectionInfo, FPQuestPtr quest, int timeout = 0)
 		{
-			if (connectionInfo._isWebSocket)
+			/*if (connectionInfo._isWebSocket)
 			{
 				quest->unsetFlag(FPMessage::FP_FLAG_MSGPACK);
 				quest->setFlag(FPMessage::FP_FLAG_JSON);
-			}
+			}*/
 
 			return _concurrentSender->sendQuest(connectionInfo.socket, connectionInfo.token, connectionInfo._mutex, quest, timeout * 1000);
 		}
 	
 		virtual bool sendQuest(const ConnectionInfo& connectionInfo, FPQuestPtr quest, AnswerCallback* callback, int timeout = 0)
 		{
-			if (connectionInfo._isWebSocket)
+			/*if (connectionInfo._isWebSocket)
 			{
 				quest->unsetFlag(FPMessage::FP_FLAG_MSGPACK);
 				quest->setFlag(FPMessage::FP_FLAG_JSON);
-			}
+			}*/
 
 			return _concurrentSender->sendQuest(connectionInfo.socket, connectionInfo.token, quest, callback, timeout * 1000);
 		}
 	
 		virtual bool sendQuest(const ConnectionInfo& connectionInfo, FPQuestPtr quest, std::function<void (FPAnswerPtr answer, int errorCode)> task, int timeout = 0)
 		{
-			if (connectionInfo._isWebSocket)
+			/*if (connectionInfo._isWebSocket)
 			{
 				quest->unsetFlag(FPMessage::FP_FLAG_MSGPACK);
 				quest->setFlag(FPMessage::FP_FLAG_JSON);
-			}
+			}*/
 
 			return _concurrentSender->sendQuest(connectionInfo.socket, connectionInfo.token, quest, std::move(task), timeout * 1000);
 		}
@@ -293,7 +293,7 @@ namespace fpnn
 		virtual FPAnswerPtr unknownMethod(const std::string& method_name, const FPReaderPtr args, const FPQuestPtr quest, const ConnectionInfo& connInfo) 
 		{
 			if (quest->isTwoWay()){
-				return FPAWriter::errorAnswer(quest, FPNN_EC_CORE_UNKNOWN_METHOD, "Unknow method:" + method_name, connInfo.str().c_str());
+				return FpnnErrorAnswer(quest, FPNN_EC_CORE_UNKNOWN_METHOD, std::string("Unknow method:") + method_name + ", " + connInfo.str());
 			}
 			else{
 				LOG_ERROR("OneWay Quest, UNKNOWN method:%s. %s", method_name.c_str(), connInfo.str().c_str());
@@ -338,9 +338,9 @@ namespace fpnn
 			auto iter = _methodMap.find(method);	\
 			if (iter != _methodMap.end()) {	\
 				if ((iter->second.attributes & EncryptOnly) && connInfo.isEncrypted() == false)	\
-					return FPAWriter::errorAnswer(quest, FPNN_EC_CORE_FORBIDDEN, "Action is Forbidden!", connInfo.str().c_str()); \
+					return FpnnErrorAnswer(quest, FPNN_EC_CORE_FORBIDDEN, std::string("Action is Forbidden! ") + connInfo.str()); \
 				if ((iter->second.attributes & PrivateIPOnly) && connInfo.isPrivateIP() == false)	\
-					return FPAWriter::errorAnswer(quest, FPNN_EC_CORE_FORBIDDEN, "Action is Forbidden!", connInfo.str().c_str()); \
+					return FpnnErrorAnswer(quest, FPNN_EC_CORE_FORBIDDEN, std::string("Action is Forbidden! ") + connInfo.str()); \
 				return (this->*(iter->second.func))(args, quest, connInfo); }	\
 			else  \
 				return unknownMethod(method, args, quest, connInfo);	\

@@ -18,6 +18,7 @@ namespace StringUtil{
 	std::string& ltrim(std::string& s);
 	std::string& trim(std::string& s);
 
+	void softTrim(const char* path, char* &start, char* &end);		//-- [start, end). Not include char '*end'.
 	bool replace(std::string& str, const std::string& from, const std::string& to);
         
 	//will discard empty field

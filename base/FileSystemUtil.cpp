@@ -2,6 +2,11 @@
 #include <utime.h>
 #include <sys/types.h>
 #include <sys/stat.h>
+#include <unistd.h>
+#include <string.h>
+#include <dirent.h>
+#include <stddef.h>	//-- offsetof macro.
+#include "AutoRelease.h"
 #include "StringUtil.h"
 #include "md5.h"
 #include "hex.h"
@@ -107,4 +112,119 @@ bool FileSystemUtil::readFileAndAttrs(const std::string& file, FileAttrs& attrs)
 	attrs.sign = hexstr;
 
 	return true;
+}
+
+std::string FileSystemUtil::getSelfExectuedFilePath()
+{
+	const size_t BufferSize = 1024;
+	char pathBuffer[BufferSize];
+	
+	if (readlink("/proc/self/exe", pathBuffer, BufferSize) == -1)
+		return "";
+
+	char *pointer = strrchr(pathBuffer, '/');
+	if (pointer)
+	{
+		if (pointer != pathBuffer)
+			return std::string(pathBuffer, (size_t)(pointer - pathBuffer) + 1);
+		else
+			return "/";
+	}
+
+	return "";
+}
+
+bool FileSystemUtil::createDirectory(const char* path)
+{
+	if (access(path, F_OK /*| W_OK*/) != 0)		//-- Create the folder which don't exist.
+	{
+		if (mkdir(path, S_IRWXU | S_IRGRP | S_IROTH/*0700*/) == -1)
+			return false;
+	}
+	return true;
+}
+
+bool FileSystemUtil::createDirectories(const char* path)
+{
+	if (path == NULL)
+		return false;
+
+	char *start, *end;
+	StringUtil::softTrim(path, start, end);
+
+	if (start == NULL || start == end)
+		return false;
+
+	char *buffer = (char *)malloc(end - start + 1);
+	AutoFreeGuard afg(buffer);
+
+	char *dst = buffer;
+	char *src = start;
+
+	while (src != end)
+	{
+		*dst++ = *src++;
+
+		if (*(src - 1) == '/')
+		{
+			*dst = '\0';
+			if (createDirectory(buffer) == false)
+				return false;
+		}
+	}
+
+	*dst = '\0';
+	return createDirectory(buffer);
+}
+
+std::vector<std::string> FileSystemUtil::getFilesInDirectory(const char* directoryPath, bool excludeSubDirectories)
+{
+	std::vector<std::string> files;
+	DIR *dir = opendir(directoryPath);
+	if (dir == NULL)
+		return files;
+
+	long name_max = pathconf(directoryPath, _PC_NAME_MAX);
+	if (name_max == -1)         /* Limit not defined, or error */
+		name_max = 255;         /* Take a guess */
+	long len = offsetof(struct dirent, d_name) + name_max + 1;
+	struct dirent *entry = (struct dirent *)malloc(len);
+
+	AutoFreeGuard afg(entry);
+
+	while (true)
+	{
+		struct dirent *result;
+		if (readdir_r(dir, entry, &result) || !result)
+			break;
+
+		if (strcmp(entry->d_name, ".") == 0 || strcmp(entry->d_name, "..") == 0)
+			continue;
+
+		if (entry->d_type == DT_REG)
+		{
+			files.push_back(entry->d_name);
+		}
+		else if (entry->d_type == DT_DIR && !excludeSubDirectories)
+		{
+			files.push_back(entry->d_name);
+		}
+		else if (entry->d_type == DT_LNK || entry->d_type == DT_UNKNOWN)
+		{
+			std::string path(directoryPath);
+			path.append("/").append(entry->d_name);
+
+			struct stat statBuf;
+			if(stat(path.c_str(), &statBuf) == 0)
+			{
+				if (S_ISREG(statBuf.st_mode))
+					files.push_back(entry->d_name);
+				else if (S_ISDIR(statBuf.st_mode) && !excludeSubDirectories)
+					files.push_back(entry->d_name);
+			}
+		}
+	}
+
+	closedir(dir);
+	return files;
 }

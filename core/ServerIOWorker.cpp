@@ -248,7 +248,7 @@ bool TCPServerIOWorker::returnServerStoppingAnswer(TCPServerConnection * connect
 {
 	try
 	{
-		FPAnswerPtr answer = FPAWriter::errorAnswer(quest, FPNN_EC_CORE_SERVER_STOPPING, "", _server->sName());
+		FPAnswerPtr answer = FpnnErrorAnswer(quest, FPNN_EC_CORE_SERVER_STOPPING, _server->sName());
 		std::string *raw = answer->raw();
 		connection->_sendBuffer.appendData(raw);
 		return true;
@@ -341,7 +341,7 @@ bool TCPServerIOWorker::deliverQuest(TCPServerConnection * connection, FPQuestPt
 			{
 				try
 				{
-					FPAnswerPtr answer = FPAWriter::errorAnswer(quest, FPNN_EC_CORE_WORK_QUEUE_FULL, "Server queue full", connection->_connectionInfo->str().c_str());
+					FPAnswerPtr answer = FpnnErrorAnswer(quest, FPNN_EC_CORE_WORK_QUEUE_FULL, std::string("Server queue full, ") + connection->_connectionInfo->str());
 					std::string *raw = answer->raw();
 					connection->_sendBuffer.appendData(raw);
 				}

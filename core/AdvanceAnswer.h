@@ -31,7 +31,7 @@ namespace fpnn
 			if (_sent == false)
 			{
 				const char* defaultErrorInfo = "Answer is lost in normal logic. The error answer is sent for instead.";
-				FPAnswerPtr errAnswer = FPAWriter::errorAnswer(_quest, FPNN_EC_CORE_UNKNOWN_ERROR, _traceInfo.empty() ? defaultErrorInfo : _traceInfo, _traceRaiser);
+				FPAnswerPtr errAnswer = FpnnErrorAnswer(_quest, FPNN_EC_CORE_UNKNOWN_ERROR, (_traceInfo.empty() ? defaultErrorInfo : _traceInfo) + ", " +  _traceRaiser);
 				try
 				{
 					sendAnswer(errAnswer);

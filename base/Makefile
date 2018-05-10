@@ -6,7 +6,7 @@ OBJS_C = binary_abbr.o md5.o bit.o hashint.o jenkins.o obpool.o cpu.o \
 OBJS_CXX = FpnnError.o FunCarpSequence.o ParamThreadPool.o TaskThreadPool.o \
 		   ChainBuffer.o CachedChainBuffer.o StringUtil.o TimeUtil.o  \
 		   HSequence.o Setting.o ServerInfo.o FPLog.o \
-		   TimeAnalyst.o Statistician.o HostLookup.o Endian.o \
+		   TimeAnalyst.o HostLookup.o Endian.o \
 		   PrintMemory.o NetworkUtility.o MemoryPool.o HttpClient.o UnlockedMemoryPool.o \
 		   TableRow.o MidGenerator.o FPJson.o FPJsonParser.o FileSystemUtil.o gzpipe.o \
 		   FormattedPrint.o ResourceCenter.o FPTimer.o StringInt.o CommandLineUtil.o

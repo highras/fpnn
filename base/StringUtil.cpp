@@ -38,6 +38,29 @@ char * StringUtil::trim(char *s){
 	return rtrim(s);
 }
 
+void StringUtil::softTrim(const char* path, char* &start, char* &end)
+{
+	start = (char *)path;
+	if (!start)
+	{
+		end = NULL;
+		return;
+	}
+
+	while (start && *start != 0 && isspace(*start++));
+
+	end = start;
+	if (*start == 0)
+		return;
+	
+	start -= 1;
+	
+	char *forward = end;
+	while (*forward != 0)
+		if (!isspace(*forward++))
+			end = forward;
+}
+
 std::string& StringUtil::rtrim(std::string& s){
 	if(s.empty()) return s;
 	size_t size = s.find_last_not_of("\n\r\t ");

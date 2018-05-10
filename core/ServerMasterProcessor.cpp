@@ -225,7 +225,7 @@ FPAnswerPtr ServerMasterProcessor::tune(const FPReaderPtr args, const FPQuestPtr
 	if (_server->encrpytionEnabled() && !ci.isEncrypted())
 	{
 		LOG_ERROR("Server encryption enabled, but the tune quest is not encrypted. %s", ci.str().c_str());
-		return FPAWriter::errorAnswer(quest, FPNN_EC_CORE_FORBIDDEN, "Forbidden Operation", "Server");
+		return FpnnErrorAnswer(quest, FPNN_EC_CORE_FORBIDDEN, "Forbidden Operation");
 	}
 
 	try
@@ -334,7 +334,7 @@ void ServerMasterProcessor::dealQuest(RequestPackage * requestPackage)
 			if (requestPackage->_connectionInfo->isPrivateIP())
 				answer = (this->*(node->data))(args, quest, *(requestPackage->_connectionInfo));
 			else
-				answer = FPAWriter::errorAnswer(quest, FPNN_EC_CORE_FORBIDDEN, "Can not call internal method from external", requestPackage->_connectionInfo->str().c_str());
+				answer = FpnnErrorAnswer(quest, FPNN_EC_CORE_FORBIDDEN, std::string("Can not call internal method from external, ") + requestPackage->_connectionInfo->str());
 		}
 	}
 
@@ -349,7 +349,7 @@ void ServerMasterProcessor::dealQuest(RequestPackage * requestPackage)
 			if (quest->isTwoWay())
 			{
 				if (_questProcessor->getQuestAnsweredStatus() == false)
-					answer = FPAWriter::errorAnswer(quest, ex.code(), ex.what(), requestPackage->_connectionInfo->str().c_str());
+					answer = FpnnErrorAnswer(quest, ex.code(), std::string(ex.what()) + ", " + requestPackage->_connectionInfo->str());
 			}
 		}
 		catch (...)
@@ -358,7 +358,7 @@ void ServerMasterProcessor::dealQuest(RequestPackage * requestPackage)
 			if (quest->isTwoWay())
 			{
 				if (_questProcessor->getQuestAnsweredStatus() == false)
-					answer = FPAWriter::errorAnswer(quest, FPNN_EC_CORE_UNKNOWN_ERROR, "Unknow error when calling processQuest() function.", requestPackage->_connectionInfo->str().c_str());
+					answer = FpnnErrorAnswer(quest, FPNN_EC_CORE_UNKNOWN_ERROR, std::string("Unknow error when calling processQuest() function. ") + requestPackage->_connectionInfo->str());
 			}
 		}
 	}
@@ -377,7 +377,7 @@ void ServerMasterProcessor::dealQuest(RequestPackage * requestPackage)
 			return;
 		}
 		else if (!answer)
-			answer = FPAWriter::errorAnswer(quest, FPNN_EC_CORE_UNKNOWN_ERROR, "Twoway quest lose an answer.", requestPackage->_connectionInfo->str().c_str());
+			answer = FpnnErrorAnswer(quest, FPNN_EC_CORE_UNKNOWN_ERROR, std::string("Twoway quest lose an answer. ") + requestPackage->_connectionInfo->str());
 	}
 	else if (answer)
 	{
@@ -393,14 +393,14 @@ void ServerMasterProcessor::dealQuest(RequestPackage * requestPackage)
 			raw = answer->raw();
 		}
 		catch (const FpnnError& ex){
-			answer = FPAWriter::errorAnswer(quest, ex.code(), ex.what(), requestPackage->_connectionInfo->str().c_str());
+			answer = FpnnErrorAnswer(quest, ex.code(), std::string(ex.what()) + ", " + requestPackage->_connectionInfo->str());
 			raw = answer->raw();
 		}
 		catch (...)
 		{
 			/**  close the connection is to complex, so, return a error answer. It alway success? */
 
-			answer = FPAWriter::errorAnswer(quest, FPNN_EC_CORE_UNKNOWN_ERROR, "exception while do answer raw", requestPackage->_connectionInfo->str().c_str());
+			answer = FpnnErrorAnswer(quest, FPNN_EC_CORE_UNKNOWN_ERROR, std::string("exception while do answer raw, ") + requestPackage->_connectionInfo->str());
 			raw = answer->raw();
 		}
 

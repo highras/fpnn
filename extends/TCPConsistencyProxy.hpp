@@ -147,7 +147,7 @@ namespace fpnn
 		{
 			std::shared_ptr<SyncedAnswerCallback> s(new SyncedAnswerCallback(&_mutex, quest));
 			if (!broadcastQuest(quest, s.get(), _condition, _requiredCount, timeout))
-				return FPAWriter::errorAnswer(quest, FPNN_EC_CORE_SEND_ERROR, "unknown sending error.");
+				return FpnnErrorAnswer(quest, FPNN_EC_CORE_SEND_ERROR, "unknown sending error.");
 
 			return s->takeAnswer();
 		}
@@ -171,7 +171,7 @@ namespace fpnn
 		{
 			std::shared_ptr<SyncedAnswerCallback> s(new SyncedAnswerCallback(&_mutex, quest));
 			if (!broadcastQuest(quest, s.get(), condition, requiredCount, timeout))
-				return FPAWriter::errorAnswer(quest, FPNN_EC_CORE_SEND_ERROR, "unknown sending error.");
+				return FpnnErrorAnswer(quest, FPNN_EC_CORE_SEND_ERROR, "unknown sending error.");
 
 			return s->takeAnswer();
 		}

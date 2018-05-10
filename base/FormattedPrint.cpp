@@ -1,6 +1,46 @@
 #include <iostream>
 #include "FormattedPrint.h"
 
+std::string fpnn::formatBytesQuantity(unsigned long long quantity, int outputRankCount)
+{
+	const char sign[8] = {'Z', 'E', 'P', 'T', 'G', 'M', 'K', 'B'};
+	int sections[8];
+
+	if (quantity == 0)
+		return "0 B";
+
+	for (int i = 0; i < 8; i++)
+	{
+		unsigned long long upLevel = quantity / 1024;
+		sections[7 - i] = (int)(quantity - upLevel * 1024);
+		quantity = upLevel;
+	}
+
+	if (outputRankCount < 1 || outputRankCount > 8)
+		outputRankCount = 8;
+
+	std::string res;
+	for (int i = 0; i < 8; i++)
+	{
+		if (sections[i] == 0)
+			continue;
+
+		if (res.size())
+			res.append(" ");
+
+		res.append(std::to_string(sections[i])).append(" ").append(1, sign[i]);
+		outputRankCount -= 1;
+
+		if (outputRankCount == 0)
+			break;
+	}
+
+	if (res[res.length() - 1] != 'B')
+		res.append("B");
+
+	return res;
+}
+
 void fpnn::printTable(const std::vector<std::string>& fields, const std::vector<std::vector<std::string>>& rows)
 {
 	std::vector<size_t> fieldLens(fields.size(), 0);

@@ -50,4 +50,4 @@ all:
 
 clean:
 	$(RM) -f *.o $(EXES) $(JSON_Module) queueListPerformanceTest_O2 queueListPerformanceTest_O2_tcmalloc \
-		ThreadPoolPerformanceTest_O2 ThreadPoolPerformanceTest_O2_tcmalloc heapPerformanceTest_O2 heapPerformanceTest_O2_tcmalloc
+		ThreadPoolPerformanceTest_O2 ThreadPoolPerformanceTest_O2_tcmalloc heapPerformanceTest_O2 heapPerformanceTest_O2_tcmalloc rijndaelPerformance_O2

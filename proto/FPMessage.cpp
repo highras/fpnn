@@ -329,18 +329,21 @@ std::string* FPAnswer::rawHTTP(){
 		status = 101;
 
 	std::ostringstream header;
-	header <<
-		"HTTP/1.1 "<< status <<" " << httpcode_description(status) << _CRLF <<
-		"Date: " << TimeUtil::getTimeRFC1123() << _CRLF <<
-		"Server: FPNN/1.0" << _CRLF <<
-		"Content-Length: " << len << _CRLF <<
-		"Connection: Keep-Alive" << _CRLF;
-	if(_quest->http_header("Origin").size()){
-		header << "Access-Control-Allow-Origin: *" << _CRLF 
-			<< "Access-Control-Allow-Credentials: true" << _CRLF
-			<< "Access-Control-Allow-Methods: GET, POST" << _CRLF; 
+	header << "HTTP/1.1 "<< status <<" " << httpcode_description(status) << _CRLF;
+	if(websocket.empty())
+	{
+		header <<
+			"Date: " << TimeUtil::getTimeRFC1123() << _CRLF <<
+			"Server: FPNN/1.0" << _CRLF <<
+			"Content-Length: " << len << _CRLF <<
+			"Connection: Keep-Alive" << _CRLF;
+		if(_quest->http_header("Origin").size()){
+			header << "Access-Control-Allow-Origin: *" << _CRLF 
+				<< "Access-Control-Allow-Credentials: true" << _CRLF
+				<< "Access-Control-Allow-Methods: GET, POST" << _CRLF; 
+		}
 	}
-	if(websocket.size() > 0){
+	else {
 		header << "Upgrade: websocket" << _CRLF 
 			<< "Connection: Upgrade" << _CRLF;
 		std::string acceptKey = genWebsocketKey(websocket);
@@ -363,9 +366,9 @@ int64_t FPAnswer::timeCost(){
 
 std::string FPAnswer::info(){
 	std::ostringstream os; 
-	os << "Answer, Status("<<_status<<"),seqID(" << _quest->seqNum() << "),TCP(";
-	os << _quest->isTCP()<<"),Method(";
-	os << _quest->method()<<"),body("<<json()<<")";
+	os << "Answer, Status("<<_status<<"),seqID(" << (_quest ? _quest->seqNum() : 0) << "),TCP(";
+	os << (_quest ? _quest->isTCP() : false) <<"),Method(";
+	os << (_quest ? _quest->method() : "null")<<"),body("<<json()<<")";
 	return os.str();
 }
 
@@ -377,6 +380,6 @@ std::string FPAnswer::genWebsocketKey(const std::string& access){
 	char buf[128] = {0};
 	base64_t b64;
 	base64_init(&b64, (const char *)std_base64.alphabet);
-	int len = base64_encode(&b64, buf, digest, 20, BASE64_AUTO_NEWLINE);
+	int32_t len = base64_encode(&b64, buf, digest, 20, BASE64_AUTO_NEWLINE);
 	return std::string(buf, len);
 }

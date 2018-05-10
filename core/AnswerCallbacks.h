@@ -53,7 +53,7 @@ namespace fpnn
 		virtual void fillResult(FPAnswerPtr answer, int errorCode) final
 		{
 			if (!answer)
-				answer = FPAWriter::errorAnswer(_quest, errorCode, "no msg, please refer to log.:)");
+				answer = FpnnErrorAnswer(_quest, errorCode, "no msg, please refer to log.:)");
 
 			std::unique_lock<std::mutex> lck(*_mutex);
 			_answer = answer;

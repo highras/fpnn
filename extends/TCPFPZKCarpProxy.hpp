@@ -281,6 +281,14 @@ namespace fpnn
 			else
 				return false;
 		}
+		std::map<std::string, TCPClientPtr> getAllClients(){
+			std::unique_lock<std::mutex> lck(_mutex);
+			return 	_clients;
+		}
+		size_t count(){
+			std::unique_lock<std::mutex> lck(_mutex);
+			return 	_clients.size();
+		}
 	};
 	typedef std::shared_ptr<TCPFPZKCarpProxy> TCPFPZKCarpProxyPtr;
 }

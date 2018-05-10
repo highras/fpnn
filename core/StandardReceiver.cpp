@@ -51,7 +51,7 @@ bool StandardReceiver::recv(int fd, int length)
 		{
 			LOG_ERROR("Recv huge TCP data from socket: %d. Connection will be closed by framework.", fd);
 			return false;
-		}	
+		}
 	}
 
 	while (_curr < _total)

@@ -120,11 +120,11 @@ FPAnswerPtr FPAWriter::take(){
 	return a;
 }
 
-FPAnswerPtr FPAWriter::errorAnswer(const FPQuestPtr quest, int code, const std::string& ex, const std::string& raiser){
+FPAnswerPtr FPAWriter::errorAnswer(const FPQuestPtr quest, int32_t code, const std::string& ex, const std::string& raiser){
 	return errorAnswer(quest, code, ex.c_str(), raiser.c_str());
 }
 
-FPAnswerPtr FPAWriter::errorAnswer(const FPQuestPtr quest, int code, const char* ex, const char* raiser){
+FPAnswerPtr FPAWriter::errorAnswer(const FPQuestPtr quest, int32_t code, const char* ex, const char* raiser){
 	FPAWriter aw(3, FPAnswer::FP_ST_ERROR, quest);
 	aw.param("code", code);
 	aw.param("ex", ex);

@@ -11,11 +11,11 @@ bool EncryptedPackageReceiver::recv(int fd, int length)
 	if (length)
 	{
 		_total += length;
-		if (_total > Config::_max_recv_package_length)
+		/*if (_total > Config::_max_recv_package_length)
 		{
 			LOG_ERROR("Recv huge TCP data from socket: %d. Connection will be closed by framework.", fd);
 			return false;
-		}	
+		}*/
 	}
 
 	while (_curr < _total)
@@ -69,6 +69,12 @@ bool EncryptedPackageReceiver::recvPackage(int fd, bool& needNextEvent)
 	if (_getLength == false)
 	{
 		uint32_t len = le32toh(_packageLen);
+		if (len > (uint32_t)Config::_max_recv_package_length)
+		{
+			LOG_ERROR("Recv huge TCP data from socket: %d. Package length: %u. Connection will be closed by framework.", fd, len);
+			return false;
+		}
+
 		_packageLen = len;
 		_curr = 0;
 		_total = len;

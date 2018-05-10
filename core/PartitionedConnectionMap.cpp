@@ -116,7 +116,7 @@ namespace fpnn
 		std::shared_ptr<SyncedAnswerCallback> s(new SyncedAnswerCallback(mutex, quest));
 		if (!sendQuestWithBasicAnswerCallback(socket, token, quest, s.get(), timeout))
 		{
-			return FPAWriter::errorAnswer(quest, FPNN_EC_CORE_SEND_ERROR, "unknown sending error.");
+			return FpnnErrorAnswer(quest, FPNN_EC_CORE_SEND_ERROR, "unknown sending error.");
 		}
 
 		return s->takeAnswer();

@@ -249,7 +249,7 @@ void TCPClient::dealQuest(FPQuestPtr quest, ConnectionInfoPtr connectionInfo)		/
 			{
 				try
 				{
-					FPAnswerPtr answer = FPAWriter::errorAnswer(quest, FPNN_EC_CORE_WORK_QUEUE_FULL, "worker queue full", connectionInfo->str().c_str());
+					FPAnswerPtr answer = FpnnErrorAnswer(quest, FPNN_EC_CORE_WORK_QUEUE_FULL, std::string("worker queue full, ") + connectionInfo->str().c_str());
 					std::string *raw = answer->raw();
 					_engine->sendData(connectionInfo->socket, connectionInfo->token, raw);
 				}
@@ -314,7 +314,7 @@ void TCPClient::processQuest(FPQuestPtr quest, ConnectionInfoPtr connectionInfo)
 		if (quest->isTwoWay())
 		{
 			if (_questProcessor->getQuestAnsweredStatus() == false)
-				answer = FPAWriter::errorAnswer(quest, ex.code(), ex.what(), connectionInfo->str().c_str());
+				answer = FpnnErrorAnswer(quest, ex.code(), std::string(ex.what()) + ", " + connectionInfo->str());
 		}
 	}
 	catch (...){
@@ -322,7 +322,7 @@ void TCPClient::processQuest(FPQuestPtr quest, ConnectionInfoPtr connectionInfo)
 		if (quest->isTwoWay())
 		{
 			if (_questProcessor->getQuestAnsweredStatus() == false)
-				answer = FPAWriter::errorAnswer(quest, FPNN_EC_CORE_UNKNOWN_ERROR, "Unknown error when calling processQuest() function", connectionInfo->str().c_str());
+				answer = FpnnErrorAnswer(quest, FPNN_EC_CORE_UNKNOWN_ERROR, std::string("Unknown error when calling processQuest() function, ") + connectionInfo->str());
 		}
 	}
 
@@ -338,7 +338,7 @@ void TCPClient::processQuest(FPQuestPtr quest, ConnectionInfoPtr connectionInfo)
 			return;
 		}
 		else if (!answer)
-			answer = FPAWriter::errorAnswer(quest, FPNN_EC_CORE_UNKNOWN_ERROR, "Twoway quest lose an answer.", connectionInfo->str().c_str());
+			answer = FpnnErrorAnswer(quest, FPNN_EC_CORE_UNKNOWN_ERROR, std::string("Twoway quest lose an answer. ") + connectionInfo->str());
 	}
 	else if (answer)
 	{
@@ -354,14 +354,14 @@ void TCPClient::processQuest(FPQuestPtr quest, ConnectionInfoPtr connectionInfo)
 			raw = answer->raw();
 		}
 		catch (const FpnnError& ex){
-			FPAnswerPtr errAnswer = FPAWriter::errorAnswer(quest, ex.code(), ex.what(), connectionInfo->str().c_str());
+			FPAnswerPtr errAnswer = FpnnErrorAnswer(quest, ex.code(), std::string(ex.what()) + ", " + connectionInfo->str());
 			raw = errAnswer->raw();
 		}
 		catch (...)
 		{
 			/**  close the connection is to complex, so, return a error answer. It alway success? */
 
-			FPAnswerPtr errAnswer = FPAWriter::errorAnswer(quest, FPNN_EC_CORE_UNKNOWN_ERROR, "exception while do answer raw", connectionInfo->str().c_str());
+			FPAnswerPtr errAnswer = FpnnErrorAnswer(quest, FPNN_EC_CORE_UNKNOWN_ERROR, std::string("exception while do answer raw, ") + connectionInfo->str());
 			raw = errAnswer->raw();
 		}
 
@@ -439,10 +439,10 @@ FPAnswerPtr TCPClient::sendQuest(FPQuestPtr quest, int timeout)
 	if (!_connected)
 	{
 		if (!_autoReconnect)
-			return FPAWriter::errorAnswer(quest, FPNN_EC_CORE_CONNECTION_CLOSED, "Connection not inited.");
+			return FpnnErrorAnswer(quest, FPNN_EC_CORE_CONNECTION_CLOSED, "Connection not inited.");
 
 		if (!reconnect())
-			return FPAWriter::errorAnswer(quest, FPNN_EC_CORE_CONNECTION_CLOSED, "Reconnection failed.");
+			return FpnnErrorAnswer(quest, FPNN_EC_CORE_CONNECTION_CLOSED, "Reconnection failed.");
 	}
 
 	ConnectionInfoPtr connInfo;
