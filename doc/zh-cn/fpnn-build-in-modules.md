@@ -79,7 +79,6 @@
 | 性能 | 性能分析 | 耗时分析 | TimeAnalyst.h | 耗时分析。 |
 | 调试 | 输出 | 输出 | FormattedPrint.h | 打印表格。 |
 | 调试 | 输出 | 输出 | PrintMemory.h | 内存十六进制打印。 |
-| 统计 | 统计 | 统计 | Statistician.h | 通用统计。 |
 
 
 ## <fpnn-folder>/proto 目录
