@@ -6,7 +6,7 @@ EXES_CLIENT3 = memcacheClient
 CFLAGS +=
 CXXFLAGS +=
 CPPFLAGS += -g -I.. -I../../base -I../../proto -I../../proto/msgpack -I../../proto/rapidjson
-LIBS += -L.. -L../../base -L../../proto
+LIBS += -L.. -L../../base -L../../proto  -L../../extends
 
 OBJS_TEST = complexServer.o
 OBJS_TEST2 = simpleServer.o

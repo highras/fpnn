@@ -5,7 +5,7 @@ EXES_CLIENT2 = eccKeyMaker
 CFLAGS +=
 CXXFLAGS +=
 CPPFLAGS += -g -I.. -I../../base -I../../proto -I../../proto/msgpack -I../../proto/rapidjson
-LIBS += -L.. -L../../base -L../../proto
+LIBS += -L.. -L../../base -L../../proto  -L../../extends
 
 OBJS_CMD = cmd.o
 OBJS_CLIENT = fss.o linenoise.o
