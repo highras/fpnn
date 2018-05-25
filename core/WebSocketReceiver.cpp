@@ -12,6 +12,7 @@ void WebSocketReceiver::freeFragmentedDataList()
 		free(data._buf);
 
 	_fragmentedDataList.clear();
+	_currFragmentsTotalLength = 0;
 }
 
 bool WebSocketReceiver::recv(int fd)
@@ -156,7 +157,7 @@ bool WebSocketReceiver::processPayloadSize(int fd)
 	else
 		return false;
 
-	if (_payloadSize > (uint64_t)Config::_max_recv_package_length)
+	if (_payloadSize + _currFragmentsTotalLength > (uint64_t)Config::_max_recv_package_length)
 	{
 		LOG_ERROR("WebSocket client want send huge TCP data (size: %llu) to server, from socket: %d. Connection will be closed by framework.", _payloadSize, fd);
 		return false;
@@ -172,7 +173,7 @@ bool WebSocketReceiver::processPayloadSize(int fd)
 
 bool WebSocketReceiver::processMaskingKey(int fd)
 {
-	if (_payloadSize > (uint64_t)Config::_max_recv_package_length)
+	if (_payloadSize + _currFragmentsTotalLength > (uint64_t)Config::_max_recv_package_length)
 	{
 		LOG_ERROR("WebSocket client want send huge TCP data (size: %llu) to server, from socket: %d. Connection will be closed by framework.", _payloadSize, fd);
 		return false;
@@ -185,6 +186,7 @@ bool WebSocketReceiver::processMaskingKey(int fd)
 		frag._buf = (uint8_t*)malloc(_payloadSize);
 
 		_fragmentedDataList.push_back(frag);
+		_currFragmentsTotalLength += frag._len;
 
 		_recvStep = 3;
 		_currBuf = frag._buf;
@@ -233,7 +235,9 @@ bool WebSocketReceiver::fetch(FPQuestPtr& quest, FPAnswerPtr& answer, bool &isHT
 	{
 		if (_payloadSize > 0)
 		{
-			free(_fragmentedDataList.back()._buf);
+			struct FragmentedData &backNode = _fragmentedDataList.back();
+			_currFragmentsTotalLength -= backNode._len;
+			free(backNode._buf);
 			_fragmentedDataList.pop_back();
 		}
 		return true;
@@ -247,12 +251,15 @@ bool WebSocketReceiver::fetch(FPQuestPtr& quest, FPAnswerPtr& answer, bool &isHT
 	{
 		fullyData = _fragmentedDataList.back();
 		_fragmentedDataList.clear();
+		_currFragmentsTotalLength = 0;
 	}
 	else if (fragmentCount > 1)
 	{
-		fullyData._len = 0;
-		for (auto& frag: _fragmentedDataList)
-			fullyData._len += frag._len;
+		// fullyData._len = 0;
+		// for (auto& frag: _fragmentedDataList)
+		// 	fullyData._len += frag._len;
+
+		fullyData._len = _currFragmentsTotalLength;
 
 		uint64_t pos = 0;
 		fullyData._buf = (uint8_t*)malloc(fullyData._len);

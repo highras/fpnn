@@ -12,10 +12,10 @@
 + 目前，FPNN 仅支持 HTTP POST 与 GET 访问。
 + HTTP POST 与 GET 只能访问 twoway 类型的接口，访问 oneway 类型的接口，会产生异常日志。
 
-默认情况下，FPNN 应答 HTTP POST & GET 请求后，将立刻关闭当前链接。  
-如果希望保留当前链接，继续使用，请在配置文件中加入：
+默认情况下，FPNN 应答 HTTP POST & GET 请求后，将保持当前链接一段时间。链接保持时间取决于配置项 FPNN.server.idle.timeout。默认情况下为 60 秒。 
+如果希望回复后立刻关闭当前链接，请在配置文件中加入：
 
-	FPNN.server.http.closeAfterAnswered = false
+	FPNN.server.http.closeAfterAnswered = true
 
 注意：
 

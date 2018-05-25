@@ -65,12 +65,13 @@ namespace fpnn
 		inline bool isEncrypted() { return _connectionInfo->_encrypted; }
 		inline bool isWebSocket() { return _connectionInfo->_isWebSocket; }
 
-		inline int send(bool& needWaitSendEvent, std::string* data = NULL)
+		virtual int send(bool& needWaitSendEvent, std::string* data = NULL)
 		{
+			bool actualSent = false;
 			//-- _activeTime vaule maybe in confusion after concurrent Sending on one connection.
 			//-- But the probability is very low even server with high load. So, it hasn't be adjusted at current.
 			_activeTime = slack_real_sec();
-			return _sendBuffer.send(_connectionInfo->socket, needWaitSendEvent, data);
+			return _sendBuffer.send(_connectionInfo->socket, needWaitSendEvent, actualSent, data);
 		}
 		
 		TCPBasicConnection(std::mutex* mutex, int ioChunkSize, ConnectionInfoPtr connectionInfo):

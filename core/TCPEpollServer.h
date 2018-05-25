@@ -27,7 +27,7 @@ struct sockaddr_in;
 
 namespace fpnn
 {
-#define FPNN_SERVER_VERSION				"0.8.0"
+#define FPNN_SERVER_VERSION				"0.8.1"
 #define FPNN_DEFAULT_WORK_POOL_QUEUE_SIZE	2000000
 #define FPNN_DEFAULT_MAX_CONNECTION			500000
 #define FPNN_DEFAULT_SOCKET_BACKLOG			10000
@@ -336,6 +336,16 @@ namespace fpnn
 		inline void closeConnection(const ConnectionInfo& ci)
 		{
 			closeConnection(&ci);
+		}
+
+		/*
+			Experimental interface.
+			** Maybe change or remove in following version. **
+		*/
+		void closeConnectionAfterSent(const ConnectionInfo* ci);
+		inline void closeConnectionAfterSent(const ConnectionInfo& ci)
+		{
+			closeConnectionAfterSent(&ci);
 		}
 
 		/*===============================================================================

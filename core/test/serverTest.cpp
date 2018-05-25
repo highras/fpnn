@@ -192,6 +192,21 @@ public:
 		return FPAWriter(2, quest)("Simple","one")("Simple2", 2);
 	}
 
+	FPAnswerPtr closeAfterSent(const FPReaderPtr args, const FPQuestPtr quest, const ConnectionInfo& ci)
+	{
+		FPAnswerPtr answer = FPAWriter::emptyAnswer(quest);
+		sendAnswer(quest, answer);
+
+		bool duplex = args->getBool("duplex", false);
+		if (duplex)
+		{
+			FPQuestPtr quest2 = QWriter("one way duplex quest", true, FPMessage::FP_PACK_MSGPACK);
+			sendQuest(ci, quest2);
+		}
+		TCPEpollServer::instance()->closeConnectionAfterSent(ci);
+		return nullptr;
+	}
+
 	QuestProcessor()
 	{
 		registerMethod("one way demo", &QuestProcessor::demoOneway);
@@ -202,6 +217,7 @@ public:
 		registerMethod("httpDemo", &QuestProcessor::httpDemo);
 		registerMethod("duplex demo", &QuestProcessor::duplexDemo);
 		registerMethod("delay duplex demo", &QuestProcessor::delayDuplexDemo);
+		registerMethod("close after sent", &QuestProcessor::closeAfterSent);
 
 		_delayAnswerPool.init(1, 1, 1, 1);
 	}

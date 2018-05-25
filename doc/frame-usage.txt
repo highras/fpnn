@@ -784,5 +784,5 @@ void enableAnswerCallbackThreadPool(int32_t initCount, int32_t perAppendCount, i
 		FPNN.server.preset.signal = true
 		FPNN.server.max.connections = 500000
 		FPNN.server.perfect.connections = 100000
-		FPNN.server.http.closeAfterAnswered = true
+		FPNN.server.http.closeAfterAnswered = false
 

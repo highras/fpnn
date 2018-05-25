@@ -76,6 +76,7 @@ namespace fpnn
 		std::queue<std::string*> _outQueue;
 		uint64_t _sentBytes;		//-- Total Bytes
 		uint64_t _sentPackage;
+		bool _stopAppendData;
 		bool _encryptAfterFirstPackage;
 		Encryptor* _encryptor;
 
@@ -87,7 +88,8 @@ namespace fpnn
 
 	public:
 		SendBuffer(std::mutex* mutex): _mutex(mutex), _sendToken(true), _offset(0), _currBuffer(0),
-			_sentBytes(0), _sentPackage(0), _encryptAfterFirstPackage(false), _encryptor(NULL), _currBufferProcess(NULL) {}
+			_sentBytes(0), _sentPackage(0), _stopAppendData(false), _encryptAfterFirstPackage(false),
+			_encryptor(NULL), _currBufferProcess(NULL) {}
 		~SendBuffer()
 		{
 			while (_outQueue.size())
@@ -105,10 +107,11 @@ namespace fpnn
 		}
 
 		/** returned INT: id 0, success, else, is errno. */
-		int send(int fd, bool& needWaitSendEvent, std::string* data = NULL);
+		int send(int fd, bool& needWaitSendEvent, bool& actualSent, std::string* data = NULL);
 		bool entryEncryptMode(uint8_t *key, size_t key_len, uint8_t *iv, bool streamMode);
 		void encryptAfterFirstPackage() { _encryptAfterFirstPackage = true; }
 		void appendData(std::string* data);
+		void stopAppendData() { _stopAppendData = true; }
 		void entryWebSocketMode(std::string* data = NULL);	//-- if data not NULL, MUST set additionalSend in TCPServerIOWorker::read().
 	};
 }

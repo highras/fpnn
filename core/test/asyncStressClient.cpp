@@ -68,6 +68,8 @@ public:
 		if (pqps == 0)
 			pqps = 1;
 		int remain = _qps - pqps * _thread_num;
+		if (remain < 0)
+			remain = 0;
 
 		for(int i = 0 ; i < _thread_num; i++)
 			_threads.push_back(std::thread(&Tester::test_worker, this, pqps));

@@ -14,7 +14,7 @@ bool Config::_log_server_quest(false);
 bool Config::_log_server_answer(false);
 int16_t Config::_log_server_slow(0);
 bool Config::_server_http_supported(false);
-bool Config::_server_http_close_after_answered(true);
+bool Config::_server_http_close_after_answered(false);
 bool Config::_server_stat(true);
 bool Config::_server_preset_signals(true);
 int32_t Config::_server_perfect_connections(FPNN_PERFECT_CONNECTIONS);
@@ -65,7 +65,7 @@ void Config::initServerVaribles(){
 	_log_server_answer = Setting::getBool("FPNN.server.answer.log", false);
 	_log_server_slow = Setting::getInt("FPNN.server.slow.log", 0);
 	_server_http_supported = Setting::getBool("FPNN.server.http.supported", false);
-    _server_http_close_after_answered = Setting::getBool("FPNN.server.http.closeAfterAnswered", true);
+    _server_http_close_after_answered = Setting::getBool("FPNN.server.http.closeAfterAnswered", false);
 	_server_stat = Setting::getBool("FPNN.server.stat", true);
 	_server_preset_signals = Setting::getBool("FPNN.server.preset.signal", true);
 	_max_recv_package_length = Setting::getInt("FPNN.global.max.package.len", FPNN_DEFAULT_MAX_PACKAGE_LEN);

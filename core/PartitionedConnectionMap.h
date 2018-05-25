@@ -11,6 +11,7 @@
 #include "FPWriter.h"
 #include "AnswerCallbacks.h"
 #include "IOWorker.h"
+#include "ServerIOWorker.h"		//-- only for closeAfterSent().
 #include "msec.h"
 
 namespace fpnn
@@ -72,6 +73,28 @@ namespace fpnn
 				}
 			}
 			return NULL;
+		}
+
+		void closeAfterSent(const ConnectionInfo* ci)
+		{
+			bool needWaitSendEvent = false;
+			std::unique_lock<std::mutex> lck(_mutex);
+
+			HashMap<int, TCPBasicConnection*>::node_type* node = _connections.find(ci->socket);
+			if (node)
+			{
+				TCPBasicConnection* conn = node->data;
+				if ((uint64_t)conn == ci->token)
+				{
+					if (conn->connectionType() == TCPBasicConnection::ServerConnectionType)
+					{
+						TCPServerConnection *sconn = (TCPServerConnection*)conn;
+						sconn->closeAfterSent(needWaitSendEvent);
+						if (needWaitSendEvent)
+							conn->waitForAllEvents();
+					}
+				}
+			}
 		}
 
 		bool insert(int fd, TCPBasicConnection* connection)
@@ -202,6 +225,12 @@ namespace fpnn
 		{
 			int idx = ci->socket % _count;
 			return _array[idx]->takeConnection(ci);
+		}
+
+		void closeAfterSent(const ConnectionInfo* ci)
+		{
+			int idx = ci->socket % _count;
+			return _array[idx]->closeAfterSent(ci);
 		}
 
 		bool insert(int fd, TCPBasicConnection* conn)

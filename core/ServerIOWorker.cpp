@@ -445,6 +445,12 @@ void TCPServerIOWorker::run(TCPServerConnection * connection)
 	bool fdInvalid = false;
 	bool needWaitSendEvent = false;
 
+	if (connection->_requireClose)
+	{
+		closeConnection(connection, false);
+		return;
+	}
+
 	if (connection->_needSend)
 	{
 		if (sendData(connection, fdInvalid, needWaitSendEvent) == false)

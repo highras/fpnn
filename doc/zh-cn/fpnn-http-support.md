@@ -12,10 +12,10 @@ FPNN框架duplex模式下，仅Server端支持接收和回应来自客户端的H
 
 1. HTTP 支持默认关闭，需要显示配置 `FPNN.server.http.supported ＝ true` 方才接受HTTP请求。
 1. FPNN 默认支持 HTTP 和 TCP 包在同一个链接中混杂传递(FPNN持有该能力，但**强烈不建议使用**。一般情况下禁止TCP请求和HTTP请求在同一链接中混合发送)。
-1. 如果没有配置 `FPNN.server.http.closeAfterAnswered` 条目，默认在收到第一个 HTTP 请求后，停止在同一链接中接收新的请求（不论是HTTP还是TCP）。并在answer发送后，关闭链接。
+1. 如果没有配置 `FPNN.server.http.closeAfterAnswered` 条目，默认**不会**在发送完 HTTP 应答后关闭当前链接，而会保持当前链接一段时间。链接保持时间 取决于配置项 `FPNN.server.idle.timeout`。默认 60 秒。
+1. 如果配置 `FPNN.server.http.closeAfterAnswered = true`， 会在收到第一个 HTTP 请求后，停止在同一链接中接收新的请求（不论是HTTP还是TCP）。并在answer发送后，关闭链接。
 1. 目前忽略 HTTP 1.1 标准中 Keep-Alive操作，是否关闭链接取决于配置项 `FPNN.server.http.closeAfterAnswered` 和 `FPNN.server.idle.timeout`。
 1. 目前不支持HTTP 1.1 标准中连续发送 HTTP 请求时，顺序回应的要求。回应的先后顺序取决于请求的完成先后。
-1. 如果 `FPNN.server.http.closeAfterAnswered` 为 true， 禁止在同一链接中混合发送TCP和HTTP请求。
 
 
 ## 2. 相关配置

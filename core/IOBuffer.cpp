@@ -100,9 +100,9 @@ int SendBuffer::realSend(int fd, bool& needWaitSendEvent)
 	}
 }
 
-int SendBuffer::send(int fd, bool& needWaitSendEvent, std::string* data)
+int SendBuffer::send(int fd, bool& needWaitSendEvent, bool& actualSent, std::string* data)
 {
-	if (data && data->empty())
+	if (data && (data->empty() || _stopAppendData))
 	{
 		delete data;
 		data = NULL;
@@ -114,14 +114,18 @@ int SendBuffer::send(int fd, bool& needWaitSendEvent, std::string* data)
 			_outQueue.push(data);
 
 		if (!_sendToken)
+		{
+			actualSent = false;
 			return 0;
+		}
 
 		_sendToken = false;
 	}
 
+	actualSent = true;
+
 	//-- Token will be return in realSend() function.
-	int err = realSend(fd, needWaitSendEvent); 	//-- ignore all error status. it will be deal in IO thread.
-	return err;
+	return realSend(fd, needWaitSendEvent); 	//-- ignore all error status. it will be deal in IO thread.
 }
 
 bool SendBuffer::entryEncryptMode(uint8_t *key, size_t key_len, uint8_t *iv, bool streamMode)
@@ -149,7 +153,7 @@ bool SendBuffer::entryEncryptMode(uint8_t *key, size_t key_len, uint8_t *iv, boo
 
 void SendBuffer::appendData(std::string* data)
 {
-	if (data && data->empty())
+	if (data && (data->empty() || _stopAppendData))
 	{
 		delete data;
 		return;

@@ -45,11 +45,9 @@ void TCPEpollServer::install_signal(){
 }
 
 void TCPEpollServer::stop_handler(int sig){ // should a static function
-	LOG_WARN("Got signal:%d.", sig);
 	bool status = _stopSignalTriggered.exchange(true);
 	if(_server && status == false)
 	{
-		//std::thread(&TCPEpollServer::stop, _server).detach();
 		_server->_stopSignalThread = std::thread(&TCPEpollServer::stop, _server);
 	}
 }
@@ -671,6 +669,8 @@ void TCPEpollServer::stop()
 {
 	if(!_running) return;
 
+	LOG_INFO("Server will go to stop!");
+
 	_stopping = true;
 	_ioWorker->serverWillStop();
 
@@ -813,6 +813,11 @@ void TCPEpollServer::closeConnection(const ConnectionInfo* ci)
 	clearConnectionQuestCallbacks(connection, FPNN_EC_CORE_CONNECTION_CLOSED);
 	if (_workerPool->forceWakeUp(requestPackage) == false)
 		cleanForExistConnectionError(connection, requestPackage, "Worker pool wake up for error or close event failed. Server is exiting.");
+}
+
+void TCPEpollServer::closeConnectionAfterSent(const ConnectionInfo* ci)
+{
+	_connectionMap.closeAfterSent(ci);
 }
 
 void TCPEpollServer::timeoutCheckThread()

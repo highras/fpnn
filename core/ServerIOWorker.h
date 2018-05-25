@@ -44,6 +44,28 @@ namespace fpnn
 		bool waitForRecvEvent();
 		void exitEpoll();
 
+		virtual int send(bool& needWaitSendEvent, std::string* data = NULL)
+		{
+			bool actualSent = false;
+			//-- _activeTime vaule maybe in confusion after concurrent Sending on one connection.
+			//-- But the probability is very low even server with high load. So, it hasn't be adjusted at current.
+			_activeTime = slack_real_sec();
+			int err = _sendBuffer.send(_connectionInfo->socket, needWaitSendEvent, actualSent, data);
+			if (_disposable && err == 0 && actualSent && !needWaitSendEvent)
+			{
+				_requireClose = true;
+				needWaitSendEvent = true;
+			}
+			return err;
+		}
+
+		void closeAfterSent(bool& needWaitSendEvent)
+		{
+			_disposable = true;
+			_sendBuffer.stopAppendData();
+			send(needWaitSendEvent);
+		}
+
 		TCPServerConnection(int epollfd, std::mutex* mutex, int ioChunkSize, ConnectionInfoPtr connectionInfo):
 			TCPBasicConnection(mutex, ioChunkSize, connectionInfo), _epoll_fd(epollfd), _joined(false), _disposable(false), _requireClose(false)
 		{

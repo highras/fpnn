@@ -162,6 +162,7 @@ namespace fpnn
 		uint8_t* _payladBuffer;
 		uint8_t* _currBuf;
 		std::list<struct FragmentedData> _fragmentedDataList;
+		int64_t _currFragmentsTotalLength;
 		uint8_t _opCode;	//-- unnecessary inited when instance constructor.
 		int _recvStep; 		//- 0: header, 1: payloadSize, 2: maskingKey, 3: _payloadData.
 		bool _dataCompleted;
@@ -174,7 +175,8 @@ namespace fpnn
 		void processPayloadData();
 
 	public:
-		WebSocketReceiver(): Receiver(), _header(0), _maskingKey(0), _payloadSize(0), _payladBuffer(NULL), _recvStep(0), _dataCompleted(false)
+		WebSocketReceiver(): Receiver(), _header(0), _maskingKey(0), _payloadSize(0), _payladBuffer(NULL),
+			_currFragmentsTotalLength(0), _recvStep(0), _dataCompleted(false)
 		{
 			_total = sizeof(uint16_t);
 			_currBuf = (uint8_t*)&_header;
