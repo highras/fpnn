@@ -17,11 +17,13 @@
 	+ 支持长链接
 	+ 支持链接池
 	+ 支持多 sharding 并发查询和汇总
+	+ 项目地址：[DBProxy](https://github.com/highras/dbproxy)
 
 * **数据库行级缓存服务**
 
 	+ 数据库前端高速缓存
 	+ 服务即**数据源**，负责数据读取与落地，无需再次操作数据库
+	+ 项目地址：[TableCache](https://github.com/highras/tableCache)
 
 * **日志系统**
 
