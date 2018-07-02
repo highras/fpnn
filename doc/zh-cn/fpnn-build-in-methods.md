@@ -4,7 +4,7 @@
 
       **仅能内网访问。**
 
-         => *state {}
+         => *status {}
          <= { status:%b }
 
 1. **tune**
