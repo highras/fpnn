@@ -11,8 +11,8 @@ FPNN 自动化分布式测试工具需要在 **DATS (Distributed Automated Testi
 
 压力测试使用亚马逊 m4.xlarge 机型和 m4.2xlarge 机型。
 
-	+ m4.xlarge 机型为虚拟 4 核 CPU，16 GB 内存
-	+ m4.2xlarge 机型为虚拟 8 核 CPU，32 GB 内存
++ m4.xlarge 机型为虚拟 4 核 CPU，16 GB 内存
++ m4.2xlarge 机型为虚拟 8 核 CPU，32 GB 内存
 
 1. 测试准备
 
@@ -92,7 +92,7 @@ StressController 启动参数请参见 [FPNN 内置工具](fpnn-tools.md) 对应
 
 海量链接测试仅使用亚马逊 m4.xlarge 机型。
 
-	+ m4.xlarge 机型为虚拟 4 核 CPU，16 GB 内存
++ m4.xlarge 机型为虚拟 4 核 CPU，16 GB 内存
 
 1. 测试准备
 
