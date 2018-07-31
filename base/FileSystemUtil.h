@@ -38,6 +38,21 @@ namespace fpnn
 		/* Only normal file, or symbolic which point a normal file, or sub-directories when excludeSubDirectories == false. */
 		std::vector<std::string> getFilesInDirectory(const char* directoryPath, bool excludeSubDirectories = true);
 	}
+
+	class FileLocker
+	{
+		int _fd;
+		char *_lock_file;
+		
+		bool canRelock(int fd);
+		bool lock(bool may_relock);
+		
+	public:
+		FileLocker(const char *lock_file);
+		~FileLocker();
+		
+		bool locked() { return (_fd != 0); }
+	};
 }
 
 #endif

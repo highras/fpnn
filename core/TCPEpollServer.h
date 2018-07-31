@@ -6,14 +6,13 @@
 #include <memory>
 #include <vector>
 #include <thread>
-#include <signal.h>
-#include <sys/sysinfo.h>
 #include "ParamTemplateThreadPoolArray.h"
 #include "TaskThreadPoolArray.h"
+#include "ServerController.h"
 #include "ServerInterface.h"
 #include "ServerIOWorker.h"
 #include "FPMessage.h"
-#include "ServerMasterProcessor.h"
+#include "TCPServerMasterProcessor.h"
 #include "ConcurrentSenderInterface.h"
 #include "ConnectionReclaimer.h"
 #include "PartitionedConnectionMap.h"
@@ -27,7 +26,6 @@ struct sockaddr_in;
 
 namespace fpnn
 {
-#define FPNN_SERVER_VERSION				"0.8.1"
 #define FPNN_DEFAULT_WORK_POOL_QUEUE_SIZE	2000000
 #define FPNN_DEFAULT_MAX_CONNECTION			500000
 #define FPNN_DEFAULT_SOCKET_BACKLOG			10000
@@ -37,7 +35,7 @@ namespace fpnn
 #define FPNN_SEND_QUEUE_MUTEX_COUNT			128
 
 	class TCPEpollServer;
-	typedef std::shared_ptr<TCPEpollServer> ServerPtr;
+	typedef std::shared_ptr<TCPEpollServer> TCPServerPtr;
 
 	class TCPEpollServer: virtual public ServerInterface, virtual public IConcurrentSender
 	{
@@ -55,21 +53,13 @@ namespace fpnn
 		int _max_events;
 		struct epoll_event* _epollEvents;
 
-		bool _listenIPv6;
 		std::atomic<bool> _running;
 		volatile bool _stopping;
-		std::atomic<bool> _stopped;
+		std::atomic<bool> _stopSignalNotified;
 		std::atomic<int> _connectionCount;
 
 		size_t _ioBufferChunkSize;
 		int _closeNotifyFds[2];
-
-		uint16_t _cpuCount;
-		uint16_t _ioThreadMin;
-		uint16_t _ioThreadMax;
-		
-		uint16_t _workThreadMin;
-		uint16_t _workThreadMax;
 
 		uint16_t _duplexThreadMin; // --default set to 0
 		uint16_t _duplexThreadMax; // --default set to 0
@@ -77,27 +67,15 @@ namespace fpnn
 		size_t _maxWorkerPoolQueueLength;
 		int _maxConnections;
 
-		time_t _started;
-		time_t _compiled;
-		std::string _sName;
-		std::string _version;
-
-		bool _checkQuestTimeout;
+		volatile bool _checkQuestTimeout;
 		int64_t _timeoutQuest; //only valid when as a client
 		int64_t _timeoutIdle;
-		std::thread _timeoutChecker;
-		std::thread _stopSignalThread;
-
-		bool _logServerStatusInfos;
-		int _logStatusIntervalSeconds;
 
 		static std::mutex _sendQueueMutex[FPNN_SEND_QUEUE_MUTEX_COUNT];
-		static uint16_t _THREAD_MIN;
-		static uint16_t _THREAD_MAX;
 
 		PartitionedConnectionMap _connectionMap;
 		std::shared_ptr<TCPServerIOWorker> _ioWorker;
-		std::shared_ptr<ServerMasterProcessor> _serverMasterProcessor;
+		std::shared_ptr<TCPServerMasterProcessor> _serverMasterProcessor;
 
 		GlobalIOPoolPtr _ioPool;
 		std::shared_ptr<ParamTemplateThreadPoolArray<RequestPackage *>> _workerPool;
@@ -110,6 +88,7 @@ namespace fpnn
 		ConnectionReclaimerPtr _reclaimer;
 
 	private:
+		int								getCPUCount();
 		bool							prepare();
 		bool							init();
 		bool							initIPv6();
@@ -119,58 +98,30 @@ namespace fpnn
 		void							processEvent(struct epoll_event & event);
 		void							cleanForNewConnectionError(TCPServerConnection*, RequestPackage*, const char* log_info, bool connectionInCache);
 		void							cleanForExistConnectionError(TCPServerConnection*, RequestPackage*, const char* log_info);
-		void							fatalFailClean(const char* fail_info);
+		void							initFailClean(const char* fail_info);
 		void							clean();
 		void							sendCloseEvent();
-		void							timeoutCheckThread();
 
 	private:
 		TCPEpollServer()
 			: _port(0), _port6(0), _backlog(FPNN_DEFAULT_SOCKET_BACKLOG), _socket(0), _socket6(0), _epoll_fd(0), 
 			_max_events(FPNN_DEFAULT_MAX_EVENT), 
-			_epollEvents(NULL), _listenIPv6(false), _running(false), _stopping(false), _stopped(true), _connectionCount(0),
+			_epollEvents(NULL), _running(false), _stopping(false), _stopSignalNotified(false), _connectionCount(0),
 			_ioBufferChunkSize(FPNN_DEFAULT_IO_BUFFER_CHUNK_SIZE),
 			_maxWorkerPoolQueueLength(FPNN_DEFAULT_WORK_POOL_QUEUE_SIZE),
-			_maxConnections(FPNN_DEFAULT_MAX_CONNECTION),
-			_started(time(NULL)), _version(FPNN_SERVER_VERSION), _checkQuestTimeout(false),
+			_maxConnections(FPNN_DEFAULT_MAX_CONNECTION), _checkQuestTimeout(false),
 			_timeoutQuest(FPNN_DEFAULT_QUEST_TIMEOUT * 1000),
 			_timeoutIdle(FPNN_DEFAULT_IDLE_TIMEOUT * 1000),
-			_logServerStatusInfos(false), _logStatusIntervalSeconds(60),
-			_serverMasterProcessor(new ServerMasterProcessor()), _encryptEnabled(false), _enableIPWhiteList(false)
+			_serverMasterProcessor(new TCPServerMasterProcessor()), _encryptEnabled(false), _enableIPWhiteList(false)
 		{
-			install_signal();
+			ServerController::installSignal();
 
 			initSystemVaribles();
 
-			_sName = Setting::getString("FPNN.server.name", "FPNN.TEST");
-
-			std::string logEndpoint = Setting::getString("FPNN.server.log.endpoint", "std::cout");
-			std::string logRoute = Setting::getString("FPNN.server.log.route", "FPNN.TEST");
-			std::string logLevel = Setting::getString("FPNN.server.log.level", "DEBUG");
-			FPLog::init(logEndpoint, logRoute, logLevel, _sName);
-
 			_maxConnections = Setting::getInt("FPNN.server.max.connections", FPNN_DEFAULT_MAX_CONNECTION);
-			_logServerStatusInfos = Setting::getBool("FPNN.server.status.logStatusInfos", false);
-			_logStatusIntervalSeconds = Setting::getInt("FPNN.server.status.logStatusInterval", 60);
-			if (_logStatusIntervalSeconds < 1)
-				_logServerStatusInfos = false;
-
-			_cpuCount = get_nprocs();
-			if (_cpuCount < 2)
-				_cpuCount = 2;
-	
-			_workThreadMin = _cpuCount;
-			_workThreadMax = _cpuCount;
-			_ioThreadMin = _cpuCount;
-			_ioThreadMax = _cpuCount;
 
 			_duplexThreadMin = 0;
 			_duplexThreadMax = 0;
-
-			std::string built = std::string("") + __DATE__ + " " + __TIME__;  
-			struct tm t;
-			strptime(built.c_str(), "%b %d %Y %H:%M:%S", &t);
-			_compiled = mktime(&t);
 
 			initServerVaribles();
 
@@ -178,8 +129,7 @@ namespace fpnn
 			_closeNotifyFds[1] = 0;
 			_reclaimer = ConnectionReclaimer::instance();
 		}
-		static ServerPtr _server;
-		static std::atomic<bool> _stopSignalTriggered;
+		static TCPServerPtr _server;
 	public:
 		virtual ~TCPEpollServer()
 		{
@@ -187,7 +137,7 @@ namespace fpnn
 				_ioPool->setServerIOWorker(nullptr);
 		}
 
-		static ServerPtr create(){
+		static TCPServerPtr create(){
 			if(!_server) _server.reset(new TCPEpollServer());
 			return _server;
 		}
@@ -196,7 +146,7 @@ namespace fpnn
 		{
 			return _server.get();
 		}
-		static ServerPtr instance()
+		static TCPServerPtr instance()
 		{
 			return _server;
 		}
@@ -204,13 +154,13 @@ namespace fpnn
 		virtual bool startup()
 		{
 			bool status = prepare() ? init() : false;
-			if (_listenIPv6 && initIPv6() == false)
+			if (_port6 && initIPv6() == false)
 			{
 				LOG_ERROR("Init IPv6 failed.");
 			}
 
 			if(status){
-				_timeoutChecker = std::thread(&TCPEpollServer::timeoutCheckThread, this);
+				ServerController::startTimeoutCheckThread();
 				_serverMasterProcessor->getQuestProcessor()->start();
 			}
 			return status;
@@ -224,17 +174,14 @@ namespace fpnn
 		virtual void setIP(const std::string& ip) { _ip = ip; }
 		virtual void setIPv6(const std::string& ipv6) { _ipv6 = ipv6; }
 		virtual void setPort(uint16_t port) { _port = port; }
+		virtual void setPort6(unsigned short port) { _port6 = port; }
 		virtual void setBacklog(int backlog) { _backlog = backlog; }
 
 		virtual uint16_t port() const { return _port; }
+		virtual uint16_t port6() const { return _port6; }
 		virtual std::string ip() const { return _ip; }
 		virtual std::string ipv6() const { return _ipv6; }	
 		virtual int32_t backlog() const { return _backlog; }
-
-		const std::string& sName() const { return _sName; }
-		const std::string& version() const { return _version; }
-		time_t started() const { return _started; }
-		time_t compiled() const { return _compiled; }
 
 		inline void setMaxEvents(int maxCount) { _max_events = maxCount; }
 		inline void setIoBufferChunkSize(size_t size) { _ioBufferChunkSize = size; }
@@ -242,10 +189,14 @@ namespace fpnn
 		int maxEvent() const { return _max_events; }
 		size_t ioBufferChunkSize() const { return _ioBufferChunkSize; }
 
-		inline void setQuestProcessor(IQuestProcessorPtr questProcessor)
+		virtual void setQuestProcessor(IQuestProcessorPtr questProcessor)
 		{
 			questProcessor->setConcurrentSender(this);
 			_serverMasterProcessor->setQuestProcessor(questProcessor);
+		}
+		virtual IQuestProcessorPtr getQuestProcessor()
+		{
+			return _serverMasterProcessor->getQuestProcessor();
 		}
 		inline void setEstimateMaxConnections(size_t estimateMaxConnections, int partitionCount = 128)
 		{
@@ -273,21 +224,15 @@ namespace fpnn
 		}
 		inline void configWorkerThreadPool(int32_t initCount, int32_t perAppendCount, int32_t perfectCount, int32_t maxCount, size_t maxQueueSize)
 		{
-			_workerPool.reset(new ParamTemplateThreadPoolArray<RequestPackage *>(_cpuCount, _serverMasterProcessor));
+			_workerPool.reset(new ParamTemplateThreadPoolArray<RequestPackage *>(getCPUCount(), _serverMasterProcessor));
 			_workerPool->init(initCount, perAppendCount, perfectCount, maxCount, maxQueueSize);
-		}
-		inline void configWorkerThreadPool(IQuestProcessorPtr questProcessor,
-						int32_t initCount, int32_t perAppendCount, int32_t perfectCount, int32_t maxCount, size_t maxQueueSize)
-		{
-			setQuestProcessor(questProcessor);
-			configWorkerThreadPool(initCount, perAppendCount, perfectCount, maxCount, maxQueueSize);
 		}
 		inline void enableAnswerCallbackThreadPool(int32_t initCount, int32_t perAppendCount, int32_t perfectCount, int32_t maxCount)
 		{
 			if (_answerCallbackPool)
 				return;
 
-			_answerCallbackPool.reset(new TaskThreadPoolArray(_cpuCount));
+			_answerCallbackPool.reset(new TaskThreadPoolArray(getCPUCount()));
 			_answerCallbackPool->init(initCount, perAppendCount, perfectCount, maxCount);
 		}
 
@@ -369,30 +314,14 @@ namespace fpnn
 		inline int64_t getIdleTimeout(){
 			return _timeoutIdle / 1000;
 		}
-		inline void setStatusInfosLogStatus(bool logStatusInfos)
-		{
-			_logServerStatusInfos = logStatusInfos;
-		}
-		inline bool getStatusInfosLogStatus()
-		{
-			return _logServerStatusInfos;
-		}
-		inline void setStatusInfosLogIntervalSeconds(int seconds)
-		{
-			_logStatusIntervalSeconds = seconds;
-		}
-		inline int getStatusInfosLogIntervalSeconds()
-		{
-			return _logStatusIntervalSeconds;
-		}
 
-		inline std::string workerPoolStatus(){
+		virtual std::string workerPoolStatus(){
 			if (_workerPool){
 				return _workerPool->infos();
 			}
 			return "{}";
 		}
-		inline std::string answerCallbackPoolStatus(){
+		virtual std::string answerCallbackPoolStatus(){
 			if (_answerCallbackPool){
 				return _answerCallbackPool->infos();
 			}
@@ -427,9 +356,10 @@ namespace fpnn
 		{
 			_ipWhiteList.removeIP(ip);
 		}
+		
+		void checkTimeout();
+
 	private:
-		void install_signal();
-		static void stop_handler(int sig);
 		bool initSystemVaribles();
 		bool initServerVaribles();
 	};

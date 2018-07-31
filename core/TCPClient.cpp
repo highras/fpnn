@@ -15,39 +15,9 @@
 
 using namespace fpnn;
 
-TCPClient::TCPClient(const std::string& host, int port, bool autoReconnect): _connected(false),
-	_connStatus(ConnStatus::NoConnected), _answerCallbackPool(nullptr), _questProcessPool(nullptr), _timeoutQuest(0),
-	_AESKeyLen(16), _packageEncryptionMode(true),
-	_autoReconnect(autoReconnect), _callbackMapSize(0), _ioChunkSize(256)
-{
-	_engine = ClientEngine::instance();
-	_isIPv4 = (host.find(':') == std::string::npos);
-	if (_isIPv4)
-	{
-		_connectionInfo.reset(new ConnectionInfo(0, port, HostLookup::get(host), _isIPv4));
-		_endpoint = std::string(host + ":").append(std::to_string(port));
-	}
-	else
-	{
-		_connectionInfo.reset(new ConnectionInfo(0, port, host, _isIPv4));
-		_endpoint = std::string("[").append(host).append("]:").append(std::to_string(port));
-	}
-}
-
-TCPClient::~TCPClient()
-{
-	if (_connected)
-	{
-		_autoReconnect = false;
-		close();
-	}
-
-	if (_answerCallbackPool)
-	{
-		_answerCallbackPool->release();
-		delete _answerCallbackPool;
-	}
-}
+TCPClient::TCPClient(const std::string& host, int port, bool autoReconnect):
+	Client(host, port, autoReconnect), _AESKeyLen(16), _packageEncryptionMode(true), _ioChunkSize(256)
+{}
 
 bool TCPClient::enableEncryptorByDerData(const std::string &derData, bool packageMode, bool reinforce)
 {
@@ -86,96 +56,6 @@ bool TCPClient::enableEncryptorByPemFile(const char *pemFilePath, bool packageMo
 		return false;
 
 	return enableEncryptorByPemData(content, packageMode, reinforce);
-}
-
-void TCPClient::connected(TCPClientConnection* connection)
-{
-	if (_questProcessor)
-	{
-		try
-		{
-			_questProcessor->connected(*(connection->_connectionInfo));
-		}
-		catch (const FpnnError& ex){
-			LOG_ERROR("connected() error:(%d)%s. %s", ex.code(), ex.what(), connection->_connectionInfo->str().c_str());
-		}
-		catch (...)
-		{
-			LOG_ERROR("Unknown error when calling connected() function. %s", connection->_connectionInfo->str().c_str());
-		}
-	}
-}
-
-class ErrorCloseTask: virtual public ITaskThreadPool::ITask, virtual public IReleaseable
-{
-	bool _error;
-	bool _executed;
-	TCPClientConnection* _connection;
-	IQuestProcessorPtr _questProcessor;
-
-public:
-	ErrorCloseTask(IQuestProcessorPtr questProcessor, TCPClientConnection* connection, bool error):
-		_error(error), _executed(false), _connection(connection), _questProcessor(questProcessor) {}
-
-	virtual ~ErrorCloseTask()
-	{
-		if (!_executed)
-			run();
-
-		delete _connection;
-	}
-
-	bool releaseable()
-	{
-		return (_connection->_refCount == 0);
-	}
-
-	virtual void run()
-	{
-		_executed = true;
-
-		if (_questProcessor)
-		try
-		{
-			_questProcessor->connectionWillClose(*(_connection->_connectionInfo), _error);
-		}
-		catch (const FpnnError& ex){
-			LOG_ERROR("ErrorCloseTask::run() error:(%d)%s. %s", ex.code(), ex.what(), _connection->_connectionInfo->str().c_str());
-		}
-		catch (...)
-		{
-			LOG_ERROR("Unknown error when calling ErrorCloseTask::run() function. %s", _connection->_connectionInfo->str().c_str());
-		}
-	}
-};
-
-void TCPClient::onErrorOrCloseEvent(TCPClientConnection* connection, bool error)
-{
-	std::shared_ptr<ErrorCloseTask> task(new ErrorCloseTask(_questProcessor, connection, error));
-	if (_questProcessor)
-	{
-		bool wakeup;
-		if (_answerCallbackPool)
-			wakeup = _answerCallbackPool->wakeUp(task);
-		else
-			wakeup = ClientEngine::wakeUpAnswerCallbackThreadPool(task);
-
-		if (!wakeup)
-			LOG_ERROR("wake up thread pool to process connection close event failed. Close callback will be called by Connection Reclaimer. %s", connection->_connectionInfo->str().c_str());
-	}
-
-	{
-		std::unique_lock<std::mutex> lck(_mutex);
-		if (_connectionInfo.get() == connection->_connectionInfo.get())
-		{
-			ConnectionInfoPtr newConnectionInfo(new ConnectionInfo(0, _connectionInfo->port, _connectionInfo->ip, _isIPv4));
-			_connectionInfo = newConnectionInfo;
-			_connected = false;
-			_connStatus = ConnStatus::NoConnected;
-		}
-	}
-
-	_engine->reclaim(task);	//-- MUST after change _connectionInfo, ensure the socket hasn't been closed before _connectionInfo reset.
 }
 
 class QuestTask: public ITaskThreadPool::ITask
@@ -269,242 +149,6 @@ void TCPClient::dealQuest(FPQuestPtr quest, ConnectionInfoPtr connectionInfo)		/
 	}
 }
 
-void TCPClient::dealAnswer(FPAnswerPtr answer, ConnectionInfoPtr connectionInfo)
-{
-	Config::ClientAnswerLog(answer, connectionInfo->ip, connectionInfo->port);
-
-	BasicAnswerCallback* callback = ClientEngine::nakedInstance()->takeCallback(connectionInfo->socket, answer->seqNumLE());
-	if (!callback)
-	{
-		LOG_ERROR("Recv an invalied answer, seq is %u. %s", answer->seqNumLE(), connectionInfo->str().c_str());
-		return;
-	}
-	if (callback->syncedCallback())		//-- check first, then fill result.
-	{
-		SyncedAnswerCallback* sac = (SyncedAnswerCallback*)callback;
-		sac->fillResult(answer, FPNN_EC_OK);
-		return;
-	}
-	
-	callback->fillResult(answer, FPNN_EC_OK);
-	BasicAnswerCallbackPtr task(callback);
-
-	bool wakeup;
-	if (_answerCallbackPool)
-		wakeup = _answerCallbackPool->wakeUp(task);
-	else
-		wakeup = ClientEngine::wakeUpAnswerCallbackThreadPool(task);
-
-	if (!wakeup)
-		LOG_ERROR("[Fatal] wake up thread pool to process answer failed. Close callback havn't called. %s", connectionInfo->str().c_str());
-}
-
-void TCPClient::processQuest(FPQuestPtr quest, ConnectionInfoPtr connectionInfo)
-{
-	FPAnswerPtr answer = NULL;
-	_questProcessor->initAnswerStatus(connectionInfo, quest);
-
-	try
-	{
-		FPReaderPtr args(new FPReader(quest->payload()));
-		answer = _questProcessor->processQuest(args, quest, *connectionInfo);
-	}
-	catch (const FpnnError& ex){
-		LOG_ERROR("processQuest ERROR:(%d) %s, connection:%s", ex.code(), ex.what(), connectionInfo->str().c_str());
-		if (quest->isTwoWay())
-		{
-			if (_questProcessor->getQuestAnsweredStatus() == false)
-				answer = FpnnErrorAnswer(quest, ex.code(), std::string(ex.what()) + ", " + connectionInfo->str());
-		}
-	}
-	catch (...){
-		LOG_ERROR("Unknown error when calling processQuest() function. %s", connectionInfo->str().c_str());
-		if (quest->isTwoWay())
-		{
-			if (_questProcessor->getQuestAnsweredStatus() == false)
-				answer = FpnnErrorAnswer(quest, FPNN_EC_CORE_UNKNOWN_ERROR, std::string("Unknown error when calling processQuest() function, ") + connectionInfo->str());
-		}
-	}
-
-	bool questAnswered = _questProcessor->finishAnswerStatus();
-	if (quest->isTwoWay())
-	{
-		if (questAnswered)
-		{
-			if (answer)
-			{
-				LOG_ERROR("Double answered after an advance answer sent, or async answer generated. %s", connectionInfo->str().c_str());
-			}
-			return;
-		}
-		else if (!answer)
-			answer = FpnnErrorAnswer(quest, FPNN_EC_CORE_UNKNOWN_ERROR, std::string("Twoway quest lose an answer. ") + connectionInfo->str());
-	}
-	else if (answer)
-	{
-		LOG_ERROR("Oneway quest return an answer. %s", connectionInfo->str().c_str());
-		answer = NULL;
-	}
-
-	if (answer)
-	{
-		std::string* raw = NULL;
-		try
-		{
-			raw = answer->raw();
-		}
-		catch (const FpnnError& ex){
-			FPAnswerPtr errAnswer = FpnnErrorAnswer(quest, ex.code(), std::string(ex.what()) + ", " + connectionInfo->str());
-			raw = errAnswer->raw();
-		}
-		catch (...)
-		{
-			/**  close the connection is to complex, so, return a error answer. It alway success? */
-
-			FPAnswerPtr errAnswer = FpnnErrorAnswer(quest, FPNN_EC_CORE_UNKNOWN_ERROR, std::string("exception while do answer raw, ") + connectionInfo->str());
-			raw = errAnswer->raw();
-		}
-
-		ClientEngine::nakedInstance()->sendData(connectionInfo->socket, connectionInfo->token, raw);
-	}
-}
-
-void TCPClient::close()
-{
-	if (!_connected)
-		return;
-
-	ConnectionInfoPtr oldConnInfo;
-	{
-		std::unique_lock<std::mutex> lck(_mutex);
-		while (_connStatus == ConnStatus::Connecting || _connStatus == ConnStatus::KeyExchanging)
-			_condition.wait(lck);
-
-		if (_connStatus == ConnStatus::NoConnected)
-			return;
-
-		oldConnInfo = _connectionInfo;
-
-		ConnectionInfoPtr newConnectionInfo(new ConnectionInfo(0, _connectionInfo->port, _connectionInfo->ip, _isIPv4));
-		_connectionInfo = newConnectionInfo;
-		_connected = false;
-		_connStatus = ConnStatus::NoConnected;
-	}
-
-	/*
-		!!! 注意 !!!
-		如果在 Client::_mutex 内调用 takeConnection() 会导致在 singleClientConcurrentTset 中，
-		其他线程处于发送状态时，死锁。
-	*/
-	TCPClientConnection* conn = _engine->takeConnection(oldConnInfo.get());
-	if (conn == NULL)
-		return;
-
-	_engine->exitEpoll(conn);
-	clearConnectionQuestCallbacks(conn, FPNN_EC_CORE_CONNECTION_CLOSED);
-	willClose(conn);
-}
-
-void TCPClient::clearConnectionQuestCallbacks(TCPClientConnection* connection, int errorCode)
-{
-	for (auto callbackPair: connection->_callbackMap)
-	{
-		BasicAnswerCallback* callback = callbackPair.second;
-		if (callback->syncedCallback())		//-- check first, then fill result.
-			callback->fillResult(NULL, errorCode);
-		else
-		{
-			callback->fillResult(NULL, errorCode);
-
-			BasicAnswerCallbackPtr task(callback);
-			
-			bool wakeup;
-			if (_answerCallbackPool)
-				wakeup = _answerCallbackPool->wakeUp(task);
-			else
-				wakeup = ClientEngine::wakeUpAnswerCallbackThreadPool(task);
-
-			if (!wakeup)
-			{
-				LOG_ERROR("wake up thread pool to process quest callback when connection closing failed. Quest callback will be called in current thread. %s", connection->_connectionInfo->str().c_str());
-				task->run();
-			}
-		}
-	}
-	// connection->_callbackMap.clear(); //-- If necessary.
-}
-
-FPAnswerPtr TCPClient::sendQuest(FPQuestPtr quest, int timeout)
-{
-	if (!_connected)
-	{
-		if (!_autoReconnect)
-			return FpnnErrorAnswer(quest, FPNN_EC_CORE_CONNECTION_CLOSED, "Connection not inited.");
-
-		if (!reconnect())
-			return FpnnErrorAnswer(quest, FPNN_EC_CORE_CONNECTION_CLOSED, "Reconnection failed.");
-	}
-
-	ConnectionInfoPtr connInfo;
-	{
-		std::unique_lock<std::mutex> lck(_mutex);
-		connInfo = _connectionInfo;
-	}
-	Config::ClientQuestLog(quest, connInfo->ip.c_str(), connInfo->port);
-
-	if (timeout == 0)
-		return ClientEngine::nakedInstance()->sendQuest(connInfo->socket, connInfo->token, &_mutex, quest, _timeoutQuest);
-	else
-		return ClientEngine::nakedInstance()->sendQuest(connInfo->socket, connInfo->token, &_mutex, quest, timeout * 1000);
-}
-
-bool TCPClient::sendQuest(FPQuestPtr quest, AnswerCallback* callback, int timeout)
-{
-	if (!_connected)
-	{
-		if (!_autoReconnect)
-			return false;
-
-		if (!reconnect())
-			return false;
-	}
-
-	ConnectionInfoPtr connInfo;
-	{
-		std::unique_lock<std::mutex> lck(_mutex);
-		connInfo = _connectionInfo;
-	}
-	Config::ClientQuestLog(quest, connInfo->ip.c_str(), connInfo->port);
-
-	if (timeout == 0)
-		return ClientEngine::nakedInstance()->sendQuest(connInfo->socket, connInfo->token, quest, callback, _timeoutQuest);
-	else
-		return ClientEngine::nakedInstance()->sendQuest(connInfo->socket, connInfo->token, quest, callback, timeout * 1000);
-}
-bool TCPClient::sendQuest(FPQuestPtr quest, std::function<void (FPAnswerPtr answer, int errorCode)> task, int timeout)
-{
-	if (!_connected)
-	{
-		if (!_autoReconnect)
-			return false;
-
-		if (!reconnect())
-			return false;
-	}
-
-	ConnectionInfoPtr connInfo;
-	{
-		std::unique_lock<std::mutex> lck(_mutex);
-		connInfo = _connectionInfo;
-	}
-	Config::ClientQuestLog(quest, connInfo->ip.c_str(), connInfo->port);
-
-	if (timeout == 0)
-		return ClientEngine::nakedInstance()->sendQuest(connInfo->socket, connInfo->token, quest, std::move(task), _timeoutQuest);
-	else
-		return ClientEngine::nakedInstance()->sendQuest(connInfo->socket, connInfo->token, quest, std::move(task), timeout * 1000);
-}
-
 bool TCPClient::configEncryptedConnection(TCPClientConnection* connection, std::string& publicKey)
 {
 	if (_eccCurve.empty())
@@ -550,11 +194,8 @@ ConnectionInfoPtr TCPClient::perpareConnection(int socket, std::string& publicKe
 	TCPClientConnection* connection = NULL;
 	{
 		std::unique_lock<std::mutex> lck(_mutex);
-		newConnectionInfo.reset(new ConnectionInfo(socket, _connectionInfo->port, _connectionInfo->ip, _isIPv4));
-		if (!_callbackMapSize)
-			connection = new TCPClientConnection(shared_from_this(), &_mutex, _ioChunkSize, newConnectionInfo, _questProcessor);
-		else
-			connection = new TCPClientConnection(shared_from_this(), &_mutex, _ioChunkSize, _callbackMapSize, newConnectionInfo, _questProcessor);
+		newConnectionInfo.reset(new ConnectionInfo(socket, _connectionInfo->port, _connectionInfo->ip, _isIPv4, false));
+		connection = new TCPClientConnection(shared_from_this(), &_mutex, _ioChunkSize, newConnectionInfo);
 	}
 
 	if (configEncryptedConnection(connection, publicKey) == false)
@@ -599,12 +240,9 @@ bool TCPClient::perpareConnectIPv4Address()
 		return false;
 
 	TCPClientConnection* connection = NULL;
-	ConnectionInfoPtr newConnectionInfo(new ConnectionInfo(socketfd, _connectionInfo->port, _connectionInfo->ip, _isIPv4));
-	if (!_callbackMapSize)
-		connection = new TCPClientConnection(shared_from_this(), &_mutex, _ioChunkSize, newConnectionInfo, _questProcessor);
-	else
-		connection = new TCPClientConnection(shared_from_this(), &_mutex, _ioChunkSize, _callbackMapSize, newConnectionInfo, _questProcessor);
-
+	ConnectionInfoPtr newConnectionInfo(new ConnectionInfo(socketfd, _connectionInfo->port, _connectionInfo->ip, _isIPv4, false));
+	connection = new TCPClientConnection(shared_from_this(), &_mutex, _ioChunkSize, newConnectionInfo);
+	
 	bool joined = ClientEngine::nakedInstance()->joinEpoll(connection);
 	if (!joined)
 	{
@@ -690,7 +328,7 @@ bool TCPClient::connect()
 	if (_connected)
 		return true;
 
-	ConnectionInfoPtr oldConnInfo;
+	ConnectionInfoPtr currConnInfo;
 	{
 		std::unique_lock<std::mutex> lck(_mutex);
 		while (_connStatus == ConnStatus::Connecting || _connStatus == ConnStatus::KeyExchanging)
@@ -699,7 +337,7 @@ bool TCPClient::connect()
 		if (_connStatus == ConnStatus::Connected)
 			return true;
 
-		oldConnInfo = _connectionInfo;
+		currConnInfo = _connectionInfo;
 
 		_connected = false;
 		_connStatus = ConnStatus::Connecting;
@@ -707,9 +345,9 @@ bool TCPClient::connect()
 
 	TCPClient* self = this;
 
-	CannelableFinallyGuard errorGuard([self, oldConnInfo](){
+	CannelableFinallyGuard errorGuard([self, currConnInfo](){
 		std::unique_lock<std::mutex> lck(self->_mutex);
-		if (oldConnInfo.get() == self->_connectionInfo.get())
+		if (currConnInfo.get() == self->_connectionInfo.get())
 		{
 			self->_connected = false;
 			self->_connStatus = ConnStatus::NoConnected;
@@ -719,13 +357,13 @@ bool TCPClient::connect()
 
 	int socket = 0;
 	if (_isIPv4)
-		socket = connectIPv4Address(oldConnInfo);
+		socket = connectIPv4Address(currConnInfo);
 	else
-		socket = connectIPv6Address(oldConnInfo);
+		socket = connectIPv6Address(currConnInfo);
 
 	if (socket == 0)
 	{
-		LOG_ERROR("Connect remote server %s failed.", oldConnInfo->str().c_str());
+		LOG_ERROR("TCP client connect remote server %s failed.", currConnInfo->str().c_str());
 		return false;
 	}
 
@@ -757,7 +395,7 @@ bool TCPClient::connect()
 		{
 			LOG_ERROR("Client's key exchanging failed. Peer %s", newConnInfo->str().c_str());
 			
-			TCPClientConnection* conn = _engine->takeConnection(newConnInfo.get());
+			TCPClientConnection* conn = (TCPClientConnection*)_engine->takeConnection(newConnInfo.get());
 			if (conn == NULL)
 				return false;
 
@@ -771,7 +409,7 @@ bool TCPClient::connect()
 	errorGuard.cancel();
 	{
 		std::unique_lock<std::mutex> lck(_mutex);
-		if (_connectionInfo.get() == oldConnInfo.get())
+		if (_connectionInfo.get() == currConnInfo.get())
 		{
 			_connectionInfo = newConnInfo;
 			_connected = true;
@@ -782,8 +420,10 @@ bool TCPClient::connect()
 		}
 	}
 
+	LOG_ERROR("This codes (TCPClient::connect dupled) is impossible touched. This is just a safety inspection. If this ERROR triggered, please tell swxlion to fix it.");
+
 	//-- dupled
-	TCPClientConnection* conn = _engine->takeConnection(newConnInfo.get());
+	TCPClientConnection* conn = (TCPClientConnection*)_engine->takeConnection(newConnInfo.get());
 	if (conn)
 	{
 		_engine->exitEpoll(conn);
@@ -802,8 +442,12 @@ bool TCPClient::connect()
 
 	return false;
 }
-bool TCPClient::reconnect()
+
+TCPClientPtr Client::createTCPClient(const std::string& host, int port, bool autoReconnect)
 {
-	close();
-	return connect();
+	return TCPClient::createClient(host, port, autoReconnect);
+}
+TCPClientPtr Client::createTCPClient(const std::string& endpoint, bool autoReconnect)
+{
+	return TCPClient::createClient(endpoint, autoReconnect);
 }

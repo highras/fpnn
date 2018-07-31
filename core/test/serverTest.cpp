@@ -249,7 +249,6 @@ void status_loop(ServerPtr server)
 
 		cout<<"[QPS] : "<<dpq<<endl;
 
-
 		cout<<"[io poll] : "<<GlobalIOPool::nakedInstance()->ioPoolStatus()<<endl;
 
 		cout<<"[work poll] : "<<server->workerPoolStatus()<<endl;

@@ -55,6 +55,10 @@ class Setting
 		/* mysql://dev:dev@127.0.0.1:3306/db^10 */
 		bool parseDBSetting(const std::string& mysqlConn, MysqlConnST& st);
 
+		static std::string getString(const std::vector<std::string>& priority, const std::string& dft = std::string(), const MapType& map = _map);
+		static intmax_t getInt(const std::vector<std::string>& priority, intmax_t dft = 0, const MapType& map = _map);
+		static bool getBool(const std::vector<std::string>& priority, bool dft = false, const MapType& map = _map);
+		static double getReal(const std::vector<std::string>& priority, double dft = 0.0, const MapType& map = _map);
 };
 }
 

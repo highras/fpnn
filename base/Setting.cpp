@@ -76,6 +76,19 @@ std::string Setting::getString(const std::string& name, const std::string& dft, 
 	return dft;
 }
 
+std::string Setting::getString(const std::vector<std::string>& priority, const std::string& dft, const Setting::MapType& map)
+{
+	for (auto it = priority.begin(); it != priority.end(); it++)
+	{
+		const std::string *v = _find(*it, map);
+		if (v)
+		{
+			return *v;
+		}
+	}
+	return dft;
+}
+
 intmax_t Setting::getInt(const std::string& name, intmax_t dft, const Setting::MapType& map)
 {
 	const std::string *v = _find(name, map);
@@ -114,6 +127,47 @@ invalid:
 	return dft;
 }
 
+intmax_t Setting::getInt(const std::vector<std::string>& priority, intmax_t dft, const Setting::MapType& map)
+{
+	for (auto it = priority.begin(); it != priority.end(); it++)
+	{
+		const std::string *v = _find(*it, map);
+		if (v)
+		{
+			char *end;
+			const char *start = v->c_str();
+			intmax_t i = strtoll(start, &end, 0);
+			if (end > start)
+			{
+				if (end[0])
+				{
+					intmax_t x = binary_abbr(end, &end);
+					if (end[0] == 0)
+					{
+						i *= x;
+					}
+					else
+					{
+						double r = strtod(start, &end);
+						if (end > start && end[0] == 0)
+						{
+							i = r > INTMAX_MAX ? INTMAX_MAX
+								 : r < INTMAX_MIN ? INTMAX_MIN
+								 : (intmax_t)r;
+						}
+						else
+							goto invalid;
+					}
+				}
+
+				return i;
+			}
+		}
+	}
+invalid:
+	return dft;
+}
+
 bool Setting::getBool(const std::string& name, bool dft, const Setting::MapType& map)
 {
 	const std::string *v = _find(name, map);
@@ -134,6 +188,29 @@ bool Setting::getBool(const std::string& name, bool dft, const Setting::MapType&
 	return dft;
 }
 
+bool Setting::getBool(const std::vector<std::string>& priority, bool dft, const Setting::MapType& map)
+{
+	for (auto it = priority.begin(); it != priority.end(); it++)
+	{
+		const std::string *v = _find(*it, map);
+		if (v)
+		{
+			const char *str = v->c_str();
+			if (isdigit(str[0]) || str[0] == '-' || str[0] == '+')
+				return atoi(str);
+
+			if (strcasecmp(str, "true")==0 || strcasecmp(str, "yes")==0
+				|| strcasecmp(str, "t")==0 || strcasecmp(str, "y")==0)
+				return true;
+
+			if (strcasecmp(str, "false")==0 || strcasecmp(str, "no")==0
+				|| strcasecmp(str, "f")==0 || strcasecmp(str, "n")==0)
+				return false;
+		}
+	}
+	return dft;
+}
+
 double Setting::getReal(const std::string& name, double dft, const Setting::MapType& map)
 {
 	const std::string *v = _find(name, map);
@@ -144,6 +221,23 @@ double Setting::getReal(const std::string& name, double dft, const Setting::MapT
 		double r = strtod(start, &end);
 		if (end > start && end[0] == 0)
 			return r;
+	}
+	return dft;
+}
+
+double Setting::getReal(const std::vector<std::string>& priority, double dft, const Setting::MapType& map)
+{
+	for (auto it = priority.begin(); it != priority.end(); it++)
+	{
+		const std::string *v = _find(*it, map);
+		if (v)
+		{
+			char *end;
+			const char *start = v->c_str();
+			double r = strtod(start, &end);
+			if (end > start && end[0] == 0)
+				return r;
+		}
 	}
 	return dft;
 }

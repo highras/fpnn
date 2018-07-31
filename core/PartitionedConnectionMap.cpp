@@ -5,10 +5,10 @@ namespace fpnn
 	BasicAnswerCallback* ConnectionMap::takeCallback(int socket, uint32_t seqNum)
 	{
 		std::unique_lock<std::mutex> lck(_mutex);
-		HashMap<int, TCPBasicConnection*>::node_type* node = _connections.find(socket);
+		HashMap<int, BasicConnection*>::node_type* node = _connections.find(socket);
 		if (node)
 		{
-			TCPBasicConnection* connection = node->data;
+			BasicConnection* connection = node->data;
 			
 			auto iter = connection->_callbackMap.find(seqNum);
   			if (iter != connection->_callbackMap.end())
@@ -24,11 +24,11 @@ namespace fpnn
 
 	void ConnectionMap::extractTimeoutedCallback(int64_t threshold, std::list<std::map<uint32_t, BasicAnswerCallback*> >& timeouted)
 	{
-		HashMap<int, TCPBasicConnection*>::node_type* node = NULL;
+		HashMap<int, BasicConnection*>::node_type* node = NULL;
 		std::unique_lock<std::mutex> lck(_mutex);
 		while ((node = _connections.next_node(node)))
 		{
-			TCPBasicConnection* connection = node->data;
+			BasicConnection* connection = node->data;
 
 			std::map<uint32_t, BasicAnswerCallback*> basMap;
 			timeouted.push_back(basMap);
@@ -36,7 +36,7 @@ namespace fpnn
 			std::map<uint32_t, BasicAnswerCallback*>& currMap = timeouted.back();
 			for (auto& cbPair: connection->_callbackMap)
 			{
-				if (cbPair.second->sendTime() <= threshold)
+				if (cbPair.second->expiredTime() <= threshold)
 					currMap[cbPair.first] = cbPair.second;
 			}
 
@@ -45,16 +45,16 @@ namespace fpnn
 		}
 	}
 
-	void ConnectionMap::extractTimeoutedConnections(int64_t threshold, std::list<TCPBasicConnection*>& timeouted)
+	void ConnectionMap::extractTimeoutedConnections(int64_t threshold, std::list<BasicConnection*>& timeouted)
 	{
-		typedef HashMap<int, TCPBasicConnection*>::node_type HashNode;
+		typedef HashMap<int, BasicConnection*>::node_type HashNode;
 
 		HashNode* node = NULL;
 		std::list<HashNode*> timeoutedNodes;
 		std::unique_lock<std::mutex> lck(_mutex);
 		while ((node = _connections.next_node(node)))
 		{
-			TCPBasicConnection* connection = node->data;
+			BasicConnection* connection = node->data;
 
 			if (connection->_activeTime <= threshold)
 			{
@@ -95,7 +95,7 @@ namespace fpnn
 		uint32_t seqNum = quest->seqNumLE();
 
 		if (callback)
-			callback->updateSendTime(slack_real_msec() + timeout);
+			callback->updateExpiredTime(slack_real_msec() + timeout);
 
 		int idx = socket % _count;
 		bool status = _array[idx]->sendQuest(socket, token, raw, seqNum, callback);

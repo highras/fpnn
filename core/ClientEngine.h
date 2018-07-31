@@ -8,6 +8,7 @@
 #include "HashMap.h"
 //#include "ParamTemplateThreadPoolArray.h"
 #include "TaskThreadPoolArray.h"
+#include "UDPClientIOWorker.h"
 #include "ClientIOWorker.h"
 #include "IQuestProcessor.h"
 #include "ConcurrentSenderInterface.h"
@@ -17,13 +18,11 @@
 
 namespace fpnn
 {
-	class TCPClientConnection;		//-- See ClientIOWorker.h.
+	class BasicConnection;			//-- See IOWorker.h.
 	class TCPClientIOWorker;		//-- See ClientIOWorker.h.
 	class TCPClient;				//-- see TCPClient.h.
 	class ClientEngine;
 	typedef std::shared_ptr<ClientEngine> ClientEnginePtr;
-	class CloseErrorTask;
-	typedef std::shared_ptr<CloseErrorTask> CloseErrorTaskPtr;
 
 	class ClientEngine: virtual public IConcurrentSender
 	{
@@ -55,7 +54,8 @@ namespace fpnn
 		static uint16_t _THREAD_MAX;
 
 		PartitionedConnectionMap _connectionMap;
-		std::shared_ptr<TCPClientIOWorker> _ioWorker;
+		std::shared_ptr<TCPClientIOWorker> _tcpIOWorker;
+		std::shared_ptr<UDPClientIOWorker> _udpIOWorker;
 
 		GlobalIOPoolPtr _ioPool;
 		TaskThreadPoolArray _answerCallbackPool;		//-- answer callback & error/close event.
@@ -78,7 +78,6 @@ namespace fpnn
 		void clean();
 
 		bool initClientVaribles();
-
 		void timeoutCheckThread();
 
 	public:
@@ -88,7 +87,7 @@ namespace fpnn
 			 stop();
 			 
 			 if (_ioPool)
-				_ioPool->setClientIOWorker(nullptr);
+				_ioPool->setClientIOWorker(nullptr, nullptr);
 		}
 
 		/*===============================================================================
@@ -157,23 +156,23 @@ namespace fpnn
 			return nakedInstance()->start();
 		}
 		
-		inline void addNewConnection(TCPClientConnection* connection)
+		inline void addNewConnection(BasicConnection* connection)
 		{
 			_connectionMap.insert(connection->socket(), connection);
 		}
-		inline TCPClientConnection* takeConnection(int fd)	//-- !!! ONLY used in Client Engine & IOWorker internal.
+		inline BasicConnection* takeConnection(int fd)	//-- !!! ONLY used in Client Engine & IOWorker internal.
 		{
-			return (TCPClientConnection*)_connectionMap.takeConnection(fd);
+			return _connectionMap.takeConnection(fd);
 		}
-		inline TCPClientConnection* takeConnection(const ConnectionInfo* ci)  //-- !!! Using for other case. e.g. TCPCLient.
+		inline BasicConnection* takeConnection(const ConnectionInfo* ci)  //-- !!! Using for other case. e.g. TCPClient.
 		{
-			return (TCPClientConnection*)_connectionMap.takeConnection(ci);
+			return _connectionMap.takeConnection(ci);
 		}
 		inline BasicAnswerCallback* takeCallback(int socket, uint32_t seqNum)
 		{
 			return _connectionMap.takeCallback(socket, seqNum);
 		}
-		void clearConnectionQuestCallbacks(TCPClientConnection*, int errorCode);
+		void clearConnectionQuestCallbacks(BasicConnection*, int errorCode);
 		
 		virtual void sendData(int socket, uint64_t token, std::string* data);
 
@@ -198,11 +197,11 @@ namespace fpnn
 			return _connectionMap.sendQuest(socket, token, quest, std::move(task), timeout);
 		}
 
-		bool joinEpoll(TCPClientConnection* connection);
-		bool waitForEvents(uint32_t baseEvent, const TCPClientConnection* connection);
-		bool waitForRecvEvent(const TCPClientConnection* connection);
-		bool waitForAllEvents(const TCPClientConnection* connection);
-		void exitEpoll(const TCPClientConnection* connection);
+		bool joinEpoll(BasicConnection* connection);
+		bool waitForEvents(uint32_t baseEvent, const BasicConnection* connection);
+		bool waitForRecvEvent(const BasicConnection* connection);
+		bool waitForAllEvents(const BasicConnection* connection);
+		void exitEpoll(const BasicConnection* connection);
 
 		inline static bool wakeUpQuestProcessThreadPool(std::shared_ptr<ITaskThreadPool::ITask> task)
 		{
@@ -224,16 +223,40 @@ namespace fpnn
 		}
 	};
 
-	class CloseErrorTask: virtual public ITaskThreadPool::ITask, virtual public IReleaseable
+
+	class ConnectionReclaimTask: virtual public IReleaseable
 	{
-		bool _error;
-		TCPClientConnection* _connection;
+		BasicConnection* _connection;
 
 	public:
-		CloseErrorTask(TCPClientConnection* connection, bool error): _error(error), _connection(connection) {}
+		ConnectionReclaimTask(BasicConnection* connection): _connection(connection) {}
+		virtual ~ConnectionReclaimTask() { delete _connection; }
+		virtual bool releaseable() { return (_connection->_refCount == 0); }
+	};
+	typedef std::shared_ptr<ConnectionReclaimTask> ConnectionReclaimTaskPtr;
 
-		virtual ~CloseErrorTask();
-		virtual bool releaseable();
+
+
+	class ClientCloseTask: virtual public ITaskThreadPool::ITask, virtual public IReleaseable
+	{
+		bool _error;
+		bool _executed;
+		BasicConnection* _connection;
+		IQuestProcessorPtr _questProcessor;
+
+	public:
+		ClientCloseTask(IQuestProcessorPtr questProcessor, BasicConnection* connection, bool error):
+			_error(error), _executed(false), _connection(connection), _questProcessor(questProcessor) {}
+
+		virtual ~ClientCloseTask()
+		{
+			if (!_executed)
+				run();
+
+			delete _connection;
+		}
+
+		virtual bool releaseable() { return (_connection->_refCount == 0); }
 		virtual void run();
 	};
 }

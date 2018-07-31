@@ -248,7 +248,7 @@ bool TCPServerIOWorker::returnServerStoppingAnswer(TCPServerConnection * connect
 {
 	try
 	{
-		FPAnswerPtr answer = FpnnErrorAnswer(quest, FPNN_EC_CORE_SERVER_STOPPING, _server->sName());
+		FPAnswerPtr answer = FpnnErrorAnswer(quest, FPNN_EC_CORE_SERVER_STOPPING, Config::_sName);
 		std::string *raw = answer->raw();
 		connection->_sendBuffer.appendData(raw);
 		return true;
@@ -307,7 +307,7 @@ bool TCPServerIOWorker::deliverQuest(TCPServerConnection * connection, FPQuestPt
 	RequestPackage* requestPackage = new(std::nothrow) RequestPackage(IOEventType::Recv, connection->_connectionInfo, quest);
 	if (!requestPackage)
 	{
-		LOG_ERROR("Alloc Event package for recv event failed. Connection will be closed by server. %s", connection->_connectionInfo->str().c_str());
+		LOG_ERROR("Alloc Event package for received quest (%s) failed. Connection will be closed by server. %s", questMethod.c_str(), connection->_connectionInfo->str().c_str());
 		return false;
 	}
 
@@ -333,36 +333,36 @@ bool TCPServerIOWorker::deliverQuest(TCPServerConnection * connection, FPQuestPt
 		bool rev;
 		if (!_workerPool->exiting())
 		{
-			LOG_ERROR("Worker pool wake up for socket recv event failed, worker Pool length limitation is caught. %s",
-				connection->_connectionInfo->str().c_str());
+			LOG_ERROR("Worker pool wake up for quest (%s) failed, worker Pool length limitation is caught. %s",
+				questMethod.c_str(), connection->_connectionInfo->str().c_str());
 			rev = true;
 
 			if (quest->isTwoWay())
 			{
 				try
 				{
-					FPAnswerPtr answer = FpnnErrorAnswer(quest, FPNN_EC_CORE_WORK_QUEUE_FULL, std::string("Server queue full, ") + connection->_connectionInfo->str());
+					FPAnswerPtr answer = FpnnErrorAnswer(quest, FPNN_EC_CORE_WORK_QUEUE_FULL, std::string("Server queue is full!"));
 					std::string *raw = answer->raw();
 					connection->_sendBuffer.appendData(raw);
 				}
 				catch (const FpnnError& ex)
 				{
-					LOG_ERROR("Generate error answer for server worker queue full failed. Connection will be closed by server. %s, exception:(%d)%s",
-						connection->_connectionInfo->str().c_str(), ex.code(), ex.what());
+					LOG_ERROR("Generate error answer for server worker queue full failed. Connection will be closed by server. Quest %s, %s, exception:(%d)%s",
+						questMethod.c_str(), connection->_connectionInfo->str().c_str(), ex.code(), ex.what());
 					rev = false;
 				}
 				catch (...)
 				{
-					LOG_ERROR("Generate error answer for server worker queue full failed. Connection will be closed by server. %s",
-						connection->_connectionInfo->str().c_str());
+					LOG_ERROR("Generate error answer for server worker queue full failed. Connection will be closed by server. Quest %s, %s",
+						questMethod.c_str(), connection->_connectionInfo->str().c_str());
 					rev = false;
 				}
 			}
 		}
 		else
 		{
-			LOG_ERROR("Worker pool wake up for socket recv event failed, server is exiting. Connection will be closed by server. %s",
-				connection->_connectionInfo->str().c_str());
+			LOG_ERROR("Worker pool wake up for quest (%s) failed, server is exiting. Connection will be closed by server. %s",
+				questMethod.c_str(), connection->_connectionInfo->str().c_str());
 			rev = false;
 		}
 

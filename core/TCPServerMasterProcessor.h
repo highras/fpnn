@@ -1,5 +1,5 @@
-#ifndef FPNN_Server_Master_Processor_H
-#define FPNN_Server_Master_Processor_H
+#ifndef FPNN_TCP_Server_Master_Processor_H
+#define FPNN_TCP_Server_Master_Processor_H
 
 #include <map>
 #include <mutex>
@@ -13,21 +13,15 @@
 namespace fpnn
 {
 	class TCPEpollServer;
-	class ServerMasterProcessor: public ParamTemplateThreadPool<RequestPackage *>::IProcessor
+	class TCPServerMasterProcessor: public ParamTemplateThreadPool<RequestPackage *>::IProcessor
 	{
-		typedef FPAnswerPtr (ServerMasterProcessor::* MethodFunc)(const FPReaderPtr, const FPQuestPtr, const ConnectionInfo&);
+		typedef FPAnswerPtr (TCPServerMasterProcessor::* MethodFunc)(const FPReaderPtr, const FPQuestPtr, const ConnectionInfo&);
 
 	private:
 		HashMap<std::string, MethodFunc>* _methodMap;
-		TCPEpollServer* _server;
-		IQuestProcessorPtr _questProcessor; 
+		IQuestProcessorPtr _questProcessor;
 		ConnectionReclaimerPtr _reclaimer;
-
-		//-- common infos cache
-		std::mutex _mutex;
-		std::string _infosHeader;
-		std::shared_ptr<std::string> _serverBaseInfos;
-		std::shared_ptr<std::string> _clientBaseInfos;
+		TCPEpollServer* _server;
 
 		void prepare();
 		FPAnswerPtr status(const FPReaderPtr, const FPQuestPtr, const ConnectionInfo&);
@@ -36,29 +30,23 @@ namespace fpnn
 
 		void dealQuest(RequestPackage * requestPackage);
 
-		void serverInfos(std::stringstream& ss, bool show_interface_stat);
-		void clientInfos(std::stringstream& ss);
-		std::string appInfos();
-
 	public:
-		ServerMasterProcessor(): _methodMap(0), _server(0)
+		TCPServerMasterProcessor(): _methodMap(0), _server(0)
 		{
 			_reclaimer = ConnectionReclaimer::instance();
 			prepare();
 		}
-		virtual ~ServerMasterProcessor()
+		virtual ~TCPServerMasterProcessor()
 		{
 			if (_methodMap)
 				delete _methodMap;
 		}
 		virtual void run(RequestPackage * requestPackage);
-		void setServer(TCPEpollServer* server);
+		inline void setServer(TCPEpollServer* server) { _server = server; }
 		inline void setQuestProcessor(IQuestProcessorPtr processor) { _questProcessor = processor; }
 		inline bool isMasterMethod(const std::string& method) { return _methodMap->find(method); }
 		inline bool checkQuestProcessor() { return (_questProcessor != nullptr); }
-		IQuestProcessorPtr getQuestProcessor() { return _questProcessor; }
-
-		void logStatus();
+		inline IQuestProcessorPtr getQuestProcessor() { return _questProcessor; }
 	};
 }
 

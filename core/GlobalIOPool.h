@@ -2,24 +2,28 @@
 #define FPNN_Global_IO_Pool_H
 
 #include "ParamTemplateThreadPoolArray.h"
+#include "UDPClientIOWorker.h"
 #include "ClientIOWorker.h"
 #include "ServerIOWorker.h"
 #include "FPLog.h"
 
 namespace fpnn
 {
-	class TCPEpollIOWorker: public ParamTemplateThreadPool<TCPBasicConnection *>::IProcessor
+	class TCPEpollIOWorker: public ParamTemplateThreadPool<BasicConnection *>::IProcessor
 	{
-		std::shared_ptr<TCPClientIOWorker> _clientIOWorker;
 		std::shared_ptr<TCPServerIOWorker> _serverIOWorker;
+		std::shared_ptr<TCPClientIOWorker> _clientIOWorker;
+		std::shared_ptr<UDPClientIOWorker> _UDPClientIOWorker;
 
 	public:
-		virtual void run(TCPBasicConnection * connection)
+		virtual void run(BasicConnection * connection)
 		{
-			if (connection->connectionType() == TCPBasicConnection::ServerConnectionType)
+			if (connection->connectionType() == BasicConnection::TCPServerConnectionType)
 				_serverIOWorker->run((TCPServerConnection*)connection);
-			else
+			else if (connection->connectionType() == BasicConnection::TCPClientConnectionType)
 				_clientIOWorker->run((TCPClientConnection*)connection);
+			else
+				_UDPClientIOWorker->run((UDPClientConnection*)connection);
 		}
 
 		/** All safe without locker.
@@ -27,8 +31,12 @@ namespace fpnn
 			If ClientEngine is not started, no client connection can come in.
 		* Server IO Worker will be set by TCPEpollServer starting. TCPEpollServer is unique in global.
 			If TCPEpollServer is not started, no server connection can come in. */
-		void setClientIOWorker(std::shared_ptr<TCPClientIOWorker> clientIOWorker) { _clientIOWorker = clientIOWorker; }
 		void setServerIOWorker(std::shared_ptr<TCPServerIOWorker> serverIOWorker) { _serverIOWorker = serverIOWorker; }
+		void setClientIOWorker(std::shared_ptr<TCPClientIOWorker> tcpClientIOWorker, std::shared_ptr<UDPClientIOWorker> udpClientIOWorker)
+		{
+			_clientIOWorker = tcpClientIOWorker;
+			_UDPClientIOWorker = udpClientIOWorker;
+		}
 	};
 
 	class GlobalIOPool;
@@ -38,7 +46,7 @@ namespace fpnn
 	{
 		static std::mutex _mutex;
 		std::shared_ptr<TCPEpollIOWorker> _ioWorker;
-		ParamTemplateThreadPoolArray<TCPBasicConnection*> _ioPool;
+		ParamTemplateThreadPoolArray<BasicConnection*> _ioPool;
 		FPLogBasePtr _heldLogger;
 
 		GlobalIOPool();
@@ -48,10 +56,10 @@ namespace fpnn
 		static GlobalIOPoolPtr instance();
 
 		inline std::string ioPoolStatus() { return _ioPool.infos(); }
-		inline void setClientIOWorker(std::shared_ptr<TCPClientIOWorker> clientIOWorker)
-					{ _ioWorker->setClientIOWorker(clientIOWorker); }
 		inline void setServerIOWorker(std::shared_ptr<TCPServerIOWorker> serverIOWorker)
 					{ _ioWorker->setServerIOWorker(serverIOWorker); }
+		inline void setClientIOWorker(std::shared_ptr<TCPClientIOWorker> tcpClientIOWorker, std::shared_ptr<UDPClientIOWorker> udpClientIOWorker)
+					{ _ioWorker->setClientIOWorker(tcpClientIOWorker, udpClientIOWorker); }
 
 		inline void init(int32_t initCount, int32_t perAppendCount, int32_t perfectCount, int32_t maxCount)
 		{
@@ -64,7 +72,7 @@ namespace fpnn
 			_heldLogger = FPLog::instance();
 		}
 
-		inline bool wakeUp(TCPBasicConnection* connection)
+		inline bool wakeUp(BasicConnection* connection)
 		{
 			return _ioPool.wakeUp(connection);
 		}

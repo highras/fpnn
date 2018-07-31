@@ -6,6 +6,9 @@
 
 namespace fpnn
 {
+	class ConnectionInfo;
+	typedef std::shared_ptr<ConnectionInfo> ConnectionInfoPtr;
+	
 	class IConcurrentSender
 	{
 	public:
@@ -19,6 +22,21 @@ namespace fpnn
 		virtual FPAnswerPtr sendQuest(int socket, uint64_t token, std::mutex* mutex, FPQuestPtr quest, int timeout = 0) = 0;
 		virtual bool sendQuest(int socket, uint64_t token, FPQuestPtr quest, AnswerCallback* callback, int timeout = 0) = 0;
 		virtual bool sendQuest(int socket, uint64_t token, FPQuestPtr quest, std::function<void (FPAnswerPtr answer, int errorCode)> task, int timeout = 0) = 0;
+	};
+
+	class IConcurrentUDPSender
+	{
+	public:
+		virtual void sendData(ConnectionInfoPtr connInfo, std::string* data) = 0;
+
+		/**
+			All SendQuest():
+				If throw exception or return false, caller must free quest & callback.
+				If return true, or FPAnswerPtr is NULL, don't free quest & callback.
+		*/
+		virtual FPAnswerPtr sendQuest(ConnectionInfoPtr connInfo, FPQuestPtr quest, int timeout = 0) = 0;
+		virtual bool sendQuest(ConnectionInfoPtr connInfo, FPQuestPtr quest, AnswerCallback* callback, int timeout = 0) = 0;
+		virtual bool sendQuest(ConnectionInfoPtr connInfo, FPQuestPtr quest, std::function<void (FPAnswerPtr answer, int errorCode)> task, int timeout = 0) = 0;
 	};
 }
 

@@ -16,6 +16,7 @@ namespace fpnn
 	class AsyncAnswerImp: public IAsyncAnswer
 	{
 		IConcurrentSender* _concurrentSender;
+		IConcurrentUDPSender* _concurrentUDPSender;
 		ConnectionInfoPtr _connectionInfo;
 		FPQuestPtr _quest;
 		std::string _traceInfo;
@@ -24,7 +25,12 @@ namespace fpnn
 
 	public:
 		AsyncAnswerImp(IConcurrentSender* concurrentSender, ConnectionInfoPtr connectionInfo, FPQuestPtr quest):
-			_concurrentSender(concurrentSender), _connectionInfo(connectionInfo), _quest(quest), _sent(false) {}
+			_concurrentSender(concurrentSender), _concurrentUDPSender(NULL), _connectionInfo(connectionInfo),
+			_quest(quest), _sent(false) {}
+
+		AsyncAnswerImp(IConcurrentUDPSender* concurrentSender, ConnectionInfoPtr connectionInfo, FPQuestPtr quest):
+			_concurrentSender(NULL), _concurrentUDPSender(concurrentSender), _connectionInfo(connectionInfo),
+			_quest(quest), _sent(false) {}
 
 		virtual ~AsyncAnswerImp()
 		{
@@ -54,7 +60,10 @@ namespace fpnn
 			try
 			{
 				std::string* raw = answer->raw();
-				_concurrentSender->sendData(_connectionInfo->socket, _connectionInfo->token, raw);
+				if (_concurrentSender)
+					_concurrentSender->sendData(_connectionInfo->socket, _connectionInfo->token, raw);
+				else
+					_concurrentUDPSender->sendData(_connectionInfo, raw);
 				_sent = true;
 				return true;
 			}

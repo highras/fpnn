@@ -4,6 +4,7 @@
 #include <memory>
 #include <sstream>
 #include <unordered_map>
+#include <netinet/in.h>
 #include "FPReader.h"
 #include "FPWriter.h"
 #include "AnswerCallbacks.h"
@@ -33,15 +34,25 @@ namespace fpnn
 		friend class TCPEpollServer;
 		friend class TCPBasicConnection;
 		friend class IQuestProcessor;
+		friend class UDPRecvBuffer;
+		friend class UDPSendBuffer;
+		friend class UDPClient;
+		friend class Client;
 
 		std::mutex* _mutex;		//-- only for sync quest to set answer map.
+		bool _isTCP;
 		bool _isIPv4;
 		bool _encrypted;
 		bool _isWebSocket;
-		bool _internalAddress;	//-- future using. Just hold place now.
+		bool _internalAddress;
+		bool _serverConnection;
 
-		ConnectionInfo(int socket_, int port_, const std::string& ip_, bool isIPv4): _mutex(0), _isIPv4(isIPv4),
-			_encrypted(false), _isWebSocket(false), _internalAddress(false), token(0), socket(socket_), port(port_), ip(ip_)
+		//-- Only use for UDP.
+		uint8_t* _socketAddress;
+
+		ConnectionInfo(int socket_, int port_, const std::string& ip_, bool isIPv4, bool serverConnection): _mutex(0), _isTCP(true), _isIPv4(isIPv4),
+			_encrypted(false), _isWebSocket(false), _internalAddress(false), _serverConnection(serverConnection), _socketAddress(NULL),
+			token(0), socket(socket_), port(port_), ip(ip_)
 		{
 			bool maybeIPv4 = isIPv4;
 			const char* ipPtr = ip.c_str();
@@ -57,6 +68,24 @@ namespace fpnn
 				_internalAddress = !ipv4_is_external_s(ipPtr);
 				ipv4 = ipv4_aton(ip.c_str());
 			}
+		}
+
+		void changToUDP(uint8_t* socketAddress, uint64_t token_)	//-- UDP Server Used.
+		{
+			_isTCP = false;
+			token = token_;
+			_socketAddress = socketAddress;
+		}
+
+		void changToUDP(int newSocket, uint8_t* socketAddress)	//-- UDP Client Used.
+		{
+			_isTCP = false;
+			socket = newSocket;
+			
+			if (_socketAddress)
+				free(_socketAddress);
+
+			_socketAddress = socketAddress;
 		}
 
 	public:
@@ -81,14 +110,30 @@ namespace fpnn
 			return (p << 32) | ipv4;
 		}
 
+		inline bool isTCP() const { return _isTCP; }
+		inline bool isUDP() const { return !_isTCP; }
+		inline bool isIPv4() const { return _isIPv4; }
+		inline bool isIPv6() const { return !_isIPv4; }
 		inline bool isEncrypted() const { return _encrypted; }
 		inline bool isPrivateIP() const { return _internalAddress; }
 		inline bool isWebSocket() const { return _isWebSocket; }
 
-		ConnectionInfo(const ConnectionInfo& ci): _mutex(0), _isIPv4(ci._isIPv4),
-			_encrypted(ci._encrypted), _internalAddress(ci._internalAddress), token(ci.token),
-			socket(ci.socket), port(ci.port), ip(ci.ip), ipv4(ci.ipv4)
+		ConnectionInfo(const ConnectionInfo& ci): _mutex(0), _isTCP(ci._isTCP), _isIPv4(ci._isIPv4),
+			_encrypted(ci._encrypted), _internalAddress(ci._internalAddress), _serverConnection(ci._serverConnection),
+			token(ci.token), socket(ci.socket), port(ci.port), ip(ci.ip), ipv4(ci.ipv4)
 		{
+			if (ci._socketAddress)
+			{
+				int len = ci._isIPv4 ? sizeof(struct sockaddr_in) : sizeof(struct sockaddr_in6);
+				_socketAddress = (uint8_t*)malloc(len);
+				memcpy(_socketAddress, ci._socketAddress, len);
+			}
+		}
+
+		~ConnectionInfo()
+		{
+			if (_socketAddress)
+				free(_socketAddress);
 		}
 	};
 
@@ -101,55 +146,16 @@ namespace fpnn
 	//=================================================================//
 	class QuestSender
 	{
-		int _socket;
-		uint64_t _token;
-		std::mutex* _mutex;
-		// bool _forceJsonFormat;
-		IConcurrentSender* _concurrentSender;
-
 	public:
-		QuestSender(IConcurrentSender* concurrentSender, const ConnectionInfo& ci, std::mutex* mutex):
-			_socket(ci.socket), _token(ci.token), _mutex(mutex), // _forceJsonFormat(ci.isWebSocket()),
-			_concurrentSender(concurrentSender) {}
-
 		virtual ~QuestSender() {}
 		/**
 			All SendQuest():
 				If return false, caller must free quest & callback.
 				If return true, don't free quest & callback.
 		*/
-		virtual FPAnswerPtr sendQuest(FPQuestPtr quest, int timeout = 0)
-		{
-			/*if (_forceJsonFormat)
-			{
-				quest->unsetFlag(FPMessage::FP_FLAG_MSGPACK);
-				quest->setFlag(FPMessage::FP_FLAG_JSON);
-			}*/
-
-			return _concurrentSender->sendQuest(_socket, _token, _mutex, quest, timeout * 1000);
-		}
-	
-		virtual bool sendQuest(FPQuestPtr quest, AnswerCallback* callback, int timeout = 0)
-		{
-			/*if (_forceJsonFormat)
-			{
-				quest->unsetFlag(FPMessage::FP_FLAG_MSGPACK);
-				quest->setFlag(FPMessage::FP_FLAG_JSON);
-			}*/
-
-			return _concurrentSender->sendQuest(_socket, _token, quest, callback, timeout * 1000);
-		}
-	
-		virtual bool sendQuest(FPQuestPtr quest, std::function<void (FPAnswerPtr answer, int errorCode)> task, int timeout = 0)
-		{
-			/*if (_forceJsonFormat)
-			{
-				quest->unsetFlag(FPMessage::FP_FLAG_MSGPACK);
-				quest->setFlag(FPMessage::FP_FLAG_JSON);
-			}*/
-
-			return _concurrentSender->sendQuest(_socket, _token, quest, std::move(task), timeout * 1000);
-		}
+		virtual FPAnswerPtr sendQuest(FPQuestPtr quest, int timeout = 0) = 0;
+		virtual bool sendQuest(FPQuestPtr quest, AnswerCallback* callback, int timeout = 0) = 0;
+		virtual bool sendQuest(FPQuestPtr quest, std::function<void (FPAnswerPtr answer, int errorCode)> task, int timeout = 0) = 0;
 	};
 
 	//=================================================================//
@@ -198,12 +204,19 @@ namespace fpnn
 	{
 	private:
 		IConcurrentSender* _concurrentSender;
+		IConcurrentUDPSender* _concurrentUDPSender;
+
+	private:
+		inline bool standardInterface(const ConnectionInfo& connInfo) const
+		{
+			return connInfo._isTCP || !(connInfo._serverConnection);
+		}
 
 	protected:
 		enum MethodAttribute { EncryptOnly = 0x1, PrivateIPOnly = 0x2 };	//-- Only for methods attributes.
 
 	public:
-		IQuestProcessor(): _concurrentSender(0) {}
+		IQuestProcessor(): _concurrentSender(0), _concurrentUDPSender(0) {}
 		virtual ~IQuestProcessor() {}
 
 		/*===============================================================================
@@ -215,6 +228,7 @@ namespace fpnn
 		bool finishAnswerStatus();	//-- return answer status
 
 		virtual void setConcurrentSender(IConcurrentSender* concurrentSender) { if (!_concurrentSender) _concurrentSender = concurrentSender; }
+		virtual void setConcurrentSender(IConcurrentUDPSender* concurrentUDPSender) { if (!_concurrentUDPSender) _concurrentUDPSender = concurrentUDPSender; }
 		virtual FPAnswerPtr processQuest(const FPReaderPtr args, const FPQuestPtr quest, const ConnectionInfo& connectionInfo) = 0;
 
 		/*===============================================================================
@@ -236,48 +250,16 @@ namespace fpnn
 		}
 
 	public:
-		inline QuestSenderPtr genQuestSender(const ConnectionInfo& connectionInfo)
-		{
-			return std::make_shared<QuestSender>(_concurrentSender, connectionInfo, connectionInfo._mutex);
-		}
+		QuestSenderPtr genQuestSender(const ConnectionInfo& connectionInfo);
 
 		/**
 			All SendQuest():
 				If return false, caller must free quest & callback.
 				If return true, don't free quest & callback.
 		*/
-		virtual FPAnswerPtr sendQuest(const ConnectionInfo& connectionInfo, FPQuestPtr quest, int timeout = 0)
-		{
-			/*if (connectionInfo._isWebSocket)
-			{
-				quest->unsetFlag(FPMessage::FP_FLAG_MSGPACK);
-				quest->setFlag(FPMessage::FP_FLAG_JSON);
-			}*/
-
-			return _concurrentSender->sendQuest(connectionInfo.socket, connectionInfo.token, connectionInfo._mutex, quest, timeout * 1000);
-		}
-	
-		virtual bool sendQuest(const ConnectionInfo& connectionInfo, FPQuestPtr quest, AnswerCallback* callback, int timeout = 0)
-		{
-			/*if (connectionInfo._isWebSocket)
-			{
-				quest->unsetFlag(FPMessage::FP_FLAG_MSGPACK);
-				quest->setFlag(FPMessage::FP_FLAG_JSON);
-			}*/
-
-			return _concurrentSender->sendQuest(connectionInfo.socket, connectionInfo.token, quest, callback, timeout * 1000);
-		}
-	
-		virtual bool sendQuest(const ConnectionInfo& connectionInfo, FPQuestPtr quest, std::function<void (FPAnswerPtr answer, int errorCode)> task, int timeout = 0)
-		{
-			/*if (connectionInfo._isWebSocket)
-			{
-				quest->unsetFlag(FPMessage::FP_FLAG_MSGPACK);
-				quest->setFlag(FPMessage::FP_FLAG_JSON);
-			}*/
-
-			return _concurrentSender->sendQuest(connectionInfo.socket, connectionInfo.token, quest, std::move(task), timeout * 1000);
-		}
+		virtual FPAnswerPtr sendQuest(const ConnectionInfo& connectionInfo, FPQuestPtr quest, int timeout = 0);
+		virtual bool sendQuest(const ConnectionInfo& connectionInfo, FPQuestPtr quest, AnswerCallback* callback, int timeout = 0);
+		virtual bool sendQuest(const ConnectionInfo& connectionInfo, FPQuestPtr quest, std::function<void (FPAnswerPtr answer, int errorCode)> task, int timeout = 0);
 
 		/*===============================================================================
 		  Event Hook. (Common)
@@ -345,7 +327,6 @@ namespace fpnn
 			else  \
 				return unknownMethod(method, args, quest, connInfo);	\
 		}
-
 }
 
 #endif

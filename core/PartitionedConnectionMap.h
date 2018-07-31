@@ -19,9 +19,9 @@ namespace fpnn
 	class ConnectionMap
 	{
 		std::mutex _mutex;
-		HashMap<int, TCPBasicConnection*> _connections;
+		HashMap<int, BasicConnection*> _connections;
 
-		inline bool sendData(TCPBasicConnection* conn, std::string* data)
+		inline bool sendData(BasicConnection* conn, std::string* data)
 		{
 			bool needWaitSendEvent = false;
 			conn->send(needWaitSendEvent, data);
@@ -31,7 +31,7 @@ namespace fpnn
 			return true;
 		}
 
-		inline bool sendQuest(TCPBasicConnection* conn, std::string* data, uint32_t seqNum, BasicAnswerCallback* callback)
+		inline bool sendQuest(BasicConnection* conn, std::string* data, uint32_t seqNum, BasicAnswerCallback* callback)
 		{
 			if (callback)
 				conn->_callbackMap[seqNum] = callback;
@@ -46,26 +46,26 @@ namespace fpnn
 	public:
 		ConnectionMap(size_t map_size): _connections(map_size) {}
 
-		TCPBasicConnection* takeConnection(int fd)
+		BasicConnection* takeConnection(int fd)
 		{
 			std::unique_lock<std::mutex> lck(_mutex);
-			HashMap<int, TCPBasicConnection*>::node_type* node = _connections.find(fd);
+			HashMap<int, BasicConnection*>::node_type* node = _connections.find(fd);
 			if (node)
 			{
-				TCPBasicConnection* conn = node->data;
+				BasicConnection* conn = node->data;
 				_connections.remove_node(node);
 				return conn;
 			}
 			return NULL;
 		}
 
-		TCPBasicConnection* takeConnection(const ConnectionInfo* ci)
+		BasicConnection* takeConnection(const ConnectionInfo* ci)
 		{
 			std::unique_lock<std::mutex> lck(_mutex);
-			HashMap<int, TCPBasicConnection*>::node_type* node = _connections.find(ci->socket);
+			HashMap<int, BasicConnection*>::node_type* node = _connections.find(ci->socket);
 			if (node)
 			{
-				TCPBasicConnection* conn = node->data;
+				BasicConnection* conn = node->data;
 				if ((uint64_t)conn == ci->token)
 				{
 					_connections.remove_node(node);
@@ -80,13 +80,13 @@ namespace fpnn
 			bool needWaitSendEvent = false;
 			std::unique_lock<std::mutex> lck(_mutex);
 
-			HashMap<int, TCPBasicConnection*>::node_type* node = _connections.find(ci->socket);
+			HashMap<int, BasicConnection*>::node_type* node = _connections.find(ci->socket);
 			if (node)
 			{
-				TCPBasicConnection* conn = node->data;
+				BasicConnection* conn = node->data;
 				if ((uint64_t)conn == ci->token)
 				{
-					if (conn->connectionType() == TCPBasicConnection::ServerConnectionType)
+					if (conn->connectionType() == BasicConnection::TCPServerConnectionType)
 					{
 						TCPServerConnection *sconn = (TCPServerConnection*)conn;
 						sconn->closeAfterSent(needWaitSendEvent);
@@ -97,7 +97,7 @@ namespace fpnn
 			}
 		}
 
-		bool insert(int fd, TCPBasicConnection* connection)
+		bool insert(int fd, BasicConnection* connection)
 		{
 			std::unique_lock<std::mutex> lck(_mutex);
 			return (bool)_connections.insert(fd, connection);
@@ -109,11 +109,11 @@ namespace fpnn
 			_connections.remove(fd);
 		}
 
-		TCPBasicConnection* signConnection(int fd, uint32_t events)
+		BasicConnection* signConnection(int fd, uint32_t events)
 		{
-			TCPBasicConnection* connection = NULL;
+			BasicConnection* connection = NULL;
 			std::unique_lock<std::mutex> lck(_mutex);
-			HashMap<int, TCPBasicConnection*>::node_type* node = _connections.find(fd);
+			HashMap<int, BasicConnection*>::node_type* node = _connections.find(fd);
 			if (node)
 			{
 				connection = node->data;
@@ -136,7 +136,7 @@ namespace fpnn
 
 		void getAllSocket(std::set<int>& fdSet)
 		{
-			HashMap<int, TCPBasicConnection*>::node_type* node = NULL;
+			HashMap<int, BasicConnection*>::node_type* node = NULL;
 			std::unique_lock<std::mutex> lck(_mutex);
 			while ((node = _connections.next_node(node)))
 				fdSet.insert(node->key);
@@ -145,10 +145,10 @@ namespace fpnn
 		bool sendData(int socket, uint64_t token, std::string* data)
 		{
 			std::unique_lock<std::mutex> lck(_mutex);
-			HashMap<int, TCPBasicConnection*>::node_type* node = _connections.find(socket);
+			HashMap<int, BasicConnection*>::node_type* node = _connections.find(socket);
 			if (node)
 			{
-				TCPBasicConnection* connection = node->data;
+				BasicConnection* connection = node->data;
 				if (token == (uint64_t)connection)
 					return sendData(connection, data);
 			}
@@ -158,10 +158,10 @@ namespace fpnn
 		bool sendQuest(int socket, uint64_t token, std::string* data, uint32_t seqNum, BasicAnswerCallback* callback)
 		{
 			std::unique_lock<std::mutex> lck(_mutex);
-			HashMap<int, TCPBasicConnection*>::node_type* node = _connections.find(socket);
+			HashMap<int, BasicConnection*>::node_type* node = _connections.find(socket);
 			if (node)
 			{
-				TCPBasicConnection* connection = node->data;
+				BasicConnection* connection = node->data;
 				if (token == (uint64_t)connection)
 					return sendQuest(connection, data, seqNum, callback);
 			}
@@ -170,7 +170,7 @@ namespace fpnn
 
 		BasicAnswerCallback* takeCallback(int socket, uint32_t seqNum);
 		void extractTimeoutedCallback(int64_t threshold, std::list<std::map<uint32_t, BasicAnswerCallback*> >& timeouted);
-		void extractTimeoutedConnections(int64_t threshold, std::list<TCPBasicConnection*>& timeouted);
+		void extractTimeoutedConnections(int64_t threshold, std::list<BasicConnection*>& timeouted);
 	};
 
 	class PartitionedConnectionMap
@@ -215,13 +215,13 @@ namespace fpnn
 			return (bool)_array.size();
 		}
 
-		TCPBasicConnection* takeConnection(int fd)
+		BasicConnection* takeConnection(int fd)
 		{
 			int idx = fd % _count;
 			return _array[idx]->takeConnection(fd);
 		}
 
-		TCPBasicConnection* takeConnection(const ConnectionInfo* ci)
+		BasicConnection* takeConnection(const ConnectionInfo* ci)
 		{
 			int idx = ci->socket % _count;
 			return _array[idx]->takeConnection(ci);
@@ -233,7 +233,7 @@ namespace fpnn
 			return _array[idx]->closeAfterSent(ci);
 		}
 
-		bool insert(int fd, TCPBasicConnection* conn)
+		bool insert(int fd, BasicConnection* conn)
 		{
 			int idx = fd % _count;
 			return _array[idx]->insert(fd, conn);
@@ -245,7 +245,7 @@ namespace fpnn
 			_array[idx]->remove(fd);
 		}
 
-		TCPBasicConnection* signConnection(int fd, uint32_t events)
+		BasicConnection* signConnection(int fd, uint32_t events)
 		{
 			int idx = fd % _count;
 			return _array[idx]->signConnection(fd, events);
@@ -306,7 +306,7 @@ namespace fpnn
 			}
 		}
 
-		void extractTimeoutedConnections(int64_t threshold, std::list<TCPBasicConnection*>& timeouted)
+		void extractTimeoutedConnections(int64_t threshold, std::list<BasicConnection*>& timeouted)
 		{
 			for (int i = 0; i < _count; i++)
 			{

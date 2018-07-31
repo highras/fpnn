@@ -8,7 +8,9 @@
 #include <set>
 #include "FPLog.h"
 #include "NetworkUtility.h"
+//#include "ServerController.h"
 #include "TCPClient.h"
+#include "UDPClient.h"
 #include "ClientEngine.h"
 #include "Setting.h"
 #include "msec.h"
@@ -132,13 +134,13 @@ void ClientEngine::prepare()
 	if (!_answerCallbackPool.inited())
 		configAnswerCallbackThreadPool(_workThreadMin, 1, _workThreadMin, _workThreadMax);
 
-	if (!_ioWorker)
-		_ioWorker.reset(new TCPClientIOWorker);
+	_tcpIOWorker.reset(new TCPClientIOWorker);
+	_udpIOWorker.reset(new UDPClientIOWorker);
 	
 	if (_ioPool == nullptr)
 	{
 		_ioPool = GlobalIOPool::instance();
-		_ioPool->setClientIOWorker(_ioWorker);
+		_ioPool->setClientIOWorker(_tcpIOWorker, _udpIOWorker);
 		/** 
 			Just ensure io Pool is inited. If is inited, it will not reconfig or reinit. */
 		_ioPool->init(_ioThreadMin, 1, _ioThreadMin, _ioThreadMax);
@@ -189,6 +191,7 @@ bool ClientEngine::start()
 	{
 		_loopThread = std::thread(&ClientEngine::loopThread, this);
 		_timeoutChecker = std::thread(&ClientEngine::timeoutCheckThread, this);
+		//ServerController::startTimeoutCheckThread();
 		_started = true;
 		return true;
 	}
@@ -219,6 +222,7 @@ void ClientEngine::stop()
 	LOG_INFO("Client engine is stopping ...");
 
 	_timeoutChecker.join();
+	//ServerController::joinTimeoutCheckThread();
 	_loopThread.join();
 
 	//-- Thread pool is runnng. It will be free when server destroy.
@@ -300,7 +304,7 @@ void ClientEngine::loopThread()
 	}
 }
 
-void ClientEngine::clearConnectionQuestCallbacks(TCPClientConnection* connection, int errorCode)
+void ClientEngine::clearConnectionQuestCallbacks(BasicConnection* connection, int errorCode)
 {
 	for (auto callbackPair: connection->_callbackMap)
 	{
@@ -326,45 +330,81 @@ void ClientEngine::processEvent(struct epoll_event & event)
 	if (event.events & EPOLLRDHUP || event.events & EPOLLHUP)
 	{
 		//-- close event processor
-		TCPClientConnection* conn = takeConnection(socket);
-		if (conn == NULL)
+		BasicConnection* orgConn = takeConnection(socket);
+		if (orgConn == NULL)
 			return;
 
-		exitEpoll(conn);
-		clearConnectionQuestCallbacks(conn, FPNN_EC_CORE_CONNECTION_CLOSED);
-		TCPClientPtr client = conn->client();
-		if (client)
-			client->willClose(conn);
+		exitEpoll(orgConn);
+		clearConnectionQuestCallbacks(orgConn, FPNN_EC_CORE_CONNECTION_CLOSED);
+
+		if (orgConn->connectionType() != BasicConnection::UDPClientConnectionType)
+		{
+			TCPClientConnection* conn = (TCPClientConnection*)orgConn;
+			TCPClientPtr client = conn->client();
+			if (client)
+			{
+				client->willClose(conn);
+				return;
+			}
+		}
 		else
 		{
-			CloseErrorTaskPtr task(new CloseErrorTask(conn, false));
-			_answerCallbackPool.wakeUp(task);
-			_reclaimer->reclaim(task);
+			UDPClientConnection* conn = (UDPClientConnection*)orgConn;
+			UDPClientPtr client = conn->client();
+			if (client)
+			{
+				client->willClose(conn);
+				return;
+			}
 		}
+
+		LOG_ERROR("This codes (Engine::close) is impossible touched. This is just a safety inspection. If this ERROR triggered, please tell swxlion to add old CloseErrorTask class back, and fix it.");
+		ConnectionReclaimTaskPtr task(new ConnectionReclaimTask(orgConn));
+		//CloseErrorTaskPtr task(new CloseErrorTask(orgConn, false));
+		//_answerCallbackPool.wakeUp(task);
+		_reclaimer->reclaim(task);
 		return;
 	}
 	else if (event.events & EPOLLERR)
 	{
 		//-- error event processor
-		TCPClientConnection* conn = takeConnection(socket);
-		if (conn == NULL)
+		BasicConnection* orgConn = takeConnection(socket);
+		if (orgConn == NULL)
 			return;
 
-		exitEpoll(conn);
-		clearConnectionQuestCallbacks(conn, FPNN_EC_CORE_UNKNOWN_ERROR);
-		TCPClientPtr client = conn->client();
-		if (client)
-			client->errorAndWillBeClosed(conn);
+		exitEpoll(orgConn);
+		clearConnectionQuestCallbacks(orgConn, FPNN_EC_CORE_UNKNOWN_ERROR);
+
+		if (orgConn->connectionType() != BasicConnection::UDPClientConnectionType)
+		{
+			TCPClientConnection* conn = (TCPClientConnection*)orgConn;
+			TCPClientPtr client = conn->client();
+			if (client)
+			{
+				client->errorAndWillBeClosed(conn);
+				return;
+			}
+		}
 		else
 		{
-			CloseErrorTaskPtr task(new CloseErrorTask(conn, true));
-			_answerCallbackPool.wakeUp(task);
-			_reclaimer->reclaim(task);
+			UDPClientConnection* conn = (UDPClientConnection*)orgConn;
+			UDPClientPtr client = conn->client();
+			if (client)
+			{
+				client->errorAndWillBeClosed(conn);
+				return;
+			}
 		}
+
+		LOG_ERROR("This codes (Engine::error) is impossible touched. This is just a safety inspection. If this ERROR triggered, please tell swxlion to add old CloseErrorTask class back, and fix it.");
+		ConnectionReclaimTaskPtr task(new ConnectionReclaimTask(orgConn));
+		//CloseErrorTaskPtr task(new CloseErrorTask(orgConn, true));
+		//_answerCallbackPool.wakeUp(task);
+		_reclaimer->reclaim(task);
 		return;
 	}
 
-	TCPClientConnection* conn = (TCPClientConnection*)_connectionMap.signConnection(socket, event.events);
+	BasicConnection* conn = _connectionMap.signConnection(socket, event.events);
 	if (conn)
 		_ioPool->wakeUp(conn);
 }
@@ -378,16 +418,16 @@ void ClientEngine::sendData(int socket, uint64_t token, std::string* data)
 	}
 }
 
-bool ClientEngine::waitForRecvEvent(const TCPClientConnection* connection)
+bool ClientEngine::waitForRecvEvent(const BasicConnection* connection)
 {
 	return waitForEvents(EPOLLIN, connection);
 }
-bool ClientEngine::waitForAllEvents(const TCPClientConnection* connection)
+bool ClientEngine::waitForAllEvents(const BasicConnection* connection)
 {
 	return waitForEvents(EPOLLOUT | EPOLLIN, connection);
 }
 
-bool ClientEngine::joinEpoll(TCPClientConnection* connection)
+bool ClientEngine::joinEpoll(BasicConnection* connection)
 {
 	if (_running == false)
 		if (!startEngine())
@@ -416,7 +456,7 @@ bool ClientEngine::joinEpoll(TCPClientConnection* connection)
 		return true;
 }
 
-bool ClientEngine::waitForEvents(uint32_t baseEvent, const TCPClientConnection* connection)
+bool ClientEngine::waitForEvents(uint32_t baseEvent, const BasicConnection* connection)
 {
 	struct epoll_event	ev;
 
@@ -429,7 +469,7 @@ bool ClientEngine::waitForEvents(uint32_t baseEvent, const TCPClientConnection* 
 		return true;
 }
 
-void ClientEngine::exitEpoll(const TCPClientConnection* connection)
+void ClientEngine::exitEpoll(const BasicConnection* connection)
 {
 	struct epoll_event	ev;
 
@@ -439,16 +479,18 @@ void ClientEngine::exitEpoll(const TCPClientConnection* connection)
 	epoll_ctl(_epoll_fd, EPOLL_CTL_DEL, connection->socket(), &ev);
 }
 
-
 void ClientEngine::timeoutCheckThread()
 {
 	while (_running)
 	{
-		//sleep(1);
-		//-- Just for quickly shutdown client engine when only client in process.
 		int cyc = 100;
 		while (_running && cyc--)
 			usleep(10000);
+
+//void ClientEngine::checkTimeout()
+//{
+//	if (_running)
+//	{
 
 		int64_t current = slack_real_msec();
 		std::list<std::map<uint32_t, BasicAnswerCallback*> > timeouted;
@@ -476,30 +518,20 @@ void ClientEngine::timeoutCheckThread()
 	}
 }
 
-CloseErrorTask::~CloseErrorTask()
+void ClientCloseTask::run()
 {
-	delete _connection;
-}
+	_executed = true;
 
-bool CloseErrorTask::releaseable()
-{
-	return (_connection->_refCount == 0);
-}
-
-void CloseErrorTask::run()
-{
-	if (_connection->_questProcessor == NULL)
-		return;
-
+	if (_questProcessor)
 	try
 	{
-		_connection->_questProcessor->connectionWillClose(*(_connection->_connectionInfo), _error);
+		_questProcessor->connectionWillClose(*(_connection->_connectionInfo), _error);
 	}
 	catch (const FpnnError& ex){
-		LOG_ERROR("CloseErrorTask::run() function.(%d)%s, connection:%s", ex.code(), ex.what(), _connection->_connectionInfo->str().c_str());
+		LOG_ERROR("ClientCloseTask::run() error:(%d)%s. %s", ex.code(), ex.what(), _connection->_connectionInfo->str().c_str());
 	}
 	catch (...)
 	{
-		LOG_ERROR("Unknown error when calling CloseErrorTask::run() function. %s", _connection->_connectionInfo->str().c_str());
+		LOG_ERROR("Unknown error when calling ClientCloseTask::run() function. %s", _connection->_connectionInfo->str().c_str());
 	}
 }

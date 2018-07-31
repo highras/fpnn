@@ -163,7 +163,11 @@ void TCPClientIOWorker::run(TCPClientConnection * connection)
 	{
 		ClientEngine::nakedInstance()->clearConnectionQuestCallbacks(connection, FPNN_EC_CORE_INVALID_CONNECTION);
 		
-		CloseErrorTaskPtr task(new CloseErrorTask(connection, true));
-		ClientEngine::wakeUpAnswerCallbackThreadPool(task);
+		//CloseErrorTaskPtr task(new CloseErrorTask(connection, true));
+		//ClientEngine::wakeUpAnswerCallbackThreadPool(task);
+
+		LOG_ERROR("This codes (TCPClientIOWorker::run) is impossible touched. This is just a safety inspection. If this ERROR triggered, please tell swxlion to add old CloseErrorTask class back, and fix it.");
+		ConnectionReclaimTaskPtr task(new ConnectionReclaimTask(connection));
+		ConnectionReclaimer::nakedInstance()->reclaim(task);
 	}
 }

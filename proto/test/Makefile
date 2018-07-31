@@ -7,7 +7,7 @@ EXES_TEST5=file_example
 CFLAGS +=
 CXXFLAGS +=
 CPPFLAGS += -I../../proto -I../../base -I../../proto/msgpack -I../../proto/rapidjson
-LIBS += -L.. -L../../base -L../../core
+LIBS += -L.. -L../../base -L../../core -L../../extends
 
 OBJS_TEST = example.o 
 OBJS_TEST2 = array_example.o 

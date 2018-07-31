@@ -10,6 +10,8 @@
 
 1. [FPNN HTTP & webSocket 支持](fpnn-http-support.md)
 
+1. [FPNN 性能报告](fpnn-performance.md)
+
 ### 2. FPNN 使用手册
 
 1. [FPNN 代码规范](fpnn-code-norm.md)
@@ -44,22 +46,6 @@
 
 1. [FPNN SDK 介绍](fpnn-sdk-list.md)
 
-
-### 3. FPNN 测试数据
-
-1. FPNN v1.x 性能测试
-
-    请参考 <fpnn-folder>/doc/ 目录下 v.1.0.2性能纪录.numbers (**MacOS Numbers 格式**)
-
-1. FPNN v2.0.0 性能测试
-
-    请参考 <fpnn-folder>/doc/ 目录下
-        
-    + v.2.0.0性能纪录.numbers
-    + v.2.0.0 massiveStressRecords.numbers
-
-    **以上均为 MacOS Numbers 格式**
-
-### 4. FPNN 最佳实践
+### 3. FPNN 最佳实践
 
 1. [FPNN 服务治理与服务网格](fpnn-SOA-governance-service-mesh.md)

@@ -38,7 +38,7 @@ namespace fpnn
 		bool _requireClose;
 
 		virtual bool waitForAllEvents();
-		virtual enum ConnectionType connectionType() { return TCPBasicConnection::ServerConnectionType; }
+		virtual enum ConnectionType connectionType() { return TCPBasicConnection::TCPServerConnectionType; }
 
 		bool joinEpoll();
 		bool waitForRecvEvent();

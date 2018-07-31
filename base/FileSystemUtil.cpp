@@ -6,6 +6,9 @@
 #include <string.h>
 #include <dirent.h>
 #include <stddef.h>	//-- offsetof macro.
+#include <fcntl.h>	//-- fileLocker
+#include <errno.h>
+#include <sys/file.h>	//-- fileLocker
 #include "AutoRelease.h"
 #include "StringUtil.h"
 #include "md5.h"
@@ -227,4 +230,69 @@ std::vector<std::string> FileSystemUtil::getFilesInDirectory(const char* directo
 
 	closedir(dir);
 	return files;
+}
+
+FileLocker::FileLocker(const char *lock_file): _fd(0)
+{
+	_lock_file = strdup(lock_file);
+	if (_lock_file)
+		lock(true);
+}
+
+FileLocker::~FileLocker()
+{
+	if (_fd)
+	{
+		close(_fd);
+		unlink(_lock_file);
+		free(_lock_file);
+	}
+}
+
+bool FileLocker::canRelock(int fd)
+{
+	struct flock finfo;
+	if (fcntl(fd, F_GETLK, &finfo) == -1)
+		return false;
+		
+	int pid = (int)finfo.l_pid;
+	char buf[32];
+	sprintf(buf, "/proc/%d", pid);
+	
+	struct stat dir_stat;
+	if (stat(buf, &dir_stat) == -1)
+	{
+		if (errno != EACCES)
+			return true;
+	}
+	return false;
+}
+
+bool FileLocker::lock(bool may_relock)
+{
+	_fd = open(_lock_file, O_CREAT|O_WRONLY|O_TRUNC, S_IRWXU);
+	if (_fd == -1)
+	{
+		_fd = 0;
+		free(_lock_file);
+		return false;
+	}
+	
+	if (flock(_fd, LOCK_EX|LOCK_NB) == -1)
+	{
+		bool relock = may_relock ? canRelock(_fd) : false;
+		close(_fd);
+		
+		if (relock)
+		{
+			unlink(_lock_file);
+			return lock(false);
+		}
+		
+		_fd = 0;
+		free(_lock_file);
+		return false;
+	}
+	
+	return true;
 }

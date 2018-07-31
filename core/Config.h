@@ -6,15 +6,24 @@
 
 namespace fpnn
 {
+#define FPNN_SERVER_VERSION "0.8.2"
+
 //in second
 #define FPNN_DEFAULT_QUEST_TIMEOUT (5)
 #define FPNN_DEFAULT_IDLE_TIMEOUT (60)
 #define FPNN_DEFAULT_MAX_PACKAGE_LEN (8*1024*1024)
 #define FPNN_PERFECT_CONNECTIONS 100000
+#define FPNN_UDP_MAX_DATA_LENGTH (65507)
+//-- UDP max data length without IPv6 jumbogram.
+
 	class Config
 	{
 		public:
 			//global config
+			static time_t _started;
+			static time_t _compiled;
+			static std::string _sName;
+			static std::string _version;
 			static int _max_recv_package_length;
 
 		public:
@@ -22,6 +31,8 @@ namespace fpnn
 			static bool _log_server_quest;
 			static bool _log_server_answer;
 			static int16_t _log_server_slow;
+			static bool _logServerStatusInfos;
+			static int _logStatusIntervalSeconds;
 			static bool _server_http_supported;
 			static bool _server_http_close_after_answered;
 			static bool _server_stat;

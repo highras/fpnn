@@ -18,24 +18,14 @@ namespace fpnn
 		std::weak_ptr<TCPClient> _client;
 
 	public:
-		IQuestProcessorPtr _questProcessor;
-
 		virtual bool waitForAllEvents();
-		virtual enum ConnectionType connectionType() { return TCPBasicConnection::ClientConnectionType; }
+		virtual enum ConnectionType connectionType() { return BasicConnection::TCPClientConnectionType; }
 		TCPClientPtr client() { return _client.lock(); }
 
-		TCPClientConnection(TCPClientPtr client, std::mutex* mutex, int ioChunkSize,
-			ConnectionInfoPtr connectionInfo, IQuestProcessorPtr questProcessor):
-			TCPBasicConnection(mutex, ioChunkSize, connectionInfo), _client(client), _questProcessor(questProcessor)
+		TCPClientConnection(TCPClientPtr client, std::mutex* mutex, int ioChunkSize, ConnectionInfoPtr connectionInfo):
+			TCPBasicConnection(mutex, ioChunkSize, connectionInfo), _client(client)
 		{
 			_connectionInfo->token = (uint64_t)this;	//-- if using Virtual Derive, must do this. Else, this is just redo the action in base class.
-		}
-
-		TCPClientConnection(TCPClientPtr client, std::mutex* mutex, int ioChunkSize, size_t callbackMapSize,
-			ConnectionInfoPtr connectionInfo, IQuestProcessorPtr questProcessor):
-			TCPBasicConnection(mutex, ioChunkSize, connectionInfo), _client(client), _questProcessor(questProcessor)
-		{
-			_connectionInfo->token = (uint64_t)this;	//-- if using Virtual Derive, must do this. Else, this is just redo the action in base class. 
 		}
 
 		~TCPClientConnection() {}

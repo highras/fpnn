@@ -123,6 +123,83 @@ namespace fpnn{
 					return dst;
 				} 
 
+			
+			msgpack::type::object_type getObjectType(const char* k){
+				return getObject(k).type;
+			}
+			msgpack::type::object_type getObjectType(const std::string& k){
+				return getObject(k).type;
+			}
+			//get the type of key, if key not exist, return false
+			bool isInt(const char* k){ 
+				msgpack::type::object_type otype = getObjectType(k);
+				if(otype == msgpack::type::POSITIVE_INTEGER || otype == msgpack::type::NEGATIVE_INTEGER)
+					return true;
+				return false;
+			}
+			bool isInt(const std::string& k)		{ return isInt(k.c_str()); }
+			bool isBool(const char* k){ 
+				msgpack::type::object_type otype = getObjectType(k);
+				if(otype == msgpack::type::BOOLEAN)
+					return true;
+				return false;
+			}
+			bool isBool(const std::string& k)		{ return isBool(k.c_str()); }
+			bool isDouble(const char* k){ 
+				msgpack::type::object_type otype = getObjectType(k);
+				if(otype == msgpack::type::FLOAT32 || otype == msgpack::type::FLOAT64 
+						|| otype == msgpack::type::FLOAT
+#if defined(MSGPACK_USE_LEGACY_NAME_AS_FLOAT)
+						|| otype == msgpack::type::DOUBLE
+#endif
+						)
+					return true;
+				return false;
+			}
+			bool isDouble(const std::string& k)		{ return isDouble(k.c_str()); }
+			bool isString(const char* k){ 
+				msgpack::type::object_type otype = getObjectType(k);
+				if(otype == msgpack::type::STR)
+					return true;
+				return false;
+			}
+			bool isString(const std::string& k)		{ return isString(k.c_str()); }
+			bool isBinary(const char* k){ 
+				msgpack::type::object_type otype = getObjectType(k);
+				if(otype == msgpack::type::BIN)
+					return true;
+				return false;
+			}
+			bool isBinary(const std::string& k)		{ return isBinary(k.c_str()); }
+			bool isArray(const char* k){ 
+				msgpack::type::object_type otype = getObjectType(k);
+				if(otype == msgpack::type::ARRAY)
+					return true;
+				return false;
+			}
+			bool isArray(const std::string& k)		{ return isArray(k.c_str()); }
+			bool isMap(const char* k){ 
+				msgpack::type::object_type otype = getObjectType(k);
+				if(otype == msgpack::type::MAP)
+					return true;
+				return false;
+			}
+			bool isMap(const std::string& k)		{ return isMap(k.c_str()); }
+			bool isExt(const char* k){ 
+				msgpack::type::object_type otype = getObjectType(k);
+				if(otype == msgpack::type::EXT)
+					return true;
+				return false;
+			}
+			bool isExt(const std::string& k)		{ return isExt(k.c_str()); }
+			bool isNil(const char* k){ 
+				msgpack::type::object_type otype = getObjectType(k);
+				if(otype == msgpack::type::NIL)
+					return true;
+				return false;
+			}
+			bool isNil(const std::string& k)		{ return isNil(k.c_str()); }
+
 		public:
 			FPReader(const std::string& payload){
 				unpack(payload.data(), payload.size());

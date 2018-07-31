@@ -21,37 +21,34 @@
 #include "Config.h"
 #include "TimeUtil.h"
 #include "StringUtil.h"
+#include "ServerController.h"
 
 using namespace fpnn;
 
 std::mutex TCPEpollServer::_sendQueueMutex[FPNN_SEND_QUEUE_MUTEX_COUNT];
-uint16_t TCPEpollServer::_THREAD_MIN = 2;
-uint16_t TCPEpollServer::_THREAD_MAX = 256;
-ServerPtr TCPEpollServer::_server = nullptr;
-std::atomic<bool> TCPEpollServer::_stopSignalTriggered(false);
+TCPServerPtr TCPEpollServer::_server = nullptr;
 
+static void adjustThreadPoolParams(int &minThread, int &maxThread, int constMin, int constMax)
+{
+	if (minThread < constMin)
+		minThread = constMin;
+	else if (minThread > constMax)
+		minThread = constMax;
 
-void TCPEpollServer::install_signal(){
-	if(!Setting::getBool("FPNN.server.preset.signal", true))
-		return;
-	signal(SIGXFSZ, SIG_IGN);  
-	signal(SIGPIPE, SIG_IGN);
-	signal(SIGALRM, SIG_IGN);
-	signal(SIGINT, &TCPEpollServer::stop_handler);
-	signal(SIGTERM, &TCPEpollServer::stop_handler);
-	signal(SIGQUIT, &TCPEpollServer::stop_handler);
-	signal(SIGUSR1, &TCPEpollServer::stop_handler);
-	signal(SIGUSR2, &TCPEpollServer::stop_handler);
+	if (maxThread < constMin)
+		maxThread = constMin;
+	else if (maxThread > constMax)
+		maxThread = constMax;
+
+	if (minThread > maxThread)
+		minThread = maxThread;
 }
 
-void TCPEpollServer::stop_handler(int sig){ // should a static function
-	bool status = _stopSignalTriggered.exchange(true);
-	if(_server && status == false)
-	{
-		_server->_stopSignalThread = std::thread(&TCPEpollServer::stop, _server);
-	}
+int TCPEpollServer::getCPUCount()
+{
+	int cpuCount = get_nprocs();
+	return (cpuCount < 2) ? 2 : cpuCount;
 }
-
 
 bool TCPEpollServer::initSystemVaribles(){
 	Config::initSystemVaribles();
@@ -63,29 +60,48 @@ bool TCPEpollServer::initServerVaribles(){
 
 	_backlog = Setting::getInt("FPNN.server.backlog.size", FPNN_DEFAULT_SOCKET_BACKLOG);
 
-	_ip = Setting::getString("FPNN.server.listening.ip", "");
-	if(_ip == "*") _ip = "";//listen all ip
-
-	int port = Setting::getInt("FPNN.server.listening.port", 0);
-	if(port <= 1024 || port > 65535){
-		throw FPNN_ERROR_CODE_FMT(FpnnCoreError, FPNN_EC_CORE_UNKNOWN_ERROR, "Invalide port(%d), should between(1024~~65535)", port);
-	}
-	_port = port;
-
-	_listenIPv6 = Setting::getBool("FPNN.server.ipv6.listening.enable", false);
-	if (_listenIPv6)
+	int port = Setting::getInt(std::vector<std::string>{
+		"FPNN.server.tcp.ipv4.listening.port",
+		"FPNN.server.ipv4.listening.port",
+		"FPNN.server.listening.port"}, 0);
+	if (port)
 	{
-		_ipv6 = Setting::getString("FPNN.server.ipv6.listening.ip", "");
-		if(_ipv6 == "*") _ipv6 = "";//listen all ip
+		if(port <= 1024 || port > 65535){
+			throw FPNN_ERROR_CODE_FMT(FpnnCoreError, FPNN_EC_CORE_UNKNOWN_ERROR, "Invalide TCP port(%d), should between(1024~~65535)", port);
+		}
+		_port = port;
 
-		int port6 = Setting::getInt("FPNN.server.ipv6.listening.port", 0);
+		_ip = Setting::getString(std::vector<std::string>{
+				"FPNN.server.tcp.ipv4.listening.ip",
+				"FPNN.server.ipv4.listening.ip",
+				"FPNN.server.listening.ip",
+			}, "");
+		if(_ip == "*") _ip = "";//listen all ip
+	}
+
+	int port6 = Setting::getInt(std::vector<std::string>{
+		"FPNN.server.tcp.ipv6.listening.port",
+		"FPNN.server.ipv6.listening.port",
+		}, 0);
+	if (port6)
+	{
 		if(port6 <= 1024 || port6 > 65535){
-			throw FPNN_ERROR_CODE_FMT(FpnnCoreError, FPNN_EC_CORE_UNKNOWN_ERROR, "Invalide port(%d) for IPv6, should between(1024~~65535)", port6);
+			throw FPNN_ERROR_CODE_FMT(FpnnCoreError, FPNN_EC_CORE_UNKNOWN_ERROR, "Invalide TCP port(%d) for IPv6, should between(1024~~65535)", port6);
 		}
 		_port6 = port6;
+
+		_ipv6 = Setting::getString(std::vector<std::string>{
+			"FPNN.server.tcp.ipv6.listening.ip",
+			"FPNN.server.ipv6.listening.ip"
+			}, "");
+		if(_ipv6 == "*") _ipv6 = "";//listen all ip
 	}
 
-	_timeoutQuest = Setting::getInt("FPNN.server.quest.timeout", FPNN_DEFAULT_QUEST_TIMEOUT) * 1000;
+	if (_port == 0 && _port6 == 0)
+		throw FPNN_ERROR_CODE_MSG(FpnnCoreError, FPNN_EC_CORE_UNKNOWN_ERROR, "Invalide TCP port. IPv4 & IPv6 port are all unconfigurated.");
+
+	_timeoutQuest = Setting::getInt(std::vector<std::string>{
+		"FPNN.server.tcp.quest.timeout", "FPNN.server.quest.timeout"}, FPNN_DEFAULT_QUEST_TIMEOUT) * 1000;
 
 	_timeoutIdle = Setting::getInt("FPNN.server.idle.timeout", FPNN_DEFAULT_IDLE_TIMEOUT) * 1000;
 
@@ -93,32 +109,13 @@ bool TCPEpollServer::initServerVaribles(){
 
 	_max_events = Setting::getInt("FPNN.server.max.event", FPNN_DEFAULT_MAX_EVENT);
 
-	_maxWorkerPoolQueueLength = Setting::getInt("FPNN.server.work.queue.max.size", FPNN_DEFAULT_WORK_POOL_QUEUE_SIZE);
+	_maxWorkerPoolQueueLength = Setting::getInt(std::vector<std::string>{
+		"FPNN.server.tcp.work.queue.max.size", "FPNN.server.work.queue.max.size"}, FPNN_DEFAULT_WORK_POOL_QUEUE_SIZE);
 
-	_workThreadMin = Setting::getInt("FPNN.server.work.thread.min.size", _cpuCount);
-	_workThreadMax = Setting::getInt("FPNN.server.work.thread.max.size", _cpuCount);
+	_duplexThreadMin = Setting::getInt(std::vector<std::string>{"FPNN.server.tcp.duplex.thread.min.size", "FPNN.server.duplex.thread.min.size"}, 0);
+	_duplexThreadMax = Setting::getInt(std::vector<std::string>{"FPNN.server.tcp.duplex.thread.max.size", "FPNN.server.duplex.thread.max.size"}, 0);
 
-	_ioThreadMin = Setting::getInt("FPNN.global.io.thread.min.size", _cpuCount);
-	_ioThreadMax = Setting::getInt("FPNN.global.io.thread.max.size", _cpuCount);
-
-	_duplexThreadMin = Setting::getInt("FPNN.server.duplex.thread.min.size", 0);
-	_duplexThreadMax = Setting::getInt("FPNN.server.duplex.thread.max.size", 0);
-
-	if(_workThreadMin == 0) _workThreadMin = _THREAD_MIN;
-	else if(_workThreadMin > _THREAD_MAX) _workThreadMin = _THREAD_MAX;
-
-	if(_workThreadMax == 0) _workThreadMax = _THREAD_MIN;
-	else if(_workThreadMax > _THREAD_MAX) _workThreadMax = _THREAD_MAX;
-
-	if(_ioThreadMin == 0) _ioThreadMin = _THREAD_MIN;
-	else if(_ioThreadMin > _THREAD_MAX) _ioThreadMin = _THREAD_MAX;
-
-	if(_ioThreadMax == 0) _ioThreadMax = _THREAD_MIN;
-	else if(_ioThreadMax > _THREAD_MAX) _ioThreadMax = _THREAD_MAX;
-
-	if(_workThreadMin > _workThreadMax) _workThreadMin = _workThreadMax;
-	if(_ioThreadMin > _ioThreadMax) _ioThreadMin = _ioThreadMax;
-	if(_duplexThreadMin > _duplexThreadMax) _duplexThreadMin = _duplexThreadMax;
+	if (_duplexThreadMin > _duplexThreadMax) _duplexThreadMin = _duplexThreadMax;
 
 	//-- ECC-AES encryption
 	_encryptEnabled = Setting::getBool("FPNN.server.security.ecdh.enable", false);
@@ -142,7 +139,7 @@ bool TCPEpollServer::prepare()
 {
 	if (_serverMasterProcessor->checkQuestProcessor() == false)
 	{
-		LOG_FATAL("Invalide Quest Processor.");
+		LOG_FATAL("Invalide Quest Processor for TCP server.");
 		return false;
 	}
 
@@ -156,7 +153,14 @@ bool TCPEpollServer::prepare()
 	_serverMasterProcessor->setServer(this);
 
 	if (_workerPool == nullptr)
-		configWorkerThreadPool(_workThreadMin, 1, _workThreadMin, _workThreadMax, _maxWorkerPoolQueueLength);
+	{
+		int cpuCount = getCPUCount();
+		int workThreadMin = Setting::getInt(std::vector<std::string>{"FPNN.server.tcp.work.thread.min.size", "FPNN.server.work.thread.min.size"}, cpuCount);
+		int workThreadMax = Setting::getInt(std::vector<std::string>{"FPNN.server.tcp.work.thread.max.size", "FPNN.server.work.thread.max.size"}, cpuCount);
+
+		adjustThreadPoolParams(workThreadMin, workThreadMax, 2, 256);
+		configWorkerThreadPool(workThreadMin, 1, workThreadMin, workThreadMax, _maxWorkerPoolQueueLength);
+	}
 
 	if (!_ioWorker)
 	{
@@ -168,9 +172,18 @@ bool TCPEpollServer::prepare()
 	{
 		_ioPool = GlobalIOPool::instance();
 		_ioPool->setServerIOWorker(_ioWorker);
-		/** 
-			Just ensure io Pool is inited. If is inited, it will not reconfig or reinit. */
-		_ioPool->init(_ioThreadMin, 1, _ioThreadMin, _ioThreadMax);
+
+		{
+			/** 
+				Just ensure io Pool is inited. If is inited, it will not reconfig or reinit. */
+
+			int cpuCount = getCPUCount();
+			int ioThreadMin = Setting::getInt("FPNN.global.io.thread.min.size", cpuCount);
+			int ioThreadMax = Setting::getInt("FPNN.global.io.thread.max.size", cpuCount);
+
+			adjustThreadPoolParams(ioThreadMin, ioThreadMax, 2, 256);
+			_ioPool->init(ioThreadMin, 1, ioThreadMin, ioThreadMax);
+		}
 
 		/**
 			Ensure helodLogger is newset.
@@ -191,7 +204,7 @@ bool TCPEpollServer::prepare()
 	return true;
 }
 
-void TCPEpollServer::fatalFailClean(const char* fail_info)
+void TCPEpollServer::initFailClean(const char* fail_info)
 {
 	close(_socket);
 	close(_epoll_fd);
@@ -244,20 +257,20 @@ bool TCPEpollServer::init()
 	_socket = socket(AF_INET, SOCK_STREAM, 0);
 	if (_socket == -1)
 	{
-		fatalFailClean("Create socket failed.");
+		initFailClean("Create socket failed.");
 		return false;
 	}
 
 	int reuse_addr = 1;
 	if (-1 == setsockopt(_socket, SOL_SOCKET, SO_REUSEADDR, (void*)&(reuse_addr), sizeof(reuse_addr)))
 	{
-		fatalFailClean("Socket resuing failed.");
+		initFailClean("Socket resuing failed.");
 		return false;
 	}
 
 	if (!nonblockedFd(_socket))
 	{
-		fatalFailClean("Change socket to non-blocked failed.");
+		initFailClean("Change socket to non-blocked failed.");
 		return false;
 	}
 
@@ -268,27 +281,27 @@ bool TCPEpollServer::init()
 
 	if (-1 == epoll_ctl(_epoll_fd, EPOLL_CTL_ADD, _socket, &ev))
 	{
-		fatalFailClean("Add listening socket to epoll failed.");
+		initFailClean("Add listening socket to epoll failed.");
 		return false;
 	}
 
 	//if (-1 == bind(_socket, (struct sockaddr *)(&serverAddr), sizeof(struct sockaddr))) 
 	if (-1 == bind(_socket, (struct sockaddr *)(&serverAddr), sizeof(serverAddr))) 
 	{
-		fatalFailClean("Bind listening socket failed.");
+		initFailClean("Bind listening socket failed.");
 		return false;
 	} 
 
 	if (-1 == listen(_socket, _backlog)) 
 	{
-		fatalFailClean("Listening failed.");
+		initFailClean("Listening failed.");
 		return false;
 	}
 
 	_epollEvents = new(std::nothrow) epoll_event[_max_events];
 	if (_epollEvents == NULL)
 	{
-		fatalFailClean("Create events matrix failed.");
+		initFailClean("Create events matrix for TCP server failed.");
 		return false;
 	}
 
@@ -377,7 +390,8 @@ bool TCPEpollServer::initIPv6()
 
 void TCPEpollServer::run()
 {
-	_stopped = false;
+	_stopping = false;
+	_stopSignalNotified = false;
 	while (true)
 	{
 		int readyfdsCount = epoll_wait(_epoll_fd, _epollEvents, _max_events, -1);
@@ -446,7 +460,7 @@ void TCPEpollServer::acceptIPv4Connection()
 			LOG_ERROR("Refuse connection from %s:%d", IPV4ToString(clientAddr.sin_addr.s_addr).c_str(), (int)ntohs(clientAddr.sin_port));
 			continue;
 		}
-		ConnectionInfoPtr ci(new ConnectionInfo(newSocket, ntohs(clientAddr.sin_port), IPV4ToString(clientAddr.sin_addr.s_addr), true));
+		ConnectionInfoPtr ci(new ConnectionInfo(newSocket, ntohs(clientAddr.sin_port), IPV4ToString(clientAddr.sin_addr.s_addr), true, true));
 		newConnection(newSocket, ci);
 	}
 }
@@ -487,7 +501,7 @@ void TCPEpollServer::acceptIPv6Connection()
 			LOG_ERROR("Refuse connection from [%s]:%d", buf, (int)ntohs(clientAddr.sin6_port));
 			continue;
 		}
-		ConnectionInfoPtr ci(new ConnectionInfo(newSocket, ntohs(clientAddr.sin6_port), buf, false));
+		ConnectionInfoPtr ci(new ConnectionInfo(newSocket, ntohs(clientAddr.sin6_port), buf, false, true));
 		newConnection(newSocket, ci);
 	}
 }
@@ -678,7 +692,7 @@ void TCPEpollServer::stop()
 	_serverMasterProcessor->getQuestProcessor()->serverWillStop();
 
 	_running = false;
-	_timeoutChecker.join();
+	ServerController::joinTimeoutCheckThread();
 
 	{
 		pipe(_closeNotifyFds);
@@ -695,23 +709,25 @@ void TCPEpollServer::stop()
 
 	LOG_INFO("Server is stopping ...");
 
-	while (!_stopped)
-		usleep(20000);
-
-	//-- I/O Thread pool is runnng. It will be free when server destroy.
-	//-- or need to release at this point?
+	_stopSignalNotified = true;
 }
 
 void TCPEpollServer::clean()
 {
-	close(_socket);
-	_socket = 0;
+	if (_socket > 0)
+	{
+		close(_socket);
+		_socket = 0;
+	}
 
 	if (_socket6 > 0)
 	{
 		close(_socket6);
 		_socket6 = 0;
 	}
+
+	while (!_stopSignalNotified)
+		usleep(20000);
 
 	close(_closeNotifyFds[1]);
 	close(_closeNotifyFds[0]);
@@ -733,10 +749,6 @@ void TCPEpollServer::clean()
 		delete [] _epollEvents;
 		_epollEvents = NULL;
 	}
-
-	_stopped = true;
-	if (_stopSignalThread.joinable())
-		_stopSignalThread.join();
 
 	LOG_INFO("Server stopped.");
 
@@ -784,7 +796,7 @@ void TCPEpollServer::dealAnswer(int socket, FPAnswerPtr answer)
 
 	if (_answerCallbackPool)
 	{
-		callback->fillResult(answer,  FPNN_EC_OK);
+		callback->fillResult(answer, FPNN_EC_OK);
 
 		BasicAnswerCallbackPtr task(callback);
 		_answerCallbackPool->wakeUp(task);
@@ -820,14 +832,10 @@ void TCPEpollServer::closeConnectionAfterSent(const ConnectionInfo* ci)
 	_connectionMap.closeAfterSent(ci);
 }
 
-void TCPEpollServer::timeoutCheckThread()
+void TCPEpollServer::checkTimeout()
 {
-	int statusLogIntervalCount = 0;
-
-	while (_running)
+	if (_running)
 	{
-		sleep(1);
-
 		if (_checkQuestTimeout)
 		{
 			//-- Quest Timeout: process as milliseconds
@@ -835,9 +843,9 @@ void TCPEpollServer::timeoutCheckThread()
 			std::list<std::map<uint32_t, BasicAnswerCallback*> > timeouted;
 
 			_connectionMap.extractTimeoutedCallback(current, timeouted);
-			for (auto bacMap: timeouted)
+			for (auto& bacMap: timeouted)
 			{
-				for (auto bacPair: bacMap)
+				for (auto& bacPair: bacMap)
 				{
 					if (bacPair.second)
 					{
@@ -860,10 +868,10 @@ void TCPEpollServer::timeoutCheckThread()
 		{
 			//-- Connection idle Timeout: process as seconds, not milliseconds.
 			int64_t threshold = slack_real_sec() - _timeoutIdle / 1000;
-			std::list<TCPBasicConnection*> timeouted;
+			std::list<BasicConnection*> timeouted;
 
 			_connectionMap.extractTimeoutedConnections(threshold, timeouted);
-			for (TCPBasicConnection* conn: timeouted)
+			for (BasicConnection* conn: timeouted)
 			{
 				TCPServerConnection* connection = (TCPServerConnection*)conn;
 				
@@ -880,16 +888,6 @@ void TCPEpollServer::timeoutCheckThread()
 				{
 					cleanForExistConnectionError(connection, requestPackage, "Worker pool wake up for idle connection failed. Server is exiting.");
 				}
-			}
-		}
-
-		if (_logServerStatusInfos && (fpLogLevel >= FP_LEVEL_WARN))
-		{
-			statusLogIntervalCount += 1;
-			if (statusLogIntervalCount >= _logStatusIntervalSeconds)	//-- _logStatusIntervalSeconds maybe tuned less.
-			{
-				_serverMasterProcessor->logStatus();
-				statusLogIntervalCount = 0;
 			}
 		}
 	}

@@ -8,13 +8,14 @@
 
 namespace fpnn
 {
-	class TCPBasicConnection: public IReleaseable
+	class BasicConnection: public IReleaseable
 	{
 	public:
 		enum ConnectionType
 		{
-			ClientConnectionType,
-			ServerConnectionType
+			TCPServerConnectionType,
+			TCPClientConnectionType,
+			UDPClientConnectionType
 		};
 
 	public:
@@ -24,16 +25,38 @@ namespace fpnn
 		std::atomic<int> _refCount;
 		std::atomic<bool> _needRecv;
 		std::atomic<bool> _needSend;
-		RecvBuffer _recvBuffer;
-		SendBuffer _sendBuffer;
 
 		std::unordered_map<uint32_t, BasicAnswerCallback*> _callbackMap;
 
 	public:
+		BasicConnection(ConnectionInfoPtr connectionInfo): _connectionInfo(connectionInfo), _refCount(0), _needRecv(false), _needSend(false)
+		{
+			_connectionInfo->token = (uint64_t)this;	//-- if use Virtual Derive, must redo this in subclass constructor.
+			_activeTime = slack_real_sec();
+		}
+
+		virtual ~BasicConnection()
+		{
+			close(_connectionInfo->socket);
+		}
+
 		virtual bool waitForAllEvents() = 0;
 		virtual enum ConnectionType connectionType() = 0;
 		virtual bool releaseable() { return (_refCount == 0); }
 
+		inline void setNeedSendFlag() { _needSend = true; }
+		inline void setNeedRecvFlag() { _needRecv = true; }
+		inline int socket() const { return _connectionInfo->socket; }
+		virtual int send(bool& needWaitSendEvent, std::string* data = NULL) = 0;
+	};
+
+	class TCPBasicConnection: public BasicConnection
+	{
+	public:
+		RecvBuffer _recvBuffer;
+		SendBuffer _sendBuffer;
+
+	public:
 		inline bool recvPackage(bool& needNextEvent) { return _recvBuffer.recvPackage(_connectionInfo->socket, needNextEvent); }
 		inline bool entryEncryptMode(uint8_t *key, size_t key_len, uint8_t *iv, bool streamMode)
 		{
@@ -58,10 +81,6 @@ namespace fpnn
 			_connectionInfo->_isWebSocket = true;
 		}
 
-		int socket() const { return _connectionInfo->socket; }
-
-		inline void setNeedSendFlag() { _needSend = true; }
-		inline void setNeedRecvFlag() { _needRecv = true; }
 		inline bool isEncrypted() { return _connectionInfo->_encrypted; }
 		inline bool isWebSocket() { return _connectionInfo->_isWebSocket; }
 
@@ -75,26 +94,13 @@ namespace fpnn
 		}
 		
 		TCPBasicConnection(std::mutex* mutex, int ioChunkSize, ConnectionInfoPtr connectionInfo):
-			_connectionInfo(connectionInfo), _refCount(0), _needRecv(false), _needSend(false), _recvBuffer(ioChunkSize, mutex), _sendBuffer(mutex)
+			BasicConnection(connectionInfo), _recvBuffer(ioChunkSize, mutex), _sendBuffer(mutex)
 		{
 			_connectionInfo->token = (uint64_t)this;	//-- if use Virtual Derive, must redo this in subclass constructor.
 			_connectionInfo->_mutex = mutex;
-			_activeTime = slack_real_sec();
-		}
-		
-		TCPBasicConnection(std::mutex* mutex, int ioChunkSize, size_t callbackMapSize, ConnectionInfoPtr connectionInfo):
-			_connectionInfo(connectionInfo), _refCount(0), _needRecv(false), _needSend(false), _recvBuffer(ioChunkSize, mutex), _sendBuffer(mutex),
-			_callbackMap(callbackMapSize)
-		{
-			_connectionInfo->token = (uint64_t)this;	//-- if use Virtual Deriver, must redo this in subclass constructor.
-			_connectionInfo->_mutex = mutex;
-			_activeTime = slack_real_sec();
 		}
 
-		virtual ~TCPBasicConnection()
-		{
-			close(_connectionInfo->socket);
-		}
+		virtual ~TCPBasicConnection() {}
 	};
 }
 

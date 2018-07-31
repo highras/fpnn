@@ -1,9 +1,10 @@
 OBJS_C = 
 
 OBJS_CXX = ClientEngine.o ConnectionReclaimer.o ClientIOWorker.o GlobalIOPool.o IOBuffer.o PartitionedConnectionMap.o \
-			ServerMasterProcessor.o ServerIOWorker.o TCPClient.o TCPEpollServer.o HttpParser.o Config.o Statistics.o \
+			TCPServerMasterProcessor.o ServerIOWorker.o TCPClient.o TCPEpollServer.o HttpParser.o Config.o Statistics.o \
 			Encryptor.o StandardReceiver.o EncryptedStreamReceiver.o EncryptedPackageReceiver.o WebSocketReceiver.o \
-			micro-ecc/uECC.o KeyExchange.o PEM_DER_SAX.o IQuestProcessor.o
+			micro-ecc/uECC.o KeyExchange.o PEM_DER_SAX.o IQuestProcessor.o UDPEpollServer.o UDPServerMasterProcessor.o \
+			ServerController.o UDPClient.o UDPIOBuffer.o UDPClientIOBuffer.o UDPSessions.o UDPClientIOWorker.o ClientInterface.o
 
 # Static 
 LIBFPNN_A = libfpnn.a
