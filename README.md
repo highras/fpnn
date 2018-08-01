@@ -136,6 +136,10 @@ RPC框架也一样。
 	1. [FPNN 客户端基础使用说明](doc/zh-cn/fpnn-client-basic-tutorial.md)
 	1. [FPNN 客户端高级使用说明](doc/zh-cn/fpnn-client-advanced-tutorial.md)
 
+1. 注意事项
+
+	注意事项请参见 [FPNN 注意事项](doc/zh-cn/fpnn-notices.md)
+
 
 ## 五、全部文档索引
 

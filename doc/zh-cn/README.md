@@ -36,6 +36,8 @@
 
     1. [FPNN 标准配置模版](../conf.template)
 
+    1. [FPNN 注意事项](fpnn-notices.md)
+
 1. [FPNN 内置接口](fpnn-build-in-methods.md)
 
 1. [FPNN 内置工具](fpnn-tools.md)
