@@ -8,8 +8,6 @@ FPNN.server.listening.port =
 #Listen backlog大小
 FPNN.server.backlog.size = 
 
-#server 是否监听 IPv6 地址
-FPNN.server.ipv6.listening.enable = false
 FPNN.server.ipv6.listening.ip = 
 FPNN.server.ipv6.listening.port = 
 

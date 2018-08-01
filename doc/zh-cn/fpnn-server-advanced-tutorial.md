@@ -37,15 +37,16 @@
 1. 操作系统已分配 IPv6 地址
 1. 当前网络支持 IPv6 路由
 
-以上都妥当后，在配置文件中加入以下三行即可：
+以上都妥当后，在配置文件中加入并配置以下两项即可：
 
-	FPNN.server.ipv6.listening.enable = true
 	FPNN.server.ipv6.listening.ip = 
 	FPNN.server.ipv6.listening.port =
 
 其中 FPNN.server.ipv6.listening.ip 可不填。
 
-当服务器启动后，将同时监听 IPv4 端口 及 IPv6 端口。
+当服务器启动后，将监听 IPv6 端口。
+
+**注意**：FPNN 可同时监听 IPv4 和 IPv6 端口。
 
 
 

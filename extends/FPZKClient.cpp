@@ -159,7 +159,10 @@ FPZKClient::FPZKClient(const std::string& fpzkSrvList, const std::string& projec
 	_syncForPublic = Setting::getBool("FPZK.client.sync.syncPublicInfo", false);
 
 	_domain = ServerInfo::getServerDomain();
-	_port = Setting::getInt("FPNN.server.listening.port", 0);
+	_port = Setting::getInt(std::vector<std::string>{
+		"FPNN.server.tcp.ipv4.listening.port",
+		"FPNN.server.ipv4.listening.port",
+		"FPNN.server.listening.port"}, 0);
 	_ipv4 = ServerInfo::getServerLocalIP4();
 	_registeredEndpoint.append(_ipv4).append(":").append(std::to_string(_port));
 	_cluster = Setting::getString("FPNN.server.cluster.name", "");
@@ -168,23 +171,20 @@ FPZKClient::FPZKClient(const std::string& fpzkSrvList, const std::string& projec
 	if (_syncForPublic)
 	{
 		_ipv4 = ServerInfo::getServerPublicIP4();
-		bool ipv6Enable = Setting::getBool("FPNN.server.ipv6.listening.enable", false);
-		if (ipv6Enable)
+		_port6 = Setting::getInt(std::vector<std::string>{
+			"FPNN.server.tcp.ipv6.listening.port",
+			"FPNN.server.ipv6.listening.port",
+			}, 0);
 		{
 			std::map<enum IPTypes, std::set<std::string>> ipDict;
-
-			_port6 = Setting::getInt("FPNN.server.ipv6.listening.port", 0);
 			if (getIPs(ipDict))
 			{
 				std::set<std::string>& global = ipDict[IPv6_Global];
 				if (global.size() > 0)
 					_ipv6 = *(global.begin());
 			}
-		}
-		if (ipv6Enable == false || _ipv6.empty())
-		{
-			_port6 = _port;
-			_ipv6 = ServerInfo::getServerPublicIP6();
+			if (_ipv6.empty())
+				_ipv6 = ServerInfo::getServerPublicIP6();
 		}
 	}
 
