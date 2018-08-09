@@ -119,7 +119,8 @@ namespace fpnn
 		inline bool isWebSocket() const { return _isWebSocket; }
 
 		ConnectionInfo(const ConnectionInfo& ci): _mutex(0), _isTCP(ci._isTCP), _isIPv4(ci._isIPv4),
-			_encrypted(ci._encrypted), _internalAddress(ci._internalAddress), _serverConnection(ci._serverConnection),
+			_encrypted(ci._encrypted), _isWebSocket(ci._isWebSocket), _internalAddress(ci._internalAddress),
+			_serverConnection(ci._serverConnection), _socketAddress(NULL),
 			token(ci.token), socket(ci.socket), port(ci.port), ip(ci.ip), ipv4(ci.ipv4)
 		{
 			if (ci._socketAddress)
