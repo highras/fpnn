@@ -37,7 +37,10 @@ bool TCPServerConnection::waitForAllEvents()
 		ev.events = EPOLLOUT | EPOLLERR | EPOLLHUP | EPOLLET | EPOLLRDHUP | EPOLLONESHOT;
 
 	if (epoll_ctl(_epoll_fd, EPOLL_CTL_MOD, _connectionInfo->socket, &ev) != 0)
+	{
+		LOG_ERROR("Server wait socket event failed. Socket: %d, errno: %d", _connectionInfo->socket, errno);
 		return false;
+	}
 	else
 		return true;
 }
@@ -52,7 +55,10 @@ bool TCPServerConnection::waitForRecvEvent()
 		ev.events = EPOLLERR | EPOLLHUP | EPOLLET | EPOLLRDHUP | EPOLLONESHOT;
 
 	if (epoll_ctl(_epoll_fd, EPOLL_CTL_MOD, _connectionInfo->socket, &ev) != 0)
+	{
+		LOG_ERROR("Server wait socket event failed. Socket: %d, errno: %d", _connectionInfo->socket, errno);
 		return false;
+	}
 	else
 		return true;
 }
@@ -73,6 +79,9 @@ void TCPServerConnection::exitEpoll()
 
 bool TCPServerIOWorker::read(TCPServerConnection * connection, bool& additionalSend)
 {
+	if (connection->_connectionInfo->isSSL() && connection->_sslContext._negotiate != SSLNegotiate::Normal)
+		return true;
+
 	if (!connection->_recvBuffer.getToken())
 		return true;
 
@@ -417,6 +426,10 @@ bool TCPServerIOWorker::sendData(TCPServerConnection * connection, bool& fdInval
 {
 	fdInvalid = false;
 	needWaitSendEvent = false;
+	
+	if (connection->_connectionInfo->isSSL() && connection->_sslContext._negotiate != SSLNegotiate::Normal)
+		return true;
+
 	int errno_ = connection->send(needWaitSendEvent);
 	switch (errno_)
 	{
@@ -428,7 +441,7 @@ bool TCPServerIOWorker::sendData(TCPServerConnection * connection, bool& fdInval
 	case EINVAL:
 	default:
 		fdInvalid = true;
-		LOG_ERROR("Sending error. Connection will be closed soon. %s", connection->_connectionInfo->str().c_str());
+		LOG_ERROR("Sending error. Connection will be closed soon. errno/code: %d, %s", errno_, connection->_connectionInfo->str().c_str());
 	}
 	connection->_needSend = false;
 
@@ -444,6 +457,7 @@ void TCPServerIOWorker::run(TCPServerConnection * connection)
 {
 	bool fdInvalid = false;
 	bool needWaitSendEvent = false;
+	bool executeDataTransmission = true;
 
 	if (connection->_requireClose)
 	{
@@ -451,25 +465,52 @@ void TCPServerIOWorker::run(TCPServerConnection * connection)
 		return;
 	}
 
-	if (connection->_needSend)
+	if (connection->_connectionInfo->isSSL())
 	{
-		if (sendData(connection, fdInvalid, needWaitSendEvent) == false)
-			return;
-	}
-	if (!fdInvalid && connection->_needRecv)
-	{
-		bool additionalSend = false;
-		fdInvalid = !read(connection, additionalSend);
-		connection->_needRecv = false;
+		if (connection->_sslContext._connected == false)
+		{
+			if (connection->_sslContext.doHandshake(needWaitSendEvent, connection->_connectionInfo.get()) == false)
+			{
+				closeConnection(connection, true);
+				return;
+			}
 
-		if (additionalSend && !fdInvalid && !needWaitSendEvent)
+			executeDataTransmission = connection->_sslContext._connected;
+			if (executeDataTransmission && connection->_sendBuffer.empty() == false)
+				connection->_needSend = true;
+		}
+		else if (connection->_sslContext._negotiate != SSLNegotiate::Normal)
+		{
+			LOG_INFO("SSL/TSL negotiate is continue.");
+
+			connection->_sslContext._negotiate = SSLNegotiate::Normal;
+			if (connection->_sendBuffer.empty() == false)
+				connection->_needSend = true;
+		}
+	}
+
+	if (executeDataTransmission)
+	{
+		if (connection->_needSend)
+		{
 			if (sendData(connection, fdInvalid, needWaitSendEvent) == false)
 				return;
-
-		if (connection->_requireClose)
+		}
+		if (!fdInvalid && connection->_needRecv)
 		{
-			closeConnection(connection, false);
-			return;
+			bool additionalSend = false;
+			fdInvalid = !read(connection, additionalSend);
+			connection->_needRecv = false;
+
+			if (additionalSend && !fdInvalid && !needWaitSendEvent)
+				if (sendData(connection, fdInvalid, needWaitSendEvent) == false)
+					return;
+
+			if (connection->_requireClose)
+			{
+				closeConnection(connection, false);
+				return;
+			}
 		}
 	}
 	

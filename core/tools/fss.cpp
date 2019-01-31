@@ -12,6 +12,7 @@ using namespace fpnn;
 void showUsage(const char* appName)
 {
 	cout<<"Usage: "<<appName<<" ip port"<<endl;
+	cout<<"Usage: "<<appName<<" ip port -ssl"<<endl;
 	cout<<"Usage: "<<appName<<" ip port -pem pem-file [encrypt-mode-opt] [encrypt-strength-opt]"<<endl;
 	cout<<"Usage: "<<appName<<" ip port -der der-file [encrypt-mode-opt] [encrypt-strength-opt]"<<endl;
 	cout<<"Usage: "<<appName<<" ip port ecc-curve raw-public-key-file [encrypt-mode-opt] [encrypt-strength-opt]"<<endl;
@@ -61,6 +62,12 @@ TCPClientPtr buildClient(int argc, const char* argv[])
 	TCPClientPtr client = TCPClient::createClient(argv[1], atoi(argv[2]));
 	if (argc == 3)
 		return client;
+
+	if (argc == 4 && strcmp(argv[3], "-ssl") == 0)
+	{
+		client->enableSSL();
+		return client;
+	}
 
 	if (argc < 5)
 	{
@@ -170,7 +177,7 @@ bool executeCommand(TCPClientPtr client, const std::string& cmd)
 
 int main(int argc, const char* argv[])
 {
-	cout<<"FPNN Secure Shell v1.0"<<endl;
+	cout<<"FPNN Secure Shell v1.1"<<endl;
 
 	TCPClientPtr client = buildClient(argc, argv);
 	cout<<"Command format: method json-body [oneway] [timeout=xxx]"<<endl<<endl;

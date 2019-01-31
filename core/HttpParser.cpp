@@ -83,10 +83,10 @@ bool HttpParser::parseHeader(ChainBuffer* cb, int header_length)
 		std::vector<std::string> elems;
 		StringUtil::split(line, " ", elems);
 		if (elems.size() != 3) 
-			throw FPNN_ERROR_CODE_FMT(FpnnHTTPError, FPNN_EC_CORE_HTTP_ERROR, "Unknown HTTP protocol (%s)", line);
+			throw FPNN_ERROR_CODE_FMT(FpnnHTTPError, FPNN_EC_CORE_HTTP_ERROR, "Unknown HTTP protocol-1 (%s)", line);
 
 		if ((elems[0].compare("GET") != 0 && elems[0].compare("POST") != 0) || elems[2].compare(0,7,"HTTP/1.") != 0)
-			throw FPNN_ERROR_CODE_FMT(FpnnHTTPError, FPNN_EC_CORE_HTTP_ERROR, "Unknown HTTP protocol (%s)", line);
+			throw FPNN_ERROR_CODE_FMT(FpnnHTTPError, FPNN_EC_CORE_HTTP_ERROR, "Unknown HTTP protocol-2 (%s)", line);
 
 		if(elems[0].compare("GET") == 0)
 			_post = false;
@@ -96,7 +96,7 @@ bool HttpParser::parseHeader(ChainBuffer* cb, int header_length)
 		elems.clear();
 		StringUtil::split(uri, "?", elems);
 		if(elems.size() > 2)
-			throw FPNN_ERROR_CODE_FMT(FpnnHTTPError, FPNN_EC_CORE_HTTP_ERROR, "Unknown HTTP protocol (%s)", line);
+			throw FPNN_ERROR_CODE_FMT(FpnnHTTPError, FPNN_EC_CORE_HTTP_ERROR, "Unknown HTTP protocol-3 (%s)", line);
 		std::string method = elems[0];
 		if(elems.size() == 2)
 			uri = elems[1];
@@ -106,7 +106,7 @@ bool HttpParser::parseHeader(ChainBuffer* cb, int header_length)
 		elems.clear();
 		StringUtil::split(method, "/", elems);
 		if(elems.size() != 2)
-			throw FPNN_ERROR_CODE_FMT(FpnnHTTPError, FPNN_EC_CORE_HTTP_ERROR, "Unknown HTTP protocol (%s)", line);
+			throw FPNN_ERROR_CODE_FMT(FpnnHTTPError, FPNN_EC_CORE_HTTP_ERROR, "Unknown HTTP protocol-4 (%s)", line);
 
 		if(elems[0].compare("service") != 0)
 			throw FPNN_ERROR_CODE_FMT(FpnnHTTPError, FPNN_EC_CORE_HTTP_ERROR, "Not Valid FPNN HTTP protocol (%s)", line);

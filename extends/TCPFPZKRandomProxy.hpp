@@ -11,8 +11,8 @@ namespace fpnn
 	{
 	public:
 		//-- If questTimeoutSeconds less then zero, mean using global settings.
-		TCPFPZKRandomProxy(FPZKClientPtr fpzkClient, const std::string& serviceName, int64_t questTimeoutSeconds = -1):
-			TCPFPZKProxyCore(fpzkClient, serviceName, questTimeoutSeconds)
+		TCPFPZKRandomProxy(FPZKClientPtr fpzkClient, const std::string& serviceName, const std::string& cluster = "", int64_t questTimeoutSeconds = -1):
+			TCPFPZKProxyCore(fpzkClient, serviceName, cluster, questTimeoutSeconds)
 		{
 		}
 

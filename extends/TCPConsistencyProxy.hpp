@@ -100,6 +100,7 @@ namespace fpnn
 
 	protected:
 		virtual void beforeBorcastQuest() {}
+		virtual void beforeGetClient() {}
 
 		virtual void afterUpdate()
 		{
@@ -134,6 +135,27 @@ namespace fpnn
 			 * from _callbackMapSuite. When the last ConsistencyAnswerCallback destroyed, _callbackMapSuite's reference count will
 			 * come to zero, and _callbackMapSuite will be destroyed. 
 			 */
+		}
+
+		TCPClientPtr getClient(const std::string& endpoint, bool connect)
+		{
+			std::unique_lock<std::mutex> lck(_mutex);
+			beforeGetClient();
+
+			auto iter = _clients.find(endpoint);
+			if (iter != _clients.end())
+			{
+				TCPClientPtr client = iter->second;
+				if (!connect || client->connected() || client->reconnect())
+					return client;
+			}
+			else
+			{
+				TCPClientPtr client = createTCPClient(endpoint, connect);
+				if (client)
+					return client;
+			}
+			return nullptr;
 		}
 
 		/**

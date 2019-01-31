@@ -12,6 +12,16 @@ using namespace fpnn;
 
 extern std::mutex gc_outputMutex;
 
+struct EncryptInfo
+{
+	bool ssl;
+	std::string eccPemData;
+	bool packagemode;
+	bool reinforce;
+
+	EncryptInfo(): ssl(false), packagemode(true), reinforce(false) {}
+};
+
 class StressController
 {
 	TCPClientPtr _client;
@@ -57,6 +67,7 @@ private:
 	bool checkActorStatus(const std::string& actorMD5, bool& avaliableCenterCached, std::set<std::string>& allDeployerEndpoints, std::set<std::string>& useableEndpoints);
 	std::string prepareUniqueId();
 	std::string prepareActorParams(const std::string& uuid);
+	bool prepareEncryptInfo(struct EncryptInfo& info);
 	void prepareAutoTest(std::string& actorInstanceName, std::string& launchParams, int& perConnCount, int& perQPS);
 	void printActionHint(const std::string& hintLineInfo);
 	void monitor();

@@ -82,7 +82,7 @@ namespace fpnn
 
 	public:
 		ClientEngine();
-		~ClientEngine()
+		virtual ~ClientEngine()
 		{
 			 stop();
 			 

@@ -18,7 +18,7 @@ const msgpack::object& FPReader::_find(const char* key){
 
 		do{
 			if(pkv->key.type != msgpack::type::STR) 
-				throw FPNN_ERROR_CODE_FMT(FpnnProtoError, FPNN_EC_PROTO_STRING_KEY, "Key type:%d", pkv->key.type);
+				throw FPNN_ERROR_CODE_FMT(FpnnProtoError, FPNN_EC_PROTO_STRING_KEY, "Key type: %d, data: %s", pkv->key.type, json().c_str());
 
 			if(strlen(key) == pkv->key.via.str.size &&
                                 !strncmp(pkv->key.via.str.ptr, key, pkv->key.via.str.size)) return pkv->val;
@@ -36,7 +36,7 @@ const msgpack::object& FPReader::_find(const char* key){
 		}while (pkv < pkv_end);
 	}   
 
-	throw FPNN_ERROR_CODE_FMT(FpnnProtoError, FPNN_EC_PROTO_KEY_NOT_FOUND, "KEY:%s NOT FOUND", key);
+	throw FPNN_ERROR_CODE_FMT(FpnnProtoError, FPNN_EC_PROTO_KEY_NOT_FOUND, "KEY: %s NOT FOUND, data: %s", key, json().c_str());
 }
 
 bool FPReader::wantFile(const char* k, FileSystemUtil::FileAttrs& attrs){

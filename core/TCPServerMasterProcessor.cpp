@@ -213,6 +213,21 @@ void TCPServerMasterProcessor::run(RequestPackage * requestPackage)
 	else if (requestPackage->_ioEvent == IOEventType::Connected)
 	{
 		try{
+			if (requestPackage->_connectionInfo->isSSL())
+			{
+				if (!requestPackage->_connection->prepareSSL(true))
+				{
+					LOG_ERROR("Error occurred when prepare SSL. %s", requestPackage->_connectionInfo->str().c_str());
+					OpenSSLModule::logLastErrors();
+
+					_server->takeConnection(requestPackage->_connectionInfo.get());
+					_server->decreaseConnectionCount();
+					::close(requestPackage->_connectionInfo->socket);
+					delete requestPackage->_connection;
+					delete requestPackage;
+					return;
+				}
+			}
 			_questProcessor->connected(*(requestPackage->_connectionInfo.get()));
 		}
 		catch (const FpnnError& ex){
@@ -222,6 +237,7 @@ void TCPServerMasterProcessor::run(RequestPackage * requestPackage)
 		{
 			LOG_ERROR("Unknown error when calling connected() function. %s", requestPackage->_connectionInfo->str().c_str());
 		}
+
 		if (!requestPackage->_connection->joinEpoll())
 		{
 			LOG_ERROR("Add socket into epoll failed. Connection will be closed by server-end. %s", requestPackage->_connectionInfo->str().c_str());

@@ -230,28 +230,20 @@
 			virtual void connected(const ConnectionInfo&) {}
 			链接已经建立。在该函数返回前，链接将被阻塞，不能进行数据收发操作。
 
-			链接关闭事件 [new for FPNN.v2]
+			链接关闭事件
 			virtual void connectionWillClose(const ConnectionInfo&, bool closeByError) {}
 			链接将被关闭。进入该事件后，该链接上的收发操作将不再成功。
 			closeByError 标识链接是否因为错误而被关闭，还是主动／正常关闭。
-
-			链接关闭事件 [Deprecated in FPNN.v2, will removed in FPNN.v3.]
-			virtual void connectionClose(const ConnectionInfo&) {}
-			链接将被关闭。进入该事件后，该链接上的收发操作将不再成功。
-
-			链接错误(将被关闭)事件 [Deprecated in FPNN.v2, will removed in FPNN.v3.]
-			virtual void connectionErrorAndWillBeClosed(const ConnectionInfo&) {}
-			链接发生错误，将被关闭。进入该事件后，该链接上的收发操作将不再成功。
  
 			注意：
 				可能出现的状况：闪联。
-				此时，fpnn 框架保证 connected() 调用完成后，connectionClose() 或 connectionErrorAndWillBeClosed() 才会被调用。
+				此时，fpnn 框架保证 connected() 调用完成后，connectionWillClose() 才会被调用。
  
-			请求方法错误
+		d. 请求方法错误
 			virtual FPAnswerPtr unknownMethod(const std::string& method_name, const FPReaderPtr args, const FPQuestPtr quest, const ConnectionInfo& connInfo)
 			当请求的方法不存在时，将进入该事件。默认返回 FPNN_EC_CORE_UNKNOWN_METHOD 错误。
 
-		d. 服务器事件
+		e. 服务器事件
 			目前 IQuestProcessor 支持 hook 的服务器事件如下：
 			服务器启动事件
 			virtual void start() {}
@@ -282,7 +274,7 @@
 			virtual void tune(const std::string& key, std::string& value) {}
 			输入需要调整的项目，和对应的目标值。
 		
-		e. server Push & duplex 双向通道
+		f. server Push & duplex 双向通道
 			服务器默认支持 server 向 client 发送 oneway 消息。
 			如果服务器需要向 client 发送 two-way 消息，则需要执行以下两个操作中，任意一个：
 
@@ -379,7 +371,7 @@ void enableAnswerCallbackThreadPool(int32_t initCount, int32_t perAppendCount, i
 			*. 异步请求对象支持并行发送请求。
 			*. 支持同一连接上多个异步请求对象并行发送请求。
 			
-		f. HTTP支持
+		g. HTTP支持
 			FPNN 框架支持直接处理 HTTP POST 请求。
 			默认情况下，FPNN 框架只处理TCP请求。如果配置项
 			FPNN.server.http.supported
@@ -404,7 +396,7 @@ void enableAnswerCallbackThreadPool(int32_t initCount, int32_t perAppendCount, i
 			FPNN.server.http.cross.origin
 			跨域访问支持
 
-		g. 高级配置
+		h. 高级配置
 			完整的配置项列表，请参见“附录：完整的配置文件模版”。
 
 			FPNN.global.max.package.len
@@ -433,7 +425,7 @@ void enableAnswerCallbackThreadPool(int32_t initCount, int32_t perAppendCount, i
 			FPNN.server.perfect.connections
 			服务器同时处理的最佳链接数量。将影响管理链接的 hash map 的大小。
 
-		h. 注意事项
+		i. 注意事项
 			*. 从版本 1.0.2 开始，框架内置的方法和连接建立事件会优先于所有用户方法执行。
 			如果框架内置方法在任务队列中积压，则框架内置方法将以先进后出的顺序被调用，类似堆栈；所有用户方法将以正常的先进先出顺序被调用。
 
@@ -446,22 +438,14 @@ void enableAnswerCallbackThreadPool(int32_t initCount, int32_t perAppendCount, i
 			virtual void connected(const ConnectionInfo&) {}
 			链接已经建立。在该函数返回前，链接将被阻塞，不能进行数据收发操作。
 
-			链接关闭事件 [new for FPNN.v2]
+			链接关闭事件
 			virtual void connectionWillClose(const ConnectionInfo&, bool closeByError) {}
 			链接将被关闭。进入该事件后，该链接上的收发操作将不再成功。
 			closeByError 标识链接是否因为错误而被关闭，还是主动／正常关闭。
-
-			链接关闭事件 [Deprecated in FPNN.v2, will removed in FPNN.v3.]
-			virtual void connectionClose(const ConnectionInfo&) {}
-			链接将被关闭。进入该事件后，该链接上的收发操作将不再成功。
-
-			链接错误(将被关闭)事件 [Deprecated in FPNN.v2, will removed in FPNN.v3.]
-			virtual void connectionErrorAndWillBeClosed(const ConnectionInfo&) {}
-			链接发生错误，将被关闭。进入该事件后，该链接上的收发操作将不再成功。
  
 			注意：
 			可能出现的状况：闪联。
-			此时，fpnn 框架保证 connected() 调用完成后，connectionClose() 或 connectionErrorAndWillBeClosed() 才会被调用。
+			此时，fpnn 框架保证 connected() 调用完成后，connectionWillClose() 才会被调用。
  
 			请求方法错误
 			virtual FPAnswerPtr unknownMethod(const std::string& method_name, const FPReaderPtr args, const FPQuestPtr quest, const ConnectionInfo& connInfo)
@@ -588,9 +572,10 @@ void enableAnswerCallbackThreadPool(int32_t initCount, int32_t perAppendCount, i
 		请参考源代码（很简单）。
 
 	2. Proxies
-		目前包含4类：Carp Proxy，Rotatory Proxy，Random Proxy，Consistency Proxy。
-		每类包含普通版本(无集群管理服务)和FPZK(Funplus Cluster Manager)版本。
-		以上8种Proxy均支持异步、同步、异步duplex独享QuestProcessor、异步duplex共享QuestProcessor、同步duplex独享QuestProcessor、同步duplex共享QuestProcessor 6种模式。
+		Proxies 目前分为 无集群管理服务版本 和 有集群管理服务(FPZK)版本 两类。
+		两类均包含：Broadcast Proxy，Carp Proxy，Rotatory Proxy，Random Proxy，Consistency Proxy。
+		另外 有集群管理服务版本 还提供 Oldest Proxy。
+		以上11种Proxy均支持异步、同步、异步duplex独享QuestProcessor、异步duplex共享QuestProcessor、同步duplex独享QuestProcessor、同步duplex共享QuestProcessor 6种模式。
 
 		FPZK版本的 Rotatory Proxy、Random Proxy 会自动清除失效的endpoint信息，普通版本 Proxies 不会自动清除。
 
@@ -615,7 +600,22 @@ void enableAnswerCallbackThreadPool(int32_t initCount, int32_t perAppendCount, i
 				该接口对 FPZK 版本同样有效，但 FPZK 版本通过 FPZKClient 进行更新，因此不建议 FPZK 版本使用该接口。
 
 
-			b. TCPCarpProxy & TCPFPZKCarpProxy
+			b. TCPBroadcastProxy & TCPFPZKBroadcastProxy
+				广播集群代理。
+
+				通用接口参见“Proxy通用接口”部分。
+
+				获取 client：
+					TCPClientPtr getClient(const std::string& endpoint, bool connect);
+
+				发送消息：
+					std::map<std::string, FPAnswerPtr> sendQuest(FPQuestPtr quest);
+					bool sendQuest(FPQuestPtr quest, BroadcastAnswerCallback* callback);
+					bool sendQuest(FPQuestPtr quest, std::function<void (const std::string& endpoint, FPAnswerPtr answer, int errorCode)> task);
+					bool sendQuest(FPQuestPtr quest, std::function<void (std::map<std::string, FPAnswerPtr>& answerMap)> task);
+
+
+			c. TCPCarpProxy & TCPFPZKCarpProxy
 				一致性哈希集群代理。
 
 				通用接口参见“Proxy通用接口”部分。
@@ -634,7 +634,7 @@ void enableAnswerCallbackThreadPool(int32_t initCount, int32_t perAppendCount, i
 					bool sendQuest(const std::string& key, FPQuestPtr quest, std::function<void (FPAnswerPtr answer, int errorCode)> task);
  
  
-			c. TCPRotatoryProxy & TCPFPZKRotatoryProxy
+			d. TCPRotatoryProxy & TCPFPZKRotatoryProxy
 				轮转集群代理。
 				TCPFPZKRotatoryProxy 会自动删除失效的endpoints, TCPRotatoryProxy 不会。
 
@@ -649,7 +649,7 @@ void enableAnswerCallbackThreadPool(int32_t initCount, int32_t perAppendCount, i
 					bool sendQuest(FPQuestPtr quest, std::function<void (FPAnswerPtr answer, int errorCode)> task);
 
 
-			d. TCPRandomProxy & TCPFPZKRandomProxy
+			e. TCPRandomProxy & TCPFPZKRandomProxy
 				随机集群代理。
 				TCPFPZKRandomProxy 会自动删除失效的endpoints, TCPRandomProxy 不会。
 
@@ -664,7 +664,7 @@ void enableAnswerCallbackThreadPool(int32_t initCount, int32_t perAppendCount, i
 					bool sendQuest(FPQuestPtr quest, std::function<void (FPAnswerPtr answer, int errorCode)> task);
 
 
-			e. TCPConsistencyProxy & TCPFPZKConsistencyProxy
+			f. TCPConsistencyProxy & TCPFPZKConsistencyProxy
 				强一致性集群代理。
 
 				强一致性类型：
@@ -683,6 +683,21 @@ void enableAnswerCallbackThreadPool(int32_t initCount, int32_t perAppendCount, i
 					FPAnswerPtr sendQuest(FPQuestPtr quest, ConsistencySuccessCondition condition, int requiredCount = 0);
 					bool sendQuest(FPQuestPtr quest, AnswerCallback* callback, ConsistencySuccessCondition condition, int requiredCount = 0);
 					bool sendQuest(FPQuestPtr quest, std::function<void (FPAnswerPtr answer, int errorCode)> task, ConsistencySuccessCondition condition, int requiredCount = 0);
+
+
+			g. TCPFPZKOldestProxy
+				最久运行服务代理。
+				用于持续集群中访问注册时间最早，运行最久的服务实例。
+
+				通用接口参见“Proxy通用接口”部分。
+
+				获取 client：
+					TCPClientPtr getClient(bool connect);
+
+				发送消息：
+					FPAnswerPtr sendQuest(FPQuestPtr quest);
+					bool sendQuest(FPQuestPtr quest, AnswerCallback* callback);
+					bool sendQuest(FPQuestPtr quest, std::function<void (FPAnswerPtr answer, int errorCode)> task);
 
 四、附录：
 	1. 完整的配置文件模版

@@ -12,8 +12,8 @@ namespace fpnn
 
 	public:
 		//-- If questTimeoutSeconds less then zero, mean using global settings.
-		TCPFPZKRotatoryProxy(FPZKClientPtr fpzkClient, const std::string& serviceName, int64_t questTimeoutSeconds = -1):
-			TCPFPZKProxyCore(fpzkClient, serviceName, questTimeoutSeconds), _index(0)
+		TCPFPZKRotatoryProxy(FPZKClientPtr fpzkClient, const std::string& serviceName, const std::string& cluster = "", int64_t questTimeoutSeconds = -1):
+			TCPFPZKProxyCore(fpzkClient, serviceName, cluster, questTimeoutSeconds), _index(0)
 		{
 		}
 

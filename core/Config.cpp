@@ -53,16 +53,17 @@ void Config::initSystemVaribles(){
     }   
 
     key = "FPNN.server.rlimit.max.nofile";
-    if(Setting::setted(key)){
-        n = Setting::getInt(key);
+    //if(Setting::setted(key)){
+	{
+        n = Setting::getInt(key, 100000);
         rlim.rlim_cur = n;
         rlim.rlim_max = n;
         setrlimit(RLIMIT_NOFILE, &rlim);
     } 
 
     key = "FPNN.server.rlimit.stack.size";
-    if(Setting::setted(key)){
-        n = Setting::getInt(key);
+	if(Setting::setted(key)){
+		n = Setting::getInt(key);
         rlim.rlim_cur = n;
         rlim.rlim_max = n;
         setrlimit(RLIMIT_STACK, &rlim);
@@ -90,11 +91,12 @@ void Config::initServerVaribles(){
     if (serverVariablesConfigured)
         return;
 
-    _sName = Setting::getString("FPNN.server.name", "FPNN.TEST");
+    _sName = Setting::getString("FPNN.server.name", "FPNN.Server");
 
-    std::string logEndpoint = Setting::getString("FPNN.server.log.endpoint", "std::cout");
-    std::string logRoute = Setting::getString("FPNN.server.log.route", "FPNN.TEST");
-    std::string logLevel = Setting::getString("FPNN.server.log.level", "DEBUG");
+    std::string logEndpoint = Setting::getString("FPNN.server.log.endpoint", "unix:///tmp/fplog.sock");
+    std::string logLevel = Setting::getString("FPNN.server.log.level", "ERROR");
+    std::string logRoute = Setting::getString("FPNN.server.log.route");
+	if(!logRoute.size()) logRoute = _sName;
     FPLog::init(logEndpoint, logRoute, logLevel, _sName);
 
 	_log_server_quest = Setting::getBool("FPNN.server.quest.log", false);
@@ -106,7 +108,7 @@ void Config::initServerVaribles(){
     if (_logStatusIntervalSeconds < 1)
         _logServerStatusInfos = false;
 
-	_server_http_supported = Setting::getBool("FPNN.server.http.supported", false);
+    _server_http_supported = Setting::getBool("FPNN.server.http.supported", false);
     _server_http_close_after_answered = Setting::getBool("FPNN.server.http.closeAfterAnswered", false);
 	_server_stat = Setting::getBool("FPNN.server.stat", true);
 	_server_preset_signals = Setting::getBool("FPNN.server.preset.signal", true);

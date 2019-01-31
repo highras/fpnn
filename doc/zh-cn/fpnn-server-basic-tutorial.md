@@ -206,10 +206,10 @@ DemoServer.cpp
 		对于数组，假设参数名为 IntArray 和 StringArray
 
 			std::vector<int> arr = args->want("IntArray", std::vector<int>())
-			std::vector<std::string> arr = args->want("IntArray", std::vector<std::string>())
+			std::vector<std::string> arr = args->want("StringArray", std::vector<std::string>())
 			//-- or
 			std::vector<int> arr = args->get("IntArray", std::vector<int>())
-			std::vector<std::string> arr = args->get("IntArray", std::vector<std::string>())
+			std::vector<std::string> arr = args->get("StringArray", std::vector<std::string>())
 
 		更多更详细的接口，请参见：<fpnn-folder>/proto/FPReader.h。  
 		更多实例请参见 <fpnn-folder>/proto/test/。
@@ -414,9 +414,9 @@ logAgent 采用默认配置时，`FPNN.server.log.endpoint` 可配置为
 执行 `./DemoServer demo.conf` 即可。
 
 测试 echo 接口：  
-运行 FPNN cmd  命令：`./cmd localhost 6789 echo '{"feedback":"Hello, FPNN!"}' 1 1`
+运行 FPNN cmd  命令：`./cmd localhost 6789 echo '{"feedback":"Hello, FPNN!"}'`
 
 测试 notify 接口：  
-运行 FPNN cmd  命令：`./cmd localhost 6789 notify '{"type":"normal", "value":2.3}' 0 1`
+运行 FPNN cmd  命令：`./cmd localhost 6789 notify '{"type":"normal", "value":2.3}' -oneway`
 
 FPNN cmd 命令，请参考 [FPNN 内置工具](fpnn-tools.md) 相关条目。

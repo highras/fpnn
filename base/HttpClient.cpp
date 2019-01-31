@@ -20,12 +20,14 @@ static size_t OnWriteData(void* buffer, size_t size, size_t nmemb, void* lpVoid)
     return nmemb;  
 }  
 
-int HttpClient::Post(const std::string& url, const std::string& data, std::string& resp, int timeout){
-    CURL* curl = curl_easy_init();  
-    if(NULL == curl)  
-    {  
-        return -1;  
-    }  
+int HttpClient::Post(const std::string& url, const std::string& data, const std::vector<std::string>& header, std::string& resp, int timeout){
+	CURL* curl = curl_easy_init();  
+	if(NULL == curl)  
+		return -1;
+	struct curl_slist *slist=NULL;
+	for(size_t i = 0; i < header.size(); ++i){
+		slist = curl_slist_append(slist, header[i].c_str());
+	}
 	long retcode = 0;
 	curl_easy_setopt(curl, CURLOPT_CONNECTTIMEOUT, timeout);
     curl_easy_setopt(curl, CURLOPT_TIMEOUT, timeout);  
@@ -36,8 +38,10 @@ int HttpClient::Post(const std::string& url, const std::string& data, std::strin
     curl_easy_setopt(curl, CURLOPT_READFUNCTION, NULL);  
     curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, OnWriteData);  
     curl_easy_setopt(curl, CURLOPT_WRITEDATA, (void *)&resp);  
+	curl_easy_setopt(curl, CURLOPT_HTTPHEADER, slist);
     CURLcode res = curl_easy_perform(curl);  
 	curl_easy_getinfo(curl, CURLINFO_RESPONSE_CODE , &retcode);
+	curl_slist_free_all(slist);
     curl_easy_cleanup(curl);  
 	if(CURLE_OK != res){
 		return -2;
@@ -48,12 +52,14 @@ int HttpClient::Post(const std::string& url, const std::string& data, std::strin
     return 0;  
 }
 
-int HttpClient::Get(const std::string& url, std::string& resp, int timeout){
-    CURL* curl = curl_easy_init();  
-    if(NULL == curl)  
-    {  
-        return -1;  
-    }  
+int HttpClient::Get(const std::string& url, const std::vector<std::string>& header, std::string& resp, int timeout){
+	CURL* curl = curl_easy_init();  
+	if(NULL == curl)  
+		return -1;
+	struct curl_slist *slist=NULL;
+	for(size_t i = 0; i < header.size(); ++i){
+		slist = curl_slist_append(slist, header[i].c_str());
+	}
 	long retcode = 0;
     curl_easy_setopt(curl, CURLOPT_CONNECTTIMEOUT, timeout);  
     curl_easy_setopt(curl, CURLOPT_TIMEOUT, timeout);  
@@ -62,8 +68,10 @@ int HttpClient::Get(const std::string& url, std::string& resp, int timeout){
     curl_easy_setopt(curl, CURLOPT_READFUNCTION, NULL);  
     curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, OnWriteData);  
     curl_easy_setopt(curl, CURLOPT_WRITEDATA, (void *)&resp);  
+	curl_easy_setopt(curl, CURLOPT_HTTPHEADER, slist);
     CURLcode res = curl_easy_perform(curl);  
 	curl_easy_getinfo(curl, CURLINFO_RESPONSE_CODE , &retcode);
+	curl_slist_free_all(slist);
     curl_easy_cleanup(curl);  
 	if(CURLE_OK != res){
 		return -2;
@@ -129,18 +137,18 @@ int main(int argc, char **argv)
 	string resp;
 	string url = "http://localhost:9876/service/httpDemo?a=b";
 	string data = "{\"key\":5,\"key2\":\"value\"}";
-	HttpClient::Post(url, data, resp);
+	HttpClient::Post(url, data, vector<string>(), resp);
 	cout<<resp<<endl;
 
 	resp = "";
 	url = "http://localhost:31023/service/translate";
 	data = "{\"source\":\"en\",\"target\":\"de\",\"q\":\"Do you understand?\"}";
-	HttpClient::Post(url, data, resp);
+	HttpClient::Post(url, data, vector<string>(), resp);
 	cout<<resp<<endl;
 
 	resp = "";
 	url = "http://169.254.169.254/latest/meta-data/placement/availability-zone/";
-	HttpClient::Get(url, resp);
+	HttpClient::Get(url, vector<string>(), resp);
 	cout<<resp<<endl;
 
 	resp = "";

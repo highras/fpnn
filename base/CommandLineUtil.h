@@ -22,7 +22,7 @@ class CommandLineParser
 	static std::vector<std::string> _unrecognizedParams;
 
 public:
-	static void init(int argc, const char** argv, int beginIndex = 1);
+	static void init(int argc, const char* const * argv, int beginIndex = 1);
 
 	static std::string getString(const std::string& sign, const std::string& dft = std::string());
 	static intmax_t getInt(const std::string& sign, intmax_t dft = 0);

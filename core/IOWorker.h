@@ -3,6 +3,7 @@
 
 #include "ConnectionReclaimer.h"
 #include "IQuestProcessor.h"
+#include "OpenSSLModule.h"
 #include "IOBuffer.h"
 #include "msec.h"
 
@@ -55,11 +56,17 @@ namespace fpnn
 	public:
 		RecvBuffer _recvBuffer;
 		SendBuffer _sendBuffer;
+		SSLContext _sslContext;
 
 	public:
 		inline bool recvPackage(bool& needNextEvent) { return _recvBuffer.recvPackage(_connectionInfo->socket, needNextEvent); }
 		inline bool entryEncryptMode(uint8_t *key, size_t key_len, uint8_t *iv, bool streamMode)
 		{
+			if (_sslContext._ssl)
+			{
+				LOG_ERROR("Entry encrypt mode failed. Current connection is SSL/TSL connection. Double-encrypting is unnecessary. Connection will be closed by server. %s", _connectionInfo->str().c_str());
+				return false;
+			}
 			if (_recvBuffer.entryEncryptMode(key, key_len, iv, streamMode) == false)
 			{
 				LOG_ERROR("Entry encrypt mode failed. Entry cmd is not the first cmd. Connection will be closed by server. %s", _connectionInfo->str().c_str());
@@ -80,8 +87,19 @@ namespace fpnn
 			_sendBuffer.entryWebSocketMode(data);
 			_connectionInfo->_isWebSocket = true;
 		}
+		bool prepareSSL(bool server)
+		{
+			if (_sslContext.init(_connectionInfo->socket, server))
+			{
+				_recvBuffer.enrtySSLMode(&_sslContext);
+				_sendBuffer.enrtySSLMode(&_sslContext);
+				return true;
+			}
+			else
+				return false;
+		}
 
-		inline bool isEncrypted() { return _connectionInfo->_encrypted; }
+		inline bool isEncrypted() { return _connectionInfo->isEncrypted(); }
 		inline bool isWebSocket() { return _connectionInfo->_isWebSocket; }
 
 		virtual int send(bool& needWaitSendEvent, std::string* data = NULL)
@@ -100,7 +118,7 @@ namespace fpnn
 			_connectionInfo->_mutex = mutex;
 		}
 
-		virtual ~TCPBasicConnection() {}
+		virtual ~TCPBasicConnection() { _sslContext.close(); }
 	};
 }
 

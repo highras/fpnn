@@ -10,7 +10,7 @@ EXES_SINGLE_CLIENT_CONCURRENT_TEST = singleClientConcurrentTest
 CFLAGS +=
 CXXFLAGS +=
 CPPFLAGS += -g -I../.. -I../../../base -I../../../proto -I../../../proto/msgpack -I../../../proto/rapidjson
-LIBS += -L../.. -L../../../base -L../../../proto -L../../../extends
+LIBS += -L../.. -L../../../base -L../../../proto -L../../../extends -lssl -lcrypto
 
 OBJS_TEST2 = cmd.o
 OBJS_SERVER = serverTest.o

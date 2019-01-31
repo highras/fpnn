@@ -29,7 +29,7 @@ namespace fpnn
 				return nullptr;
 
 			int index = _funcarp->which(key);
-			if (index < 0 || index >= _endpoints.size())
+			if (index < 0 || index >= (int)_endpoints.size())
 				return nullptr;
 
 			auto iter = _clients.find(_endpoints[index]);

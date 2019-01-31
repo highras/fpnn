@@ -1,5 +1,6 @@
 #include <errno.h>
 #include <endian.h>
+#include "FPLog.h"
 #include "IOBuffer.h"
 
 using namespace fpnn;
@@ -20,8 +21,11 @@ bool RecvBuffer::entryEncryptMode(uint8_t *key, size_t key_len, uint8_t *iv, boo
 
 void RecvBuffer::entryWebSocketMode()
 {
+	SSLContext* sslContext = _receiver->getSSLContext();
 	delete _receiver;
+
 	_receiver = new WebSocketReceiver();
+	_receiver->enrtySSLMode(sslContext);
 }
 
 void SendBuffer::encryptData()
@@ -100,6 +104,113 @@ int SendBuffer::realSend(int fd, bool& needWaitSendEvent)
 	}
 }
 
+int SendBuffer::sslRealSend(int fd, bool& needWaitSendEvent)
+{
+	uint64_t currSendBytes = 0;
+
+	needWaitSendEvent = false;
+	while (true)
+	{
+		if (_currBuffer == NULL)
+		{
+			CurrBufferProcessFunc currBufferProcess;
+			{
+				std::unique_lock<std::mutex> lck(*_mutex);
+				if (_outQueue.size() == 0)
+				{
+					_sentBytes += currSendBytes;
+					_sendToken = true;
+					return 0;
+				}
+
+				_currBuffer = _outQueue.front();
+				_outQueue.pop();
+				_offset = 0;
+
+				currBufferProcess = _currBufferProcess;
+			}
+
+			if (currBufferProcess)
+				(this->*currBufferProcess)();
+		}
+
+		size_t requireSend = _currBuffer->length() - _offset;
+		int sendBytes = SSL_write(_sslContext->_ssl, _currBuffer->data() + _offset, (int)requireSend);
+		if (sendBytes <= 0)
+		{
+			int errorCode = SSL_get_error(_sslContext->_ssl, sendBytes);
+			if (errorCode == SSL_ERROR_WANT_WRITE)
+			{
+				// continue;
+				//LOG_WARN("SSL/TSL re-negotiation occurred. SSL_write WANT_WRITE. socket: %d", fd);
+				//_sslContext->_negotiate = SSLNegotiate::Write_Want_Write;
+				
+				needWaitSendEvent = true;
+				std::unique_lock<std::mutex> lck(*_mutex);
+				_sentBytes += currSendBytes;
+				_sendToken = true;
+				return 0;
+			}
+			else if (errorCode == SSL_ERROR_WANT_READ)
+			{
+				LOG_INFO("SSL/TSL re-negotiation occurred. SSL_write WANT_READ. socket: %d", fd);
+				_sslContext->_negotiate = SSLNegotiate::Write_Want_Read;
+				
+				std::unique_lock<std::mutex> lck(*_mutex);
+				_sentBytes += currSendBytes;
+				_sendToken = true;
+				return 0;
+			}
+			else if (errorCode == SSL_ERROR_SYSCALL)
+			{
+				if (errno == EAGAIN || errno == EWOULDBLOCK)
+				{
+					needWaitSendEvent = true;
+					std::unique_lock<std::mutex> lck(*_mutex);
+					_sentBytes += currSendBytes;
+					_sendToken = true;
+					return 0;
+				}
+				if (errno == EINTR)
+					continue;
+
+				std::unique_lock<std::mutex> lck(*_mutex);
+				_sentBytes += currSendBytes;
+				_sendToken = true;
+				return errno ? errno : -1;
+			}
+			else if (errorCode == SSL_ERROR_SSL)
+			{
+				OpenSSLModule::logLastErrors();
+				
+				std::unique_lock<std::mutex> lck(*_mutex);
+				_sentBytes += currSendBytes;
+				_sendToken = true;
+				return -1;
+			}
+			else
+			{
+				std::unique_lock<std::mutex> lck(*_mutex);
+				_sentBytes += currSendBytes;
+				_sendToken = true;
+				return errno ? errno : (errorCode ? errorCode : -1);
+			}
+		}
+		else
+		{
+			_offset += (size_t)sendBytes;
+			currSendBytes += (uint64_t)sendBytes;
+			if (_offset == _currBuffer->length())
+			{
+				delete _currBuffer;
+				_currBuffer = NULL;
+				_offset = 0;
+				_sentPackage += 1;
+			}
+		}
+	}
+}
+
 int SendBuffer::send(int fd, bool& needWaitSendEvent, bool& actualSent, std::string* data)
 {
 	if (data && (data->empty() || _stopAppendData))
@@ -113,6 +224,12 @@ int SendBuffer::send(int fd, bool& needWaitSendEvent, bool& actualSent, std::str
 		if (data)
 			_outQueue.push(data);
 
+		if (_sslContext && _sslContext->_connected == false)
+		{
+			actualSent = false;
+			return 0;
+		}
+
 		if (!_sendToken)
 		{
 			actualSent = false;
@@ -124,8 +241,12 @@ int SendBuffer::send(int fd, bool& needWaitSendEvent, bool& actualSent, std::str
 
 	actualSent = true;
 
-	//-- Token will be return in realSend() function.
-	return realSend(fd, needWaitSendEvent); 	//-- ignore all error status. it will be deal in IO thread.
+	//-- Token will be return in realSend()/sslRealSend() function.
+	//-- ignore all error status. it will be deal in IO thread.
+	if (!_sslContext)
+		return realSend(fd, needWaitSendEvent);
+	else
+		return sslRealSend(fd, needWaitSendEvent);
 }
 
 bool SendBuffer::entryEncryptMode(uint8_t *key, size_t key_len, uint8_t *iv, bool streamMode)
@@ -231,4 +352,12 @@ void SendBuffer::addWebSocketWrap()
 
 		_currBuffer->assign((char*)buf, 2);
 	}
+}
+
+bool SendBuffer::empty()
+{
+	std::unique_lock<std::mutex> lck(*_mutex);
+	if (_currBuffer)
+		return true;
+	return _outQueue.empty();
 }

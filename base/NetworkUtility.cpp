@@ -4,7 +4,6 @@
 #include <sys/socket.h>
 #include <netdb.h>
 #include <ifaddrs.h>
-#include "ServerInfo.h"
 #include "StringUtil.h"
 #include "NetworkUtility.h"
 
@@ -226,6 +225,26 @@ bool fpnn::getIPs(std::map<enum IPTypes, std::set<std::string>>& ipDict)
 
 	freeifaddrs(ifaddr);
 	return true;
+}
+
+namespace NetworkUtil
+{
+	std::string getFirstIPAddress(enum IPTypes type)
+	{
+		std::map<enum IPTypes, std::set<std::string>> ipDict;
+		if (getIPs(ipDict))
+		{
+			std::set<std::string>& IPs = ipDict[type];
+			if (IPs.empty())
+				return "";
+			else
+				return *(IPs.begin());
+		}
+		else return "";
+	}
+
+	std::string getLocalIP4() { return getFirstIPAddress(IPv4_Local); }
+	std::string getPublicIP4() { return getFirstIPAddress(IPv4_Public); }
 }
 
 #ifdef TEST_NETWORK_UTIL

@@ -41,8 +41,13 @@ class QuestProcessor: public IQuestProcessor
 
 public:
 	virtual void connected(const ConnectionInfo& info) { cout<<"server connected.socket ID:"<<info.socket<<endl; }
-	virtual void connectionClose(const ConnectionInfo&) { cout<<"server close event processed."<<endl; }
-	virtual void connectionErrorAndWillBeClosed(const ConnectionInfo&) { cout<<"server error event processed."<<endl; }
+	virtual void connectionWillClose(const ConnectionInfo& ci, bool closeByError)
+	{
+		if (!closeByError)
+			cout<<"client close event processed. ci: "<<ci.str()<<", self: "<<this<<endl;
+		else
+			cout<<"client error event processed. ci: "<<ci.str()<<", self: "<<this<<endl;
+	}
 	virtual FPAnswerPtr unknownMethod(const std::string& method_name, const FPReaderPtr args, const FPQuestPtr quest, const ConnectionInfo& ci)
 	{
 		cout<<"received a unknown method"<<endl;
@@ -130,10 +135,11 @@ public:
                 std::string prjToken = Setting::getString("FPNN.fpzk.project_token");
                 std::string service = Setting::getString("FPNN.fpzk.service_name");
                 std::string version = Setting::getString("FPNN.fpzk.version");
+                std::string cluster = Setting::getString("FPNN.fpzk.cluster");
                 std::string endpoint = Setting::getString("FPNN.fpzk.endpoint");
 
                 _fpzk = FPZKClient::create(fpzkSrvs, project, prjToken);
-                _fpzk->registerService(service, version, endpoint);
+                _fpzk->registerService(service, cluster, version, endpoint);
 	}
 
 	QuestProcessorClassBasicPublicFuncs

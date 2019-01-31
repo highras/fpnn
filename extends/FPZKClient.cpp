@@ -7,6 +7,7 @@
 #include "Setting.h"
 #include "ServerInfo.h"
 #include "StringUtil.h"
+#include "MachineStatus.h"
 #include "NetworkUtility.h"
 #include "FPZKClient.h"
 
@@ -158,7 +159,7 @@ FPZKClient::FPZKClient(const std::string& fpzkSrvList, const std::string& projec
 {
 	_syncForPublic = Setting::getBool("FPZK.client.sync.syncPublicInfo", false);
 
-	_domain = ServerInfo::getServerDomain();
+	_domain = ServerInfo::getServerHostName();
 	_port = Setting::getInt(std::vector<std::string>{
 		"FPNN.server.tcp.ipv4.listening.port",
 		"FPNN.server.ipv4.listening.port",
@@ -168,6 +169,8 @@ FPZKClient::FPZKClient(const std::string& fpzkSrvList, const std::string& projec
 	_cluster = Setting::getString("FPNN.server.cluster.name", "");
 
 	_port6 = 0;
+	_sslport = 0;
+	_sslport6 = 0;
 	if (_syncForPublic)
 	{
 		_ipv4 = ServerInfo::getServerPublicIP4();
@@ -186,6 +189,9 @@ FPZKClient::FPZKClient(const std::string& fpzkSrvList, const std::string& projec
 			if (_ipv6.empty())
 				_ipv6 = ServerInfo::getServerPublicIP6();
 		}
+
+		_sslport = Setting::getInt("FPNN.server.tcp.ipv4.ssl.listening.port", 0);
+		_sslport6 = Setting::getInt("FPNN.server.tcp.ipv6.ssl.listening.port", 0);
 	}
 
 	std::vector<std::string> fpzkEndpoints;
@@ -209,10 +215,6 @@ FPZKClient::FPZKClient(const std::string& fpzkSrvList, const std::string& projec
 	_startTime = slack_real_msec();
 	_running = true;
 	_syncThread = std::thread(&FPZKClient::syncFunc, this);
-
-	//-- for resource holder
-	//_engine = ClientEngine::instance();
-	//_heldLogger = FPLog::instance();
 }
 
 FPZKClient::~FPZKClient()
@@ -224,55 +226,6 @@ FPZKClient::~FPZKClient()
 }
 
 //---------- [Begin] Copied & reconstituted from old fpzk client version, which write by biao.zhang. ---------//
-/*
- * 取整个系统中正在使用的TCP连接数(只包含IPv4的，不包含IPv6的)，
- * 取一个进程对应的TCP连接数效率太低，只好用全局连接数代替
- */
-int getConnNum()
-{
-	std::ifstream fin("/proc/net/sockstat");
-	if (fin.is_open()) {
-		char line[1024];
-		while(fin.getline(line, sizeof(line))){
-			if (strncmp("TCP:", line, 4))
-				continue;
-
-			std::string sLine(line);
-			std::vector<std::string> items;
-			StringUtil::split(sLine, " ", items);
-			if(items.size() > 2)
-			{
-				fin.close();
-				return stoi(items[2]);			// number of inused TCP connections
-			}
-		}
-		fin.close();
-	}
-	return -1;
-}
-
-float getCPULoad()
-{
-	std::stringstream msgstr;
-	std::ifstream fin("/proc/loadavg");
-	if (fin.is_open()) {
-		char line[1024];
-		fin.getline(line, sizeof(line));
-		std::string sLine(line);
-		std::vector<std::string> items;
-		StringUtil::split(sLine, " ", items);
-		fin.close();
-		try {
-			float res = stof(items[0]);		// load average within 1 miniute
-			return res;
-		} catch(std::exception& e) {
-			LOG_ERROR("failed to convert string to float, the string: %s", items[0].c_str());
-			return -1;
-		}
-	}
-	return -1;			// cannot open the file
-}
-
 class CPUUsage
 {
 	typedef unsigned long long TIC_t;
@@ -408,8 +361,8 @@ void FPZKClient::subscribe(const std::set<std::string>& serviceNames)
 bool FPZKClient::syncSelfStatus(float perCPUUsage)
 {
 	int cpuCount = get_nprocs();
-	int connNum = getConnNum();
-	float perCPULoad = getCPULoad()/cpuCount;
+	int connNum = MachineStatus::getConnectionCount();
+	float perCPULoad = MachineStatus::getCPULoad()/cpuCount;
 
 	FPQuestPtr quest;
 	bool onlineStatus = true;
@@ -418,7 +371,7 @@ bool FPZKClient::syncSelfStatus(float perCPUUsage)
 		std::lock_guard<std::mutex> lck(_mutex);
 		if (_registeredName.length())
 		{
-			int addedInfoCount = _syncForPublic ? 5 : 0;
+			int addedInfoCount = _syncForPublic ? 7 : 0;
 
 			FPQWriter qw(12 + addedInfoCount, "syncServerInfo");
 			qw.param("project", _projectName);
@@ -445,6 +398,8 @@ bool FPZKClient::syncSelfStatus(float perCPUUsage)
 				qw.param("domain", _domain);
 				qw.param("ipv4", _ipv4);
 				qw.param("ipv6", _ipv6);
+				qw.param("sslport", _sslport);
+				qw.param("sslport6", _sslport6);
 			}
 
 			quest = qw.take();
@@ -691,6 +646,10 @@ void FPZKClient::updateServicesMapCache(FPReader* reader)
 					sn.ipv4 = nodeInfos[k];
 				else if(nodeInfoFields[k] =="ipv6")
 					sn.ipv6 = nodeInfos[k];
+				else if(nodeInfoFields[k] =="sslport")
+					sn.sslport = stoi(nodeInfos[k]);
+				else if(nodeInfoFields[k] =="sslport6")
+					sn.sslport6 = stoi(nodeInfos[k]);
 			}
 
 			if (endpoint.length())
@@ -810,10 +769,10 @@ FPZKClientPtr FPZKClient::create(const std::string& fpzkSrvList, const std::stri
 	return FPZKClientPtr(new FPZKClient(servList, name, token));
 }
 
-bool FPZKClient::registerService(const std::string& serviceName, const std::string& version, const std::string& endpoint, bool online)
+bool FPZKClient::registerService(const std::string& serviceName, const std::string& cluster, const std::string& version, const std::string& endpoint, bool online)
 {
 	std::string registeredName = serviceName;
-	if(registeredName.empty())
+	if (registeredName.empty())
 	{
 		registeredName = Setting::getString("FPNN.server.name", "");
 		if(registeredName.empty())
@@ -835,6 +794,9 @@ bool FPZKClient::registerService(const std::string& serviceName, const std::stri
 		_registeredVersion = version;
 		_online = online;
 
+		if (!cluster.empty())
+			_cluster = cluster;
+
 		if (!endpoint.empty())
 			_registeredEndpoint = endpoint;
 	}
@@ -844,9 +806,9 @@ bool FPZKClient::registerService(const std::string& serviceName, const std::stri
 	return true;
 }
 
-bool FPZKClient::registerServiceSync(const std::string& serviceName, const std::string& version, const std::string& endpoint, bool online)
+bool FPZKClient::registerServiceSync(const std::string& serviceName, const std::string& cluster, const std::string& version, const std::string& endpoint, bool online)
 {
-	if (!registerService(serviceName, version, endpoint, online))
+	if (!registerService(serviceName, cluster, version, endpoint, online))
 		return false;
 
 	CPUUsage cpuUsage;
@@ -926,8 +888,8 @@ std::vector<std::string> FPZKClient::getServiceEndpoints(const std::string& serv
 	return revc;
 }
 
-std::vector<std::string> FPZKClient::getServiceEndpointsWithoutMyself(const std::string& version, bool onlineOnly){
-	std::vector<std::string> revc = getServiceEndpoints(_registeredName, _cluster, version, onlineOnly);
+std::vector<std::string> FPZKClient::getServiceEndpointsWithoutMyself(const std::string& serviceName, const std::string& cluster, const std::string& version, bool onlineOnly){
+	std::vector<std::string> revc = getServiceEndpoints(serviceName, cluster, version, onlineOnly);
 	for(size_t i = 0; i < revc.size(); ++i){
 		if(revc[i] == _registeredEndpoint){
 			revc.erase(revc.begin() + i);
@@ -937,10 +899,10 @@ std::vector<std::string> FPZKClient::getServiceEndpointsWithoutMyself(const std:
 	return revc;
 }
 
-std::string FPZKClient::getOldestServiceEndpoint(const std::string& version, bool onlineOnly){
+std::string FPZKClient::getOldestServiceEndpoint(const std::string& serviceName, const std::string& cluster, const std::string& version, bool onlineOnly){
 	std::string endpoint;
 	int32_t cur = slack_real_sec() + 1000;
-	const ServiceInfosPtr sip = checkCacheStatus(clusteredServiceName(_registeredName, _cluster));
+	const ServiceInfosPtr sip = checkCacheStatus(clusteredServiceName(serviceName, cluster));
 	if (sip)
 	{
 		for (auto& nodePair: sip->nodeMap)

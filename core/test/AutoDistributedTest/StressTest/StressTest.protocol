@@ -12,6 +12,8 @@
 method: beginStress
 payload:
 	{ endpoint:%s, connections:%d, totalQPS:%d }
+	{ endpoint:%s, connections:%d, totalQPS:%d, ssl:true }
+	{ endpoint:%s, connections:%d, totalQPS:%d, eccPem:%s, ?packageMode:%b, ?reinforce:%b }
 
 ----------------
   actorStatus

@@ -40,6 +40,7 @@ namespace fpnn
 		friend class Client;
 
 		std::mutex* _mutex;		//-- only for sync quest to set answer map.
+		bool _isSSL;
 		bool _isTCP;
 		bool _isIPv4;
 		bool _encrypted;
@@ -50,8 +51,9 @@ namespace fpnn
 		//-- Only use for UDP.
 		uint8_t* _socketAddress;
 
-		ConnectionInfo(int socket_, int port_, const std::string& ip_, bool isIPv4, bool serverConnection): _mutex(0), _isTCP(true), _isIPv4(isIPv4),
-			_encrypted(false), _isWebSocket(false), _internalAddress(false), _serverConnection(serverConnection), _socketAddress(NULL),
+		ConnectionInfo(int socket_, int port_, const std::string& ip_, bool isIPv4, bool serverConnection):
+			_mutex(0), _isSSL(false), _isTCP(true), _isIPv4(isIPv4), _encrypted(false), _isWebSocket(false),
+			_internalAddress(false),_serverConnection(serverConnection), _socketAddress(NULL),
 			token(0), socket(socket_), port(port_), ip(ip_)
 		{
 			bool maybeIPv4 = isIPv4;
@@ -110,15 +112,18 @@ namespace fpnn
 			return (p << 32) | ipv4;
 		}
 
+		inline bool isSSL() const { return _isSSL; }
 		inline bool isTCP() const { return _isTCP; }
 		inline bool isUDP() const { return !_isTCP; }
 		inline bool isIPv4() const { return _isIPv4; }
 		inline bool isIPv6() const { return !_isIPv4; }
-		inline bool isEncrypted() const { return _encrypted; }
+		inline bool isEncrypted() const { return _encrypted || _isSSL; }
 		inline bool isPrivateIP() const { return _internalAddress; }
 		inline bool isWebSocket() const { return _isWebSocket; }
+		inline uint64_t getToken() const { return token; }
+		std::string getIP() const { return ip; }
 
-		ConnectionInfo(const ConnectionInfo& ci): _mutex(0), _isTCP(ci._isTCP), _isIPv4(ci._isIPv4),
+		ConnectionInfo(const ConnectionInfo& ci): _mutex(0), _isSSL(ci._isSSL), _isTCP(ci._isTCP), _isIPv4(ci._isIPv4),
 			_encrypted(ci._encrypted), _isWebSocket(ci._isWebSocket), _internalAddress(ci._internalAddress),
 			_serverConnection(ci._serverConnection), _socketAddress(NULL),
 			token(ci.token), socket(ci.socket), port(ci.port), ip(ci.ip), ipv4(ci.ipv4)
@@ -265,21 +270,25 @@ namespace fpnn
 		/*===============================================================================
 		  Event Hook. (Common)
 		=============================================================================== */
+	private:
+		virtual void connectionClose(const ConnectionInfo&) = delete; //-- Has be dropped.
+		virtual void connectionErrorAndWillBeClosed(const ConnectionInfo&) = delete;   //-- Has be dropped.
+
+	public:
 		virtual void connected(const ConnectionInfo&) {}
-		virtual void connectionClose(const ConnectionInfo&) {}  //-- Deprecated. Will be dropped in FPNN.v3.
-		virtual void connectionErrorAndWillBeClosed(const ConnectionInfo&) {}  //-- Deprecated. Will be dropped in FPNN.v3.
 		virtual void connectionWillClose(const ConnectionInfo& connInfo, bool closeByError)
 		{
-			if (!closeByError) connectionClose(connInfo);
-			else connectionErrorAndWillBeClosed(connInfo);
+			(void)connInfo;
+			(void)closeByError;
 		}
 		virtual FPAnswerPtr unknownMethod(const std::string& method_name, const FPReaderPtr args, const FPQuestPtr quest, const ConnectionInfo& connInfo) 
 		{
 			if (quest->isTwoWay()){
+				LOG_ERROR("TwoWay Quest, UNKNOWN method:%s. %s Info: %s", method_name.c_str(), connInfo.str().c_str(), quest->info().c_str());
 				return FpnnErrorAnswer(quest, FPNN_EC_CORE_UNKNOWN_METHOD, std::string("Unknow method:") + method_name + ", " + connInfo.str());
 			}
 			else{
-				LOG_ERROR("OneWay Quest, UNKNOWN method:%s. %s", method_name.c_str(), connInfo.str().c_str());
+				LOG_ERROR("OneWay Quest, UNKNOWN method:%s. %s Info: %s", method_name.c_str(), connInfo.str().c_str(), quest->info().c_str());
 				return NULL;
 			}
 		}

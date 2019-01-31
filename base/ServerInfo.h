@@ -7,7 +7,7 @@ class ServerInfo
 public:
 	static void getAllInfos();
 
-	static const std::string& getServerDomain();
+	static const std::string& getServerHostName();
 	static const std::string& getServerRegionName();
 	static const std::string& getServerZoneName();
 	static const std::string& getServerLocalIP4();
@@ -16,10 +16,12 @@ public:
 	static const std::string& getServerPublicIP6();
 
 private:
-	static std::string getInfo(std::string url);
+	static std::string getAWSInfo(const std::string& url);
+	static std::string getGCPInfo(const std::string& url);
+	static bool getAZUREInfo(const std::string& url);
     static std::string ipv4Toipv6(const std::string& ipv4);
 
-	static std::string _serverDomain;
+	static std::string _serverHostName;
 	static std::string _serverRegionName;
 	static std::string _serverZoneName;
 	static std::string _serverLocalIP4;

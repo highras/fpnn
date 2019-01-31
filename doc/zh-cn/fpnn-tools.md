@@ -8,11 +8,35 @@
 
 	FPNN 通用命令行客户端。可以发送任何 fpnn 命令，调用任何 fpnn 接口。
 
-		Usgae: ./cmd ip port method body(json) isTwoWay isMsgPack [timeoutInSecond]
+		Usage: ./cmd ip port method body(json) [-ssl] [-json] [-oneway] [-t timeout]
+		Usage: ./cmd ip port method body(json) [-ecc-pem ecc-pem-file] [-json] [-oneway] [-t timeout]
+		Usage: ./cmd ip port method body(json) [-ecc-der ecc-der-file] [-json] [-oneway] [-t timeout]
+		Usage: ./cmd ip port method body(json) [-ecc-curve ecc-curve-name -ecc-raw-key ecc-raw-public-key-file] [-json] [-oneway] [-t timeout]
 
 	+ 接口参数须以 json 形式表示。
-	+ 该客户端不支持加密链接。
-	+ isTwoWay 与 isMsgPack 以 0 和 1 表示 false 和 true。
+
+
+* **cmdinfos**
+
+	查询使用 FPNN 框架开发的服务的框架信息/状态及业务信息/状态（如果业务支持）。
+
+		Usage: ./cmdinfos [localhost] port
+
+
+* **cmdtune**
+
+	调整使用 FPNN 框架开发的服务的运行参数及业务参数（如果业务支持）。
+
+		Usage: ./cmdtune [localhost] port key value
+
+	+ 如果目标服务配置了 FPNN ECC 加密，请使用 **cmd** 工具在加密链接下调整。非加密链接的 **cmdtune** 将被禁止链接。
+
+
+* **cmdstatus**
+
+	检测使用 FPNN 框架开发的服务的运行状态。
+
+		Usage: ./cmdstatus [localhost] port
 
 
 * **eccKeyMaker**
@@ -39,7 +63,10 @@
 	支持加密链接和非加密链接。
 
 		Usage: ./fss ip port
-		Usage: ./fss ip port ecc-curve server-public-key-file [encrypt-mode-opt] [encrypt-strength-opt]
+		Usage: ./fss ip port -ssl
+		Usage: ./fss ip port -pem pem-file [encrypt-mode-opt] [encrypt-strength-opt]
+		Usage: ./fss ip port -der der-file [encrypt-mode-opt] [encrypt-strength-opt]
+		Usage: ./fss ip port ecc-curve raw-public-key-file [encrypt-mode-opt] [encrypt-strength-opt]
 
 	+ ecc-curve：  
 		secp192r1、secp224r1、secp256r1、secp256k1 四者之一。
@@ -59,8 +86,8 @@
 	单个实例可模拟指定数目的链接，和总的输出 QPS。  
 	一般使用多个实例共同测试。
 
-		Usage: ./asyncStressClient ip port connections qps [client_work_thread]
-		Usage: ./asyncStressClient ip port connections qps client_work_thread [encryptConfigFile]
+		Usage: ./asyncStressClient ip port connections totalQPS [-ssl] [-thread client-work-thread-count]
+		Usage: ./asyncStressClient ip port connections totalQPS [-ecc-pem ecc-pem-file [-package|-stream] [-128bits|-256bits]] [-thread client-work-thread-count]
 
 	+ encryptConfigFile 模版请参见 clientEncrypt.conf
 	+ 默认测试目标服务器请参见 serverTest
@@ -97,11 +124,12 @@
 
 	FPNN 通用命令行客户端。可以发送任何 fpnn 命令，调用任何 fpnn 接口。
 
-		Usgae: ./cmd ip port method body(json) isTwoWay isMsgPack [timeoutInSecond]
+		Usage: ./cmd ip port method body(json) [-ssl] [-json] [-oneway] [-t timeout]
+		Usage: ./cmd ip port method body(json) [-ecc-pem ecc-pem-file] [-json] [-oneway] [-t timeout]
+		Usage: ./cmd ip port method body(json) [-ecc-der ecc-der-file] [-json] [-oneway] [-t timeout]
+		Usage: ./cmd ip port method body(json) [-ecc-curve ecc-curve-name -ecc-raw-key ecc-raw-public-key-file] [-json] [-oneway] [-t timeout]
 
 	+ 接口参数须以 json 形式表示。
-	+ 该客户端不支持加密链接。
-	+ isTwoWay 与 isMsgPack 以 0 和 1 表示 false 和 true。
 
 
 * **duplexClientTest**
@@ -118,7 +146,7 @@
 	最大链接数压测工具。  
 	一般使用多个实例共同测试。
 
-		Usage: ./massiveClientTest ip port threadNum clientCount [interval_times_in_milliseconds] [timeout] [worker_threads]
+		Usage: ./massiveClientTest ip port threadNum clientCount perClientQPS [timeout] [worker_threads]
 
 	+ 默认测试目标服务器请参见 serverTest
 
@@ -163,7 +191,8 @@
 	单一客户端多线程并发稳定性测试工具。  
 	(配合框架修改后，可测试是否有并发建立的多余链接。)
 
-		Usage: ./singleClientConcurrentTest ip port [encryptConfigFile]
+		Usage: ./singleClientConcurrentTest ip port [-ssl]
+		Usage: ./singleClientConcurrentTest ip port [-ecc-pem ecc-pem-file [-package|-stream] [-128bits|-256bits]]
 
 	+ encryptConfigFile 模版请参见 clientEncrypt.conf
 	+ 默认测试目标服务器请参见 serverTest
@@ -230,6 +259,10 @@
 	| answerPoolThread | 可选 | StressActor 处理请求回调的线程池大小。 | Deployer/Actor 执行机的机器核数 |
 	| perStressConnections | 可选 | 单个任务模拟的链接数量。 | 100 |
 	| perStressQPS | 可选 | 单个任务模拟的 QPS 数量。 | 50000 |
+	| ssl | 可选 | 启用 SSL/TLS 链接。**无值参数**。与 FPNN ECC 加密参数互斥。 | <无值参数> |
+	| eccPublicKey | 可选 | FPNN ECC 加密公钥，PEM 格式。与 ssl 参数互斥。 | N/A |
+	| eccEncryptMode | 可选 | FPNN ECC 加密模式。可选值为：stream、package。 | package |
+	| eccReinforce | 可选 | FPNN ECC 加密强度。false: 使用 128 位密钥；true: 使用 256 位密钥。 | false |
 
 
 

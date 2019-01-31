@@ -8,7 +8,7 @@
 
 1. [FPNN 设计理念](fpnn-design.md)
 
-1. [FPNN HTTP & webSocket 支持](fpnn-http-support.md)
+1. [FPNN HTTP/HTTPS & webSocket (ws/wss) 支持](fpnn-http-support.md)
 
 1. [FPNN 性能报告](fpnn-performance.md)
 
@@ -37,6 +37,8 @@
     1. [FPNN 标准配置模版](../conf.template)
 
     1. [FPNN 注意事项](fpnn-notices.md)
+
+    1. [FPNN 问题排查](fpnn-troubleshooting.md)
 
 1. [FPNN 内置接口](fpnn-build-in-methods.md)
 

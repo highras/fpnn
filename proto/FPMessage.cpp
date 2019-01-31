@@ -348,6 +348,9 @@ std::string* FPAnswer::rawHTTP(){
 			<< "Connection: Upgrade" << _CRLF;
 		std::string acceptKey = genWebsocketKey(websocket);
 		header << "Sec-WebSocket-Accept: " << acceptKey << _CRLF;
+		std::string SecWebSocketProtocol = _quest->http_header("Sec-WebSocket-Protocol");
+		if(SecWebSocketProtocol.size())
+			header << "Sec-WebSocket-Protocol: " << SecWebSocketProtocol << _CRLF;
 	}
 	header <<_CRLF;
 

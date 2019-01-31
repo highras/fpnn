@@ -42,6 +42,75 @@ int StandardReceiver::remainDataLen()
 	}
 }
 
+bool StandardReceiver::sslRecv(int fd, int requireRead, int& totalReadBytes)
+{
+	totalReadBytes = 0;
+
+	while (requireRead)
+	{
+		int currRecvLen = requireRead;
+		if (currRecvLen > _sslBufferLen)
+			currRecvLen = _sslBufferLen;
+
+		requireRead -= currRecvLen;
+		int readBytes = SSL_read(_sslContext->_ssl, _sslBuffer, currRecvLen);
+		if (readBytes <= 0)
+		{
+			int errorCode = SSL_get_error(_sslContext->_ssl, readBytes);
+			if (errorCode == SSL_ERROR_WANT_WRITE)
+			{
+				LOG_INFO("SSL/TSL re-negotiation occurred. SSL_read WANT_WRITE. socket: %d", fd);
+				_sslContext->_negotiate = SSLNegotiate::Read_Want_Write;
+				return true;
+			}
+			else if (errorCode == SSL_ERROR_WANT_READ)
+			{
+				//LOG_WARN("SSL/TSL re-negotiation occurred. SSL_read WANT_READ. socket: %d", fd);
+				//_sslContext->_negotiate = SSLNegotiate::Read_Want_Read;
+				return true;
+			}
+			else if (errorCode == SSL_ERROR_ZERO_RETURN)
+			{
+				//LOG_INFO("socket %d ssl is closed.", fd);
+				//-- TLS/SSL connection is colsed. But the underlying transport maybe hasn't been closed.
+				//-- Please Refer the SSL_get_error() doc on https://www.openssl.org.
+				return true;
+			}
+			else if (errorCode == SSL_ERROR_SYSCALL)
+			{
+				if (errno == EAGAIN || errno == EWOULDBLOCK)
+					return true;
+
+				if (errno == 0 || errno == ECONNRESET)
+				{
+					OpenSSLModule::logLastErrors();
+					return false;
+				}
+
+				LOG_ERROR("SSL read syscall error. socket %d. errno: %d", fd, errno);
+				OpenSSLModule::logLastErrors();
+				return false;
+			}
+			else if (errorCode == SSL_ERROR_SSL)
+			{
+				LOG_ERROR("SSL read error in openSSL library. SSL error code: SSL_ERROR_SSL. socket %d.", fd);
+				OpenSSLModule::logLastErrors();
+				return false;
+			}
+			else
+			{
+				LOG_ERROR("SSL read error. socket %d, SSL error code %d, errno: %d", fd, errorCode, errno);
+				return false;
+			}
+		}
+
+		_buffer->append(_sslBuffer, readBytes);
+		totalReadBytes += readBytes;
+	}
+
+	return true;
+}
+
 bool StandardReceiver::recv(int fd, int length)
 {
 	if (length)
@@ -53,6 +122,9 @@ bool StandardReceiver::recv(int fd, int length)
 			return false;
 		}
 	}
+
+	if (_sslContext)
+		return sslRecvFPNNData(fd);
 
 	while (_curr < _total)
 	{
@@ -88,8 +160,19 @@ bool StandardReceiver::recv(int fd, int length)
 	return true;
 }
 
+bool StandardReceiver::sslRecvFPNNData(int fd)
+{
+	int totalReadBytes = 0;
+	bool successful = sslRecv(fd, _total - _curr, totalReadBytes);
+	_curr += totalReadBytes;
+	return successful;
+}
+
 bool StandardReceiver::recvTextData(int fd)
 {
+	if (_sslContext)
+		return sslRecvTextData(fd);
+
 	const int defaultRequireRead = 1024;
 	while (true)
 	{
@@ -125,6 +208,19 @@ bool StandardReceiver::recvTextData(int fd)
 		}
 	}
 	return true;
+}
+
+bool StandardReceiver::sslRecvTextData(int fd)
+{
+	int totalReadBytes = 0;
+	bool successful = sslRecv(fd, Config::_max_recv_package_length + 1, totalReadBytes);
+	_curr += totalReadBytes;
+	if (_curr > Config::_max_recv_package_length)
+	{
+		LOG_ERROR("Recv huge HTTPS data from socket: %d. Connection will be closed by framework.", fd);
+		return false;
+	}
+	return successful;
 }
 
 bool StandardReceiver::recvTcpPackage(int fd, int length, bool& needNextEvent)
@@ -220,7 +316,7 @@ bool StandardReceiver::recvPackage(int fd, bool& needNextEvent)
 			return recvHttpPackage(fd, needNextEvent);
 		}
 		else{
-			LOG_ERROR("This Server DO NOT support HTTP, fd:%d", fd);
+			LOG_WARN("This Server DO NOT support HTTP, fd:%d", fd);
 		}
 	}
 
@@ -256,11 +352,13 @@ bool StandardReceiver::fetch(FPQuestPtr& quest, FPAnswerPtr& answer, bool &isHTT
 			{
 				desc = "TCP quest";
 				quest = Decoder::decodeQuest(cb);
+				rev = (quest != nullptr);
 			}
 			else
 			{
 				desc = "TCP answer";
 				answer = Decoder::decodeAnswer(cb);
+				rev = (answer != nullptr);
 			}
 		}
 		else
@@ -270,8 +368,8 @@ bool StandardReceiver::fetch(FPQuestPtr& quest, FPAnswerPtr& answer, bool &isHTT
 		
 			quest = Decoder::decodeHttpQuest(cb, _httpParser);
 			_httpParser.reset();
+			rev = (quest != nullptr);
 		}
-		rev = true;
 	}
 	catch (const FpnnError& ex)
 	{

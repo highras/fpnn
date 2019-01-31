@@ -109,14 +109,17 @@
 |----|-----|-----|----|----|
 | 读取器 | MySQL DBProxy 结果读取器 | DBResultReader.h | DBResultReader | 仅适用于读取 MySQL DBProxy 的返回结果。支持随机读取。 |
 | 集群管理 | 集群服务发现客户端 | FPZKCLient.h | fpnn::FPZKClient | 用于服务发现，提交自身信息等集群管理用途。适用于 FPZK 集群发现服务。 |
-| 集群管理 | 固定IP，无发现服务集群代理 | TCPCarpProxy.h | fpnn::TCPCarpProxy | 一致性哈希代理。 |
-| 集群管理 | 固定IP，无发现服务集群代理 | TCPConsistencyProxy.h | fpnn::TCPConsistencyProxy | 强一致性代理。全局强一致性。 |
-| 集群管理 | 固定IP，无发现服务集群代理 | TCPRandomProxy.h | fpnn::TCPRandomProxy | 随机代理。 |
-| 集群管理 | 固定IP，无发现服务集群代理 | TCPRotatoryProxy.h | fpnn::TCPRotatoryProxy | 循环代理。 |
-| 集群管理 | FPZK集群发现服务集群代理 | TCPFPZKCarpProxy.h | fpnn::TCPFPZKCarpProxy | 一致性哈希代理。 |
-| 集群管理 | FPZK集群发现服务集群代理 | TCPFPZKConsistencyProxy.h | fpnn::TCPFPZKConsistencyProxy | 强一致性代理。全局强一致性。 |
-| 集群管理 | FPZK集群发现服务集群代理 | TCPFPZKRandomProxy.h | fpnn::TCPFPZKRandomProxy | 随机代理。 |
-| 集群管理 | FPZK集群发现服务集群代理 | TCPFPZKRotatoryProxy.h | fpnn::TCPFPZKRotatoryProxy | 循环代理。 |
+| 集群管理 | 固定IP，无发现服务集群代理 | TCPBroadcastProxy.hpp | fpnn::TCPBroadcastProxy | 广播代理。 |
+| 集群管理 | 固定IP，无发现服务集群代理 | TCPCarpProxy.hpp | fpnn::TCPCarpProxy | 一致性哈希代理。 |
+| 集群管理 | 固定IP，无发现服务集群代理 | TCPConsistencyProxy.hpp | fpnn::TCPConsistencyProxy | 强一致性代理。全局强一致性。 |
+| 集群管理 | 固定IP，无发现服务集群代理 | TCPRandomProxy.hpp | fpnn::TCPRandomProxy | 随机代理。 |
+| 集群管理 | 固定IP，无发现服务集群代理 | TCPRotatoryProxy.hpp | fpnn::TCPRotatoryProxy | 循环代理。 |
+| 集群管理 | FPZK集群发现服务集群代理 | TCPFPZKBroadcastProxy.hpp | fpnn::TCPFPZKBroadcastProxy | 广播代理。 |
+| 集群管理 | FPZK集群发现服务集群代理 | TCPFPZKCarpProxy.hpp | fpnn::TCPFPZKCarpProxy | 一致性哈希代理。 |
+| 集群管理 | FPZK集群发现服务集群代理 | TCPFPZKConsistencyProxy.hpp | fpnn::TCPFPZKConsistencyProxy | 强一致性代理。全局强一致性。 |
+| 集群管理 | FPZK集群发现服务集群代理 | TCPFPZKRandomProxy.hpp | fpnn::TCPFPZKRandomProxy | 随机代理。 |
+| 集群管理 | FPZK集群发现服务集群代理 | TCPFPZKRotatoryProxy.hpp | fpnn::TCPFPZKRotatoryProxy | 循环代理。 |
+| 集群管理 | FPZK集群发现服务集群代理 | TCPFPZKOldestProxy.hpp | fpnn::TCPFPZKOldestProxy | 最早注册/最久运行代理。 |
 | 网络访问 | 海量URL异步并发访问引擎 | MultipleURLEngine.h | MultipleURLEngine | 支持 HTTP、HTTPS。理论支持 FTP等 curl 支持的协议。 |
 | 消息旁路 | 请求旁路 | Bypass.h | fpnn::Bypass | FPNN 协议旁路 |
 | 消息旁路 | 请求旁路 | HttpBypass.h | fpnn::HttpBypass | FPNN 转 HTTP 旁路 |

@@ -6,7 +6,13 @@
 
 1. 加密系统
 
-	FPNN 提供加密和秘钥交换功能。
+	FPNN 支持 SSL/TLS，并提供独立于 SSL/TLS 之外的加密和秘钥交换功能。
+
+	FPNN 使用 [OpenSSL](https://www.openssl.org) 提供对 SSL/TLS 的支持。OpenSSL 参见 [OpenSSL 官方网站](https://www.openssl.org) [中文维基百科](https://baike.baidu.com/item/openssl) [英文维基百科](https://en.wikipedia.org/wiki/OpenSSL)
+
+	SSL/TLS 的支持可以独立开启或者关闭。
+
+	在 SSL/TLS 之外，FPNN 提供可独立使用的加密和密钥交换功能。
 
 	1. 加密
 

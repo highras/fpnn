@@ -7,6 +7,38 @@
 
 using namespace fpnn;
 
+std::string TimeUtil::getDateStr(int64_t t, char sep){
+	char buff[32] = {0};
+	struct tm timeInfo;
+	struct tm *tmT = localtime_r(&t, &timeInfo);
+	if (tmT){
+		snprintf(buff, sizeof(buff), "%04d%c%02d%c%02d",
+				tmT->tm_year+1900, sep, tmT->tm_mon+1, sep, tmT->tm_mday);
+	}
+	return std::string(buff);
+}
+
+std::string TimeUtil::getDateStr(char sep){
+    int64_t t = slack_real_sec();
+	return TimeUtil::getDateStr(t, sep);
+}
+
+std::string TimeUtil::getDateHourStr(int64_t t, char sep){
+	char buff[32] = {0};
+	struct tm timeInfo;
+	struct tm *tmT = localtime_r(&t, &timeInfo);
+	if (tmT){
+		snprintf(buff, sizeof(buff), "%04d%c%02d%c%02d%c%02d",
+				tmT->tm_year+1900, sep, tmT->tm_mon+1, sep, tmT->tm_mday, sep, tmT->tm_hour);
+	}
+	return std::string(buff);
+}
+
+std::string TimeUtil::getDateHourStr(char sep){
+    int64_t t = slack_real_sec();
+	return TimeUtil::getDateHourStr(t, sep);
+}
+
 std::string TimeUtil::getTimeStr(int64_t t, char sep){
 	char buff[32] = {0};
 	struct tm timeInfo;

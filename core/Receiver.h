@@ -12,6 +12,7 @@
 #include "Encryptor.h"
 #include "FPMessage.h"
 #include "HttpParser.h"
+#include "OpenSSLModule.h"
 
 namespace fpnn
 {
@@ -23,13 +24,19 @@ namespace fpnn
 	protected:
 		int _curr;
 		int _total;
+		SSLContext* _sslContext;
 
 	public:
-		Receiver(): _curr(0), _total(FPMessage::_HeaderLength) {}
+		Receiver(): _curr(0), _total(FPMessage::_HeaderLength), _sslContext(0) {}
 		virtual ~Receiver() {}
 
 		virtual bool recvPackage(int fd, bool& needNextEvent) = 0;
 		virtual bool fetch(FPQuestPtr& quest, FPAnswerPtr& answer, bool &isHTTP) = 0;
+		virtual void enrtySSLMode(SSLContext *sslContext)
+		{
+			_sslContext = sslContext;
+		}
+		virtual SSLContext* getSSLContext() { return _sslContext; }
 	};
 
 	//================================//
@@ -42,6 +49,8 @@ namespace fpnn
 		int _chunkSize;
 		ChainBuffer* _buffer;
 		HttpParser _httpParser;
+		const int _sslBufferLen;
+		void* _sslBuffer;
 
 		/**
 			Only called when protocol is TCP, and header has be read.
@@ -49,9 +58,14 @@ namespace fpnn
 		*/
 		int remainDataLen();
 
+		bool sslRecv(int fd, int requireRead, int& readBytes);
+
 		/** If length > 0; will do _total += length; */
 		bool recv(int fd, int length = 0);
 		bool recvTextData(int fd);
+
+		bool sslRecvFPNNData(int fd);
+		bool sslRecvTextData(int fd);
 
 		bool recvTcpPackage(int fd, int length, bool& needNextEvent);
 		bool recvHttpPackage(int fd, bool& needNextEvent);
@@ -59,7 +73,8 @@ namespace fpnn
 		ChainBuffer* fetchBuffer();
 
 	public:
-		StandardReceiver(int chunkSize): Receiver(), _isTCP(false), _isHTTP(false), _chunkSize(chunkSize)
+		StandardReceiver(int chunkSize): Receiver(), _isTCP(false), _isHTTP(false), _chunkSize(chunkSize),
+			_sslBufferLen(4 * 1024), _sslBuffer(0)
 		{
 			_buffer = new ChainBuffer(chunkSize);
 		}
@@ -67,10 +82,18 @@ namespace fpnn
 		{
 			if (_buffer)
 				delete _buffer;
+
+			if (_sslBuffer)
+				free(_sslBuffer);
 		}
 
 		virtual bool recvPackage(int fd, bool& needNextEvent);
 		virtual bool fetch(FPQuestPtr& quest, FPAnswerPtr& answer, bool &isHTTP);
+		virtual void enrtySSLMode(SSLContext *sslContext)
+		{
+			Receiver::enrtySSLMode(sslContext);
+			_sslBuffer = malloc(_sslBufferLen);
+		}
 	};
 
 	//================================//
@@ -168,6 +191,7 @@ namespace fpnn
 		bool _dataCompleted;
 
 		bool recv(int fd);
+		bool sslRecv(int fd);
 		void freeFragmentedDataList();
 		bool processHeader();
 		bool processPayloadSize(int fd);

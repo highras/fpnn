@@ -3,15 +3,15 @@
 #include <thread>
 #include <atomic>
 #include "TCPClient.h"
-#include "ClientEncryptConfig.h"
+#include "CommandLineUtil.h"
 
 using std::cout;
 using std::cerr;
 using std::endl;
 using namespace fpnn;
 
-FPQuestPtr QWriter(const char* method, bool oneway, FPMessage::FP_Pack_Type def_ptype){
-    FPQWriter qw(6,method, oneway, def_ptype);
+FPQuestPtr genQuest(){
+    FPQWriter qw(6, "two way demo");
     qw.param("quest", "one");
     qw.param("int", 2); 
     qw.param("double", 3.3);
@@ -28,8 +28,6 @@ FPQuestPtr QWriter(const char* method, bool oneway, FPMessage::FP_Pack_Type def_
 	return qw.take();
 }
 
-ClientEncryptConfig encryptConfig;
-
 class Tester
 {
 	std::string _ip;
@@ -45,10 +43,11 @@ class Tester
 
 	std::vector<std::thread> _threads;
 
+	void processEncrypt(TCPClientPtr client);
 	void test_worker(int qps);
 
 public:
-	Tester(const char* ip, int port, int thread_num, int qps): _ip(ip), _port(port), _thread_num(thread_num), _qps(qps),
+	Tester(const std::string& ip, int port, int thread_num, int qps): _ip(ip), _port(port), _thread_num(thread_num), _qps(qps),
 		_send(0), _recv(0), _sendError(0), _recvError(0), _timecost(0)
 	{
 	}
@@ -145,13 +144,12 @@ void Tester::test_worker(int qps)
 	cout<<"-- qps: "<<qps<<", usec: "<<usec<<endl;
 
 	TCPClientPtr client = TCPClient::createClient(_ip, _port);
-	encryptConfig.process(client);
-
+	processEncrypt(client);
 	client->connect();
 
 	while (true)
 	{
-		FPQuestPtr quest = QWriter("two way demo", false, FPMessage::FP_PACK_MSGPACK);
+		FPQuestPtr quest = genQuest();
 		int64_t send_time = exact_real_usec();
 		try{
 			client->sendQuest(quest, [send_time, ins](FPAnswerPtr answer, int errorCode)
@@ -188,26 +186,43 @@ void Tester::test_worker(int qps)
 	client->close();
 }
 
+void Tester::processEncrypt(TCPClientPtr client)
+{
+	if (CommandLineParser::exist("ssl"))
+		client->enableSSL();
+	else if (CommandLineParser::exist("ecc-pem"))
+	{
+		bool packageMode = CommandLineParser::exist("package");
+		bool reinforce = CommandLineParser::exist("256bits");
+		std::string pemFile = CommandLineParser::getString("ecc-pem");
+		client->enableEncryptorByPemFile(pemFile.c_str(), packageMode, reinforce);
+	}
+}
+
+void showUsage(const char* appName)
+{
+	cout<<"Usage: "<<appName<<" ip port connections totalQPS [-ssl] [-thread client-work-thread-count]"<<endl;
+	cout<<"Usage: "<<appName<<" ip port connections totalQPS [-ecc-pem ecc-pem-file [-package|-stream] [-128bits|-256bits]] [-thread client-work-thread-count]"<<endl;
+}
+
 int main(int argc, char* argv[])
 {
-	if (argc < 5 || argc > 7)
+	CommandLineParser::init(argc, argv);
+	std::vector<std::string> mainParams = CommandLineParser::getRestParams();
+	if (mainParams.size() != 4)
 	{
-		cout<<"Usage: "<<argv[0]<<" ip port connections qps [client_work_thread]"<<endl;
-		cout<<"Usage: "<<argv[0]<<" ip port connections qps client_work_thread [encryptConfigFile]"<<endl;
+		showUsage(argv[0]);
 		return 0;
 	}
 
 	ClientEngine::setQuestTimeout(300);
-	if (argc == 6)
+	if (CommandLineParser::exist("thread"))
 	{
-		int count = atoi(argv[5]);
+		int count = CommandLineParser::getInt("thread");
 		ClientEngine::configAnswerCallbackThreadPool(count, 1, count, count);
 	}
 
-	if (argc == 7 && !encryptConfig.enableEncryption(argv[6]))
-		return 1;
-
-	Tester tester(argv[1], atoi(argv[2]), atoi(argv[3]), atoi(argv[4]));
+	Tester tester(mainParams[0], std::stoi(mainParams[1]), std::stoi(mainParams[2]), std::stoi(mainParams[3]));
 
 	tester.launch();
 	tester.showStatistics();

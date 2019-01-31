@@ -252,9 +252,9 @@ class JsonParser
 			throw FPNN_ERROR_MSG(FpnnJosnInvalidContentError, "Json parser: content error, invalid number.");
 
 		bool realType = (dot > 0|| e > 0);
-		double d;
-		intmax_t i;
-		char *endptr;
+		double d = 0;
+		intmax_t i = 0;
+		char *endptr = nullptr;
 
 		errno = 0;
 		if (realType)

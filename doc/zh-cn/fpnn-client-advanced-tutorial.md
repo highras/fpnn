@@ -74,41 +74,15 @@ TCPClient 的接口
 
 ## * 链接关闭事件
 
-如果需要处理链接关闭事件，需要向 TCPClient 指派 IQuestProcessor 的实例，并重载 IQuestProcessor 中对应的接口。
+如果需要处理链接关闭事件，需要向 TCPClient 指派 IQuestProcessor 的实例。
+该实例只需在 IQuestProcessor 的派生类中重载 connectionWillClose() 接口即可。
 
-链接关闭事件，FPNN v1 与 v2 略有不同。v2 兼容 v1，但计划中的 v3 将不再兼容 v1。
-
-1. FPNN v1
-
-	FPNN v1 中，链接关闭事件分为正常关闭，和异常关闭。
-
-		//-- 正常关闭
-		virtual void connectionClose(const ConnectionInfo&) {}  //-- Deprecated. Will be dropped in FPNN.v3.
-		//-- 异常关闭
-		virtual void connectionErrorAndWillBeClosed(const ConnectionInfo&) {}  //-- Deprecated. Will be dropped in FPNN.v3.
-
-	在 IQuestProcessor 的派生类中直接重载 connectionClose() 和 connectionErrorAndWillBeClosed() 接口即可。
-
-	注：
-
-	+ 如果需要处理关闭事件，两类关闭事件都必须处理，否则会有遗漏。
-	+ FPNN v2 兼容该两接口，但不推荐继续使用。FPNN v3 将去除该两接口。
-
-1. FPNN v2
-
-	FPNN v2 中，新增统一接口：
-
-		virtual void connectionWillClose(const ConnectionInfo& connInfo, bool closeByError);
-
-	并兼容 v1 版两个旧接口。
-
-	在 IQuestProcessor 的派生类中直接重载 connectionWillClose() 接口即可。
-
-	注：
-
-	+ FPNN v1 的 connectionWillClose() 与 FPNN v2 的 connectionClose() & connectionErrorAndWillBeClosed() 是互斥关系。
-	+ v1 & v2 接口都重载的情况下，v1 版的接口将不被调用。
-
+	
+	class IQuestProcessor
+	{
+	public:
+	    virtual void connectionWillClose(const ConnectionInfo& connInfo, bool closeByError);
+	};
 
 TCPClient 的接口
 
@@ -123,19 +97,24 @@ TCPClient 的接口
 
 
 
-## * 加密链接（FPNN v2 Only）
+## * 加密链接
 
 TCPClient 的接口
 
 	class TCPClient
 	{
 	public:
+		bool enableSSL(bool enable = true);
 	    void enableEncryptor(const std::string& curve, const std::string& peerPublicKey, bool packageMode = true, bool reinforce = false);
 	    bool enableEncryptorByDerData(const std::string &derData, bool packageMode = true, bool reinforce = false);
 	    bool enableEncryptorByPemData(const std::string &PemData, bool packageMode = true, bool reinforce = false);
 	    bool enableEncryptorByDerFile(const char *derFilePath, bool packageMode = true, bool reinforce = false);
 	    bool enableEncryptorByPemFile(const char *pemFilePath, bool packageMode = true, bool reinforce = false);
 	};
+
++ enableSSL() 为启用 SSL/TLS 链接。
+
+	**注**：在同一连接上，SSL/TLS 与 FPNN 自身的加密不可同时开启。为了防止无谓的消耗系统资源，FPNN 不支持冗余的加密。
 
 + curve 为服务器采用的椭圆曲线名称，有四个选项：
 

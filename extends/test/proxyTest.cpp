@@ -10,6 +10,7 @@
 #include "TCPRotatoryProxy.hpp"
 #include "TCPRandomProxy.hpp"
 #include "TCPConsistencyProxy.hpp"
+#include "TCPBroadcastProxy.hpp"
 #include "IQuestProcessor.h"
 
 using namespace std;
@@ -19,14 +20,20 @@ std::shared_ptr<TCPRotatoryProxy> equProxy;
 std::shared_ptr<TCPCarpProxy> carpProxy;
 std::shared_ptr<TCPRandomProxy> randomProxy;
 std::shared_ptr<TCPConsistencyProxy> consistencyProxy;
+std::shared_ptr<TCPBroadcastProxy> broadcastProxy;
 
 class QuestProcessor: public IQuestProcessor
 {
 	QuestProcessorClassPrivateFields(QuestProcessor)
 public:
 	virtual void connected(const ConnectionInfo& ci) { cout<<"client connected. ci: "<<ci.str()<<", self: "<<this<<endl; }
-	virtual void connectionClose(const ConnectionInfo& ci) { cout<<"client close event processed. ci: "<<ci.str()<<", self: "<<this<<endl; }
-	virtual void connectionErrorAndWillBeClosed(const ConnectionInfo& ci) { cout<<"client error event processed. ci: "<<ci.str()<<", self: "<<this<<endl; }
+	virtual void connectionWillClose(const ConnectionInfo& ci, bool closeByError)
+	{
+		if (!closeByError)
+			cout<<"client close event processed. ci: "<<ci.str()<<", self: "<<this<<endl;
+		else
+			cout<<"client error event processed. ci: "<<ci.str()<<", self: "<<this<<endl;
+	}
 
 	FPAnswerPtr serverQuest(const FPReaderPtr args, const FPQuestPtr quest, const ConnectionInfo& ci)
 	{
@@ -111,6 +118,14 @@ void syncProcess()
 				answer = consistencyProxy->sendQuest(quest);
 				if (consistencyProxy->empty())
 					cout<<"consistencyProxy is empty"<<endl;
+			}
+			else if (proxyTypeId == 5)
+			{
+				std::map<std::string, FPAnswerPtr> results = broadcastProxy->sendQuest(quest);
+				if (broadcastProxy->empty())
+					cout<<"broadcastProxy is empty"<<endl;
+
+				answer = FPAWriter::emptyAnswer(quest);
 			}
 
 			if (quest->isTwoWay()){
@@ -220,6 +235,37 @@ void asyncProcess()
 				if (consistencyProxy->empty())
 					cout<<"consistencyProxy is empty"<<endl;
 			}
+			else if (proxyTypeId == 5)
+			{
+				struct TestBroadcastCallback: public BroadcastAnswerCallback
+				{
+					FPQuestPtr _quest;
+					TestCallback* _cb;
+
+					virtual ~TestBroadcastCallback() {}
+					
+					virtual void onCompleted(std::map<std::string, FPAnswerPtr>& answerMap)
+					{
+						FPAnswerPtr answer = FPAWriter::emptyAnswer(_quest);
+						_cb->onAnswer(answer);
+						delete _cb;
+					}
+				};
+
+				TestBroadcastCallback* tbcb = new TestBroadcastCallback();
+				tbcb->_quest = quest;
+				tbcb->_cb = cb;
+
+				stat = broadcastProxy->sendQuest(quest, tbcb);
+				if (broadcastProxy->empty())
+					cout<<"broadcastProxy is empty"<<endl;
+
+				if (!stat)
+				{
+					tbcb->_cb = NULL;
+					delete tbcb;
+				}
+			}
 
 			async_sendQuest++;
 		}
@@ -285,6 +331,12 @@ void prepareProxy()
 		}
 
 		pbm = consistencyProxy.get();
+	}
+	else if (proxyType == "5" || proxyType == "broadcastProxy")
+	{
+		proxyTypeId = 5;
+		broadcastProxy.reset(new TCPBroadcastProxy);
+		pbm = broadcastProxy.get();
 	}
 	else
 	{

@@ -16,7 +16,7 @@
 using namespace fpnn;
 
 TCPClient::TCPClient(const std::string& host, int port, bool autoReconnect):
-	Client(host, port, autoReconnect), _AESKeyLen(16), _packageEncryptionMode(true), _ioChunkSize(256)
+	Client(host, port, autoReconnect), _AESKeyLen(16), _packageEncryptionMode(true), _sslEnabled(false), _ioChunkSize(256)
 {}
 
 bool TCPClient::enableEncryptorByDerData(const std::string &derData, bool packageMode, bool reinforce)
@@ -56,6 +56,17 @@ bool TCPClient::enableEncryptorByPemFile(const char *pemFilePath, bool packageMo
 		return false;
 
 	return enableEncryptorByPemData(content, packageMode, reinforce);
+}
+
+bool TCPClient::enableSSL(bool enable)
+{
+	if (OpenSSLModule::clientModuleInit())
+	{
+		_sslEnabled = enable;
+		return true;
+	}
+	else
+		return false;
 }
 
 class QuestTask: public ITaskThreadPool::ITask
@@ -196,6 +207,19 @@ ConnectionInfoPtr TCPClient::perpareConnection(int socket, std::string& publicKe
 		std::unique_lock<std::mutex> lck(_mutex);
 		newConnectionInfo.reset(new ConnectionInfo(socket, _connectionInfo->port, _connectionInfo->ip, _isIPv4, false));
 		connection = new TCPClientConnection(shared_from_this(), &_mutex, _ioChunkSize, newConnectionInfo);
+	}
+
+	if (_sslEnabled)
+	{
+		newConnectionInfo->_isSSL = true;
+		if (!connection->prepareSSL(false))
+		{
+			LOG_ERROR("Error occurred when prepare SSL. %s", newConnectionInfo->str().c_str());
+			OpenSSLModule::logLastErrors();
+
+			delete connection;		//-- connection will close socket.
+			return nullptr;
+		}
 	}
 
 	if (configEncryptedConnection(connection, publicKey) == false)

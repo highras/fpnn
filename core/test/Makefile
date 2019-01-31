@@ -19,7 +19,7 @@ EXES_ACCASVT = asyncCloseConnectionAfterSentViolentTest
 CFLAGS +=
 CXXFLAGS +=
 CPPFLAGS += -g -I.. -I../../base -I../../proto -I../../proto/msgpack -I../../proto/rapidjson
-LIBS += -L.. -L../../base -L../../proto -L../../extends
+LIBS += -L.. -L../../base -L../../proto -L../../extends  -lssl -lcrypto
 
 OBJS_CLIENT = clientTest.o
 OBJS_TEST = clientAsyncTest.o

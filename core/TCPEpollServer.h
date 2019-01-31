@@ -39,15 +39,23 @@ namespace fpnn
 
 	class TCPEpollServer: virtual public ServerInterface, virtual public IConcurrentSender
 	{
-	private:
-		uint16_t _port;
-		std::string _ip;
-		uint16_t _port6;
-		std::string _ipv6;
-		int _backlog;
+		struct SocketInfo
+		{
+			uint16_t port;
+			std::string ip;
+			int socket;
 
-		int _socket;
-		int _socket6;
+			SocketInfo(): port(0), socket(0) {}
+			void init(const std::vector<std::string>& ipItems, const std::vector<std::string>& portItems);
+			void close();
+		};
+
+	private:
+		struct SocketInfo _ipv4;
+		struct SocketInfo _ipv6;
+		struct SocketInfo _sslIPv4;
+		struct SocketInfo _sslIPv6;
+		int _backlog;
 		int _epoll_fd;
 
 		int _max_events;
@@ -91,9 +99,11 @@ namespace fpnn
 		int								getCPUCount();
 		bool							prepare();
 		bool							init();
-		bool							initIPv6();
-		void							acceptIPv4Connection();
-		void							acceptIPv6Connection();
+		bool							initIPv4(struct SocketInfo& info);
+		bool							initIPv6(struct SocketInfo& info);
+		bool							initEpoll();
+		void							acceptIPv4Connection(int socket, bool ssl);
+		void							acceptIPv6Connection(int socket, bool ssl);
 		void							newConnection(int newSocket, ConnectionInfoPtr ci);
 		void							processEvent(struct epoll_event & event);
 		void							cleanForNewConnectionError(TCPServerConnection*, RequestPackage*, const char* log_info, bool connectionInCache);
@@ -104,7 +114,7 @@ namespace fpnn
 
 	private:
 		TCPEpollServer()
-			: _port(0), _port6(0), _backlog(FPNN_DEFAULT_SOCKET_BACKLOG), _socket(0), _socket6(0), _epoll_fd(0), 
+			: _backlog(FPNN_DEFAULT_SOCKET_BACKLOG), _epoll_fd(0), 
 			_max_events(FPNN_DEFAULT_MAX_EVENT), 
 			_epollEvents(NULL), _running(false), _stopping(false), _stopSignalNotified(false), _connectionCount(0),
 			_ioBufferChunkSize(FPNN_DEFAULT_IO_BUFFER_CHUNK_SIZE),
@@ -154,11 +164,6 @@ namespace fpnn
 		virtual bool startup()
 		{
 			bool status = prepare() ? init() : false;
-			if (_port6 && initIPv6() == false)
-			{
-				LOG_ERROR("Init IPv6 failed.");
-			}
-
 			if(status){
 				ServerController::startTimeoutCheckThread();
 				_serverMasterProcessor->getQuestProcessor()->start();
@@ -171,16 +176,20 @@ namespace fpnn
 		/*===============================================================================
 		  Basic configurations & properties.
 		=============================================================================== */
-		virtual void setIP(const std::string& ip) { _ip = ip; }
-		virtual void setIPv6(const std::string& ipv6) { _ipv6 = ipv6; }
-		virtual void setPort(uint16_t port) { _port = port; }
-		virtual void setPort6(unsigned short port) { _port6 = port; }
+		virtual void setIP(const std::string& ip) { _ipv4.ip = ip; }
+		virtual void setIPv6(const std::string& ipv6) { _ipv6.ip = ipv6; }
+		virtual void setPort(uint16_t port) { _ipv4.port = port; }
+		virtual void setPort6(unsigned short port) { _ipv6.port = port; }
 		virtual void setBacklog(int backlog) { _backlog = backlog; }
 
-		virtual uint16_t port() const { return _port; }
-		virtual uint16_t port6() const { return _port6; }
-		virtual std::string ip() const { return _ip; }
-		virtual std::string ipv6() const { return _ipv6; }	
+		virtual uint16_t port() const { return _ipv4.port; }
+		virtual uint16_t port6() const { return _ipv6.port; }
+		virtual std::string ip() const { return _ipv4.ip; }
+		virtual std::string ipv6() const { return _ipv6.ip; }
+		virtual uint16_t sslPort() const { return _sslIPv4.port; }
+		virtual uint16_t sslPort6() const { return _sslIPv6.port; }
+		virtual std::string sslIP() const { return _sslIPv4.ip; }
+		virtual std::string sslIP6() const { return _sslIPv6.ip; }
 		virtual int32_t backlog() const { return _backlog; }
 
 		inline void setMaxEvents(int maxCount) { _max_events = maxCount; }

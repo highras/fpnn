@@ -46,6 +46,13 @@ enum IPTypes {
 };
 bool getIPs(std::map<enum IPTypes, std::set<std::string>>& ipDict);
 
+namespace NetworkUtil
+{
+	std::string getFirstIPAddress(enum IPTypes type);
+	std::string getLocalIP4();
+	std::string getPublicIP4();
+}
+
 }
 
 #endif

@@ -1,4 +1,6 @@
 #include <fstream>
+#include <iostream>
+#include <queue>
 #include <utime.h>
 #include <sys/types.h>
 #include <sys/stat.h>
@@ -183,6 +185,7 @@ bool FileSystemUtil::createDirectories(const char* path)
 std::vector<std::string> FileSystemUtil::getFilesInDirectory(const char* directoryPath, bool excludeSubDirectories)
 {
 	std::vector<std::string> files;
+	if(directoryPath == NULL) return files;
 	DIR *dir = opendir(directoryPath);
 	if (dir == NULL)
 		return files;
@@ -204,6 +207,8 @@ std::vector<std::string> FileSystemUtil::getFilesInDirectory(const char* directo
 		if (strcmp(entry->d_name, ".") == 0 || strcmp(entry->d_name, "..") == 0)
 			continue;
 
+		std::string path(directoryPath);
+		path.append("/").append(entry->d_name);
 		if (entry->d_type == DT_REG)
 		{
 			files.push_back(entry->d_name);
@@ -214,9 +219,6 @@ std::vector<std::string> FileSystemUtil::getFilesInDirectory(const char* directo
 		}
 		else if (entry->d_type == DT_LNK || entry->d_type == DT_UNKNOWN)
 		{
-			std::string path(directoryPath);
-			path.append("/").append(entry->d_name);
-
 			struct stat statBuf;
 			if(stat(path.c_str(), &statBuf) == 0)
 			{
@@ -230,6 +232,233 @@ std::vector<std::string> FileSystemUtil::getFilesInDirectory(const char* directo
 
 	closedir(dir);
 	return files;
+}
+
+std::vector<std::string> FileSystemUtil::getFilesInDirectories(const char* directoryPath)
+{
+	std::vector<std::string> files;
+	if(directoryPath == NULL) return files;
+
+	std::queue<std::string> pathes;
+	pathes.push(directoryPath);
+
+	while(!pathes.empty()){
+		std::string path = pathes.front();
+		pathes.pop();
+
+		DIR *dir = opendir(path.c_str());
+		if (dir == NULL) continue;
+
+		long name_max = pathconf(path.c_str(), _PC_NAME_MAX);
+		if (name_max == -1)         /* Limit not defined, or error */
+			name_max = 255;         /* Take a guess */
+		long len = offsetof(struct dirent, d_name) + name_max + 1;
+		struct dirent *entry = (struct dirent *)malloc(len);
+
+		AutoFreeGuard afg(entry);
+
+		while (true)
+		{
+			struct dirent *result;
+			if (readdir_r(dir, entry, &result) || !result)
+				break;
+
+			if (strcmp(entry->d_name, ".") == 0 || strcmp(entry->d_name, "..") == 0)
+				continue;
+
+			std::string pathlink(path);
+			pathlink.append("/").append(entry->d_name);
+			if (entry->d_type == DT_REG)
+			{
+				files.push_back(pathlink);
+			}
+			else if (entry->d_type == DT_DIR)
+			{
+				pathes.push(pathlink);
+			}
+			else if (entry->d_type == DT_LNK || entry->d_type == DT_UNKNOWN)
+			{
+
+				struct stat statBuf;
+				if(stat(pathlink.c_str(), &statBuf) == 0)
+				{
+					if (S_ISREG(statBuf.st_mode))
+						files.push_back(pathlink);
+					else if (S_ISDIR(statBuf.st_mode)){
+						pathes.push(pathlink);
+					}
+				}
+			}
+		}
+
+		closedir(dir);
+	}
+	return files;
+}
+
+std::vector<std::string> FileSystemUtil::findFilesInDirectories(const char* directoryPath, const char* name)
+{
+	std::vector<std::string> files;
+	if(directoryPath == NULL || name == NULL) return files;
+
+	std::queue<std::string> pathes;
+	pathes.push(directoryPath);
+
+	while(!pathes.empty()){
+		std::string path = pathes.front();
+		pathes.pop();
+
+		DIR *dir = opendir(path.c_str());
+		if (dir == NULL) continue;
+
+		long name_max = pathconf(path.c_str(), _PC_NAME_MAX);
+		if (name_max == -1)         /* Limit not defined, or error */
+			name_max = 255;         /* Take a guess */
+		long len = offsetof(struct dirent, d_name) + name_max + 1;
+		struct dirent *entry = (struct dirent *)malloc(len);
+
+		AutoFreeGuard afg(entry);
+
+		while (true)
+		{
+			struct dirent *result;
+			if (readdir_r(dir, entry, &result) || !result)
+				break;
+
+			if (strcmp(entry->d_name, ".") == 0 || strcmp(entry->d_name, "..") == 0)
+				continue;
+
+			std::string pathlink(path);
+			pathlink.append("/").append(entry->d_name);
+			if (entry->d_type == DT_REG)
+			{
+				if(strstr(entry->d_name, name) != NULL)
+					files.push_back(pathlink);
+			}
+			else if (entry->d_type == DT_DIR)
+			{
+				pathes.push(pathlink);
+			}
+			else if (entry->d_type == DT_LNK || entry->d_type == DT_UNKNOWN)
+			{
+
+				struct stat statBuf;
+				if(stat(pathlink.c_str(), &statBuf) == 0)
+				{
+					if (S_ISREG(statBuf.st_mode)){
+						if(strstr(entry->d_name, name) != NULL)
+							files.push_back(pathlink);
+					}
+					else if (S_ISDIR(statBuf.st_mode)){
+						pathes.push(pathlink);
+					}
+				}
+			}
+		}
+
+		closedir(dir);
+	}
+	return files;
+}
+
+bool FileSystemUtil::deleteFilesInDirectories(const char* directoryPath)
+{
+	if(directoryPath == NULL) return false;
+	DIR *dir = opendir(directoryPath);
+	if (dir == NULL) return false;
+
+	long name_max = pathconf(directoryPath, _PC_NAME_MAX);
+	if (name_max == -1)         /* Limit not defined, or error */
+		name_max = 255;         /* Take a guess */
+	long len = offsetof(struct dirent, d_name) + name_max + 1;
+	struct dirent *entry = (struct dirent *)malloc(len);
+
+	AutoFreeGuard afg(entry);
+
+	while (true)
+	{
+		struct dirent *result;
+		if (readdir_r(dir, entry, &result) || !result)
+			break;
+
+		if (strcmp(entry->d_name, ".") == 0 || strcmp(entry->d_name, "..") == 0)
+			continue;
+
+		std::string pathlink(directoryPath);
+		pathlink.append("/").append(entry->d_name);
+		if (entry->d_type == DT_REG)
+		{
+			unlink(pathlink.c_str());
+		}
+		else if (entry->d_type == DT_DIR)
+		{
+			deleteFilesInDirectories(pathlink.c_str());
+		}
+		else if (entry->d_type == DT_LNK || entry->d_type == DT_UNKNOWN)
+		{
+			struct stat statBuf;
+			if(stat(pathlink.c_str(), &statBuf) == 0)
+			{
+				if (S_ISREG(statBuf.st_mode))
+					unlink(pathlink.c_str());
+				else if (S_ISDIR(statBuf.st_mode)){
+					deleteFilesInDirectories(pathlink.c_str());
+				}
+			}
+
+			unlink(pathlink.c_str());
+		}
+
+	}
+	closedir(dir);
+	rmdir(directoryPath);
+	return true;
+}
+
+bool FileSystemUtil::deleteFilesInDirectory(const char* directoryPath)
+{
+	if(directoryPath == NULL) return false;
+	DIR *dir = opendir(directoryPath);
+	if (dir == NULL)
+		return false;
+
+	long name_max = pathconf(directoryPath, _PC_NAME_MAX);
+	if (name_max == -1)         /* Limit not defined, or error */
+		name_max = 255;         /* Take a guess */
+	long len = offsetof(struct dirent, d_name) + name_max + 1;
+	struct dirent *entry = (struct dirent *)malloc(len);
+
+	AutoFreeGuard afg(entry);
+
+	while (true)
+	{
+		struct dirent *result;
+		if (readdir_r(dir, entry, &result) || !result)
+			break;
+
+		if (strcmp(entry->d_name, ".") == 0 || strcmp(entry->d_name, "..") == 0)
+			continue;
+
+		std::string pathlink(directoryPath);
+		pathlink.append("/").append(entry->d_name);
+		if (entry->d_type == DT_REG)
+		{
+			unlink(pathlink.c_str());
+		}
+		else if (entry->d_type == DT_LNK || entry->d_type == DT_UNKNOWN)
+		{
+			struct stat statBuf;
+			if(stat(pathlink.c_str(), &statBuf) == 0)
+			{
+				if (S_ISREG(statBuf.st_mode))
+					unlink(pathlink.c_str());
+			}
+		}
+	}
+
+	closedir(dir);
+	rmdir(directoryPath);
+	return true;;
 }
 
 FileLocker::FileLocker(const char *lock_file): _fd(0)

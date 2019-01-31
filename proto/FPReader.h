@@ -29,10 +29,10 @@ namespace fpnn{
 					return _find(k);
 				}
 				catch(const std::exception& ex){
-					LOG_ERROR("EXCEPTION:%s, Cannot find object of key:%s. raw data:%s.", ex.what(), k, json().c_str());
+					LOG_ERROR("EXCEPTION: %s, Cannot find object of key: %s, data: %s", ex.what(), k, json().c_str());
 				}
 				catch(...){
-					LOG_ERROR("Cannot find object of key:%s. raw data:%s.", k, json().c_str());
+					LOG_ERROR("Cannot find object of key: %s, data: %s", k, json().c_str());
 				}
 				return _nilObj;
 			}
@@ -56,10 +56,10 @@ namespace fpnn{
 						dft = _find(k).as<decltype(dft)>();
 					}
 					catch(const std::exception& ex){
-						//LOG_INFO("EXCEPTION:%s, Cannot find value of key:%s. type:%s, raw data:%s.", ex.what(), k, typeid(dft).name(), json().c_str());
+						//LOG_INFO("EXCEPTION:%s, Cannot find value of key:%s type:%s, raw data:%s", ex.what(), k, typeid(dft).name(), json().c_str());
 					}
 					catch(...){
-						//LOG_WARN("Cannot find value of key:%s. type:%s, raw data:%s.", k, typeid(dft).name(), json().c_str());
+						//LOG_WARN("Cannot find value of key:%s type:%s, raw data:%s", k, typeid(dft).name(), json().c_str());
 					}
 					return dft;
 				}
@@ -93,10 +93,10 @@ namespace fpnn{
 						throw ex;
 					}
 					catch(const std::exception& ex){
-						throw FPNN_ERROR_CODE_FMT(FpnnHTTPError, FPNN_EC_PROTO_TYPE_CONVERT, "Can not convert key:%s to Type:%s", k, typeid(dft).name());
+						throw FPNN_ERROR_CODE_FMT(FpnnHTTPError, FPNN_EC_PROTO_TYPE_CONVERT, "Can not convert key: %s to Type: %s, data: %s", k, typeid(dft).name(), json().c_str());
 					}   
 					catch(...){
-						throw FPNN_ERROR_CODE_FMT(FpnnHTTPError, FPNN_EC_PROTO_UNKNOWN_ERROR, "Unknow error, Want value of key:%s", k);
+						throw FPNN_ERROR_CODE_FMT(FpnnHTTPError, FPNN_EC_PROTO_UNKNOWN_ERROR, "Unknow error, Want value of key: %s, data: %s", k, json().c_str());
 					}   
 				}
 
@@ -209,7 +209,7 @@ namespace fpnn{
 			}
 			FPReader(const msgpack::object& obj):_object(obj){
 				if(_object.type != msgpack::type::MAP) 
-					throw FPNN_ERROR_CODE_FMT(FpnnProtoError, FPNN_EC_PROTO_MAP_VALUE, "NOT a MAP object:%d", _object.type);
+					throw FPNN_ERROR_CODE_FMT(FpnnProtoError, FPNN_EC_PROTO_MAP_VALUE, "NOT a MAP object: %d", _object.type);
 			}
 			virtual ~FPReader() {}
 		public:
@@ -217,14 +217,23 @@ namespace fpnn{
 				throw FPNN_ERROR_CODE_MSG(FpnnProtoError, FPNN_EC_PROTO_NOT_SUPPORTED, "should not call raw");
 			}   
 			std::string json(){
-				return JSONConvert::Msgpack2Json(_object);
+				try{
+					return JSONConvert::Msgpack2Json(_object);
+				}   
+				catch(const std::exception& ex){
+					LOG_ERROR("EXCEPTION:%s", ex.what());
+				}   
+				catch(...){
+					LOG_ERROR("Unknow Exception");
+				}   
+				return "";
 			}
 		private:
 			void unpack(const char* buf, size_t len){
 				_oh = msgpack::unpack(buf, len);
 				_object = _oh.get();
 				if(_object.type != msgpack::type::MAP) 
-					throw FPNN_ERROR_CODE_FMT(FpnnProtoError, FPNN_EC_PROTO_MAP_VALUE, "NOT a MAP object:%d", _object.type);
+					throw FPNN_ERROR_CODE_FMT(FpnnProtoError, FPNN_EC_PROTO_MAP_VALUE, "NOT a MAP object: %d", _object.type);
 			}
 
 			const msgpack::object& _find(const char* key);

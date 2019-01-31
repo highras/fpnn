@@ -30,7 +30,7 @@ namespace fpnn
 				return nullptr;
 
 			int index = _funcarp->which(key);
-			if (index < 0 || index >= _endpoints.size())
+			if (index < 0 || index >= (int)_endpoints.size())
 				return nullptr;
 
 			auto iter = _clients.find(_endpoints[index]);
@@ -60,7 +60,7 @@ namespace fpnn
 			for (const auto& key: keys)
 			{
 				int index = _funcarp->which(key);
-				if (index < 0 || index >= _endpoints.size())
+				if (index < 0 || index >= (int)_endpoints.size())
 				{
 					continue;
 				}
@@ -100,7 +100,7 @@ namespace fpnn
 			for (const auto& key: keys)
 			{
 				int index = _funcarp->which(key);
-				if (index < 0 || index >= _endpoints.size())
+				if (index < 0 || index >= (int)_endpoints.size())
 				{
 					continue;
 				}
@@ -140,7 +140,7 @@ namespace fpnn
 			for (const auto& key: keys)
 			{
 				int index = _funcarp->which(key);
-				if (index < 0 || index >= _endpoints.size())
+				if (index < 0 || index >= (int)_endpoints.size())
 				{
 					continue;
 				}
@@ -168,8 +168,8 @@ namespace fpnn
 
 	public:
 		//-- If questTimeoutSeconds less then zero, mean using global settings.
-		TCPFPZKCarpProxy(FPZKClientPtr fpzkClient, const std::string& serviceName, int64_t questTimeoutSeconds = -1, uint32_t keymask = 0):
-			TCPFPZKProxyCore(fpzkClient, serviceName, questTimeoutSeconds), _keymask(keymask)
+		TCPFPZKCarpProxy(FPZKClientPtr fpzkClient, const std::string& serviceName, const std::string& cluster = "", int64_t questTimeoutSeconds = -1, uint32_t keymask = 0):
+			TCPFPZKProxyCore(fpzkClient, serviceName, cluster, questTimeoutSeconds), _keymask(keymask)
 		{
 		}
 

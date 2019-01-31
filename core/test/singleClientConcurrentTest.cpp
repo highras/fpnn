@@ -4,7 +4,7 @@
 #include "msec.h"
 #include "TCPClient.h"
 #include "IQuestProcessor.h"
-#include "ClientEncryptConfig.h"
+#include "CommandLineUtil.h"
 
 using namespace std;
 using namespace fpnn;
@@ -173,26 +173,40 @@ void test(TCPClientPtr client, int threadCount, int questCount)
 	cout<<endl<<endl;
 }
 
+void processEncrypt(TCPClientPtr client)
+{
+	if (CommandLineParser::exist("ssl"))
+		client->enableSSL();
+	else if (CommandLineParser::exist("ecc-pem"))
+	{
+		bool packageMode = CommandLineParser::exist("package");
+		bool reinforce = CommandLineParser::exist("256bits");
+		std::string pemFile = CommandLineParser::getString("ecc-pem");
+		client->enableEncryptorByPemFile(pemFile.c_str(), packageMode, reinforce);
+	}
+}
+
+void showUsage(const char* appName)
+{
+	cout<<"Usage: "<<appName<<" ip port [-ssl]"<<endl;
+	cout<<"Usage: "<<appName<<" ip port [-ecc-pem ecc-pem-file [-package|-stream] [-128bits|-256bits]]"<<endl;
+}
+
 int main(int argc, char* argv[])
 {
-	if (argc < 3 || argc > 4)
-	{   
-		cout<<"Usage: "<<argv[0]<<" ip port [encryptConfigFile]"<<endl;
+	CommandLineParser::init(argc, argv);
+	std::vector<std::string> mainParams = CommandLineParser::getRestParams();
+	if (mainParams.size() != 2)
+	{
+		showUsage(argv[0]);
 		return 0;
 	}
 
-	TCPClientPtr client = TCPClient::createClient(argv[1], atoi(argv[2]));
+	TCPClientPtr client = TCPClient::createClient(mainParams[0], std::stoi(mainParams[1]));
 	client->setQuestProcessor(std::make_shared<Processor>());
 	FPLog::init("std::cout", "FPNN.TEST", "FATAL", "SingleClientConcurrentTest");
 
-	if (argc == 4)
-	{
-		ClientEncryptConfig encryptConfig;
-		if (!encryptConfig.enableEncryption(argv[3]))
-			return 1;
-		encryptConfig.process(client);
-	}
-
+	processEncrypt(client);
 	showSignDesc();
 	
 	test(client, 10, 30000);

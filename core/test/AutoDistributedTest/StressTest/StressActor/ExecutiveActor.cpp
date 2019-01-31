@@ -75,6 +75,7 @@ void ExecutiveActor::action(int taskId, const std::string& method, const FPReade
 
 			stressTask.taskFinisher.reset(new TaskFinisher(taskId, method, ss.str()));
 			stressTask.stressSource.reset(new StressSource(taskId, _region, endpoint));
+			stressTask.stressSource->checkEncryptInfo(payload);
 		}
 		
 		std::thread(&stressLauncher, taskId, connections, totalQPS, this, stressTask).detach();

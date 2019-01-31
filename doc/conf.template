@@ -20,6 +20,18 @@ FPNN.server.security.ecdh.privateKey =
 # 所有用户接口，是否只允许加密访问
 FPNN.server.security.forceEncrypt.userMethods = false
 
+# SSL/TLS 相关
+FPNN.server.tcp.ipv4.ssl.listening.port =
+FPNN.server.tcp.ipv4.ssl.listening.ip =
+
+FPNN.server.tcp.ipv6.ssl.listening.port =
+FPNN.server.tcp.ipv6.ssl.listening.ip =
+
+# certificate 与 PrivateKey 均为文件路径
+FPNN.server.security.ssl.certificate = 
+FPNN.server.security.ssl.privateKey = 
+
+
 #server 是否支持http Post请求
 FPNN.server.http.supported = false
 #Server 是否支持统计,包括请求数,QPS等等,开启本项 会影响性能
@@ -78,7 +90,7 @@ FP.server.public.ip6 =
 FP.server.host.platform = 
 
 ###############################################
-#  以下参数除非你知道什么意思,请不要随便配置  #
+#  以下参数除非了解其明确含义和影响，否则请不要随便配置  #
 ###############################################
 
 FPNN.global.max.package.len = 

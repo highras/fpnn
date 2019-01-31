@@ -12,6 +12,9 @@ bool TCPClientConnection::waitForAllEvents()
 
 bool TCPClientIOWorker::read(TCPClientConnection * connection)
 {
+	if (connection->_connectionInfo->isSSL() && connection->_sslContext._negotiate != SSLNegotiate::Normal)
+		return true;
+
 	if (!connection->_recvBuffer.getToken())
 		return true;
 
@@ -98,28 +101,88 @@ void TCPClientIOWorker::run(TCPClientConnection * connection)
 {
 	bool fdInvalid = false;
 	bool needWaitSendEvent = false;
-	if (connection->_needRecv)
+	bool executeDataTransmission = true;
+
+	if (connection->_connectionInfo->isSSL())
 	{
-		fdInvalid = !read(connection);
-		connection->_needRecv = false;
-	}
-	if (!fdInvalid && connection->_needSend)
-	{
-		int errno_ = connection->send(needWaitSendEvent);
-		switch (errno_)
+		if (connection->_sslContext._connected == false)
 		{
-		case 0:
-			break;
-
-		case EPIPE:
-		case EBADF:
-		case EINVAL:
-		default:
-			fdInvalid = true;
-			LOG_ERROR("Client connection sending error. Connection will be closed soon. %s", connection->_connectionInfo->str().c_str());
+			if (connection->_sslContext.doHandshake(needWaitSendEvent, connection->_connectionInfo.get()) == false)
+			{
+				closeConnection(connection);
+				return;
+			}
+			
+			executeDataTransmission = connection->_sslContext._connected;
+			if (executeDataTransmission && connection->_sendBuffer.empty() == false)
+				connection->_needSend = true;
 		}
+		else if (connection->_sslContext._negotiate != SSLNegotiate::Normal)
+		{
+			LOG_WARN("SSL/TSL negotiate is continue.");
 
-		connection->_needSend = false;
+			connection->_sslContext._negotiate = SSLNegotiate::Normal;
+			if (connection->_sendBuffer.empty() == false)
+				connection->_needSend = true;
+
+			/*
+			SSLNegotiate lastNegotiateStatus = connection->_sslContext._negotiate;
+			connection->_sslContext._negotiate = SSLNegotiate::Normal;
+
+			if (lastNegotiateStatus == SSLNegotiate::Write_Want_Read)
+			{
+				bool additionalSend = false;
+				if (!read(connection, additionalSend))
+				{
+					closeConnection(connection, true);
+					return;
+				}
+				
+				connection->_needRecv = false;
+
+				if (connection->_sendBuffer.empty() == false)
+					connection->_needSend = true;
+			}
+			else
+				connection->_needSend = true;
+			*/
+			/*
+			//-- The following codes will call sendData() function, so, comment the below codes.
+			else
+			{
+				if (sendData(connection, fdInvalid, needWaitSendEvent) == false)
+					return;
+			}
+			*/
+		}
+	}
+
+	if (executeDataTransmission)
+	{
+		if (connection->_needRecv)
+		{
+			fdInvalid = !read(connection);
+			connection->_needRecv = false;
+		}
+		if (connection->_connectionInfo->isSSL() == false || connection->_sslContext._negotiate == SSLNegotiate::Normal)
+		if (!fdInvalid && connection->_needSend)
+		{
+			int errno_ = connection->send(needWaitSendEvent);
+			switch (errno_)
+			{
+			case 0:
+				break;
+
+			case EPIPE:
+			case EBADF:
+			case EINVAL:
+			default:
+				fdInvalid = true;
+				LOG_ERROR("Client connection sending error. Connection will be closed soon. %s", connection->_connectionInfo->str().c_str());
+			}
+
+			connection->_needSend = false;
+		}
 	}
 	
 	if (fdInvalid == false)
@@ -144,6 +207,11 @@ void TCPClientIOWorker::run(TCPClientConnection * connection)
 		LOG_INFO("Client connection wait event failed. Connection will be closed. %s", connection->_connectionInfo->str().c_str());
 	}
 
+	closeConnection(connection);
+}
+
+void TCPClientIOWorker::closeConnection(TCPClientConnection * connection)
+{
 	if (ClientEngine::nakedInstance()->takeConnection(connection->socket()) == NULL)
 	{
 		connection->_refCount--;

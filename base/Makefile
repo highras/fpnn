@@ -9,7 +9,7 @@ OBJS_CXX = FpnnError.o FunCarpSequence.o ParamThreadPool.o TaskThreadPool.o \
 		   TimeAnalyst.o HostLookup.o Endian.o escapeString.o \
 		   PrintMemory.o NetworkUtility.o MemoryPool.o HttpClient.o UnlockedMemoryPool.o \
 		   TableRow.o MidGenerator.o FPJson.o FPJsonParser.o FileSystemUtil.o gzpipe.o \
-		   FormattedPrint.o ResourceCenter.o FPTimer.o StringInt.o CommandLineUtil.o
+		   FormattedPrint.o ResourceCenter.o FPTimer.o CommandLineUtil.o MachineStatus.o
 
 # Static 
 LIBFPNN_A = libfpbase.a

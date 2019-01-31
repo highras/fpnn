@@ -7,6 +7,7 @@
 #include "FpnnError.h"
 #include "FPLog.h"
 #include "msec.h"
+#include "StringUtil.h"
 
 namespace fpnn{
 
@@ -173,9 +174,12 @@ namespace fpnn{
 					return _emptyString;
 				if(strcasecmp(http_header("Upgrade").c_str(), "websocket") != 0)
 					return _emptyString;
-				if(strcasecmp(http_header("Connection").c_str(), "Upgrade") != 0)
-					return _emptyString;
 				if(http_header("Sec-WebSocket-Version") != "13")
+					return _emptyString;
+				std::string connection = http_header("Connection");
+				std::set<std::string> elems;
+				elems = StringUtil::split(connection, ",; ", elems);
+				if(elems.find("Upgrade") == elems.end())
 					return _emptyString;
 				return http_header("Sec-WebSocket-Key");
 			}

@@ -101,17 +101,41 @@ namespace fpnn
 		void enablePrivateQuestProcessor(IProxyQuestProcessorFactoryPtr factory)
 		{
 			_questProcessorFactory = factory;
+
+			std::unique_lock<std::mutex> lck(_mutex);
+			for (auto& clientPair: _clients)
+			{
+				std::string host;
+				int port;
+				if (parseAddress(clientPair.first, host, port))
+				{
+					IQuestProcessorPtr processor = _questProcessorFactory->generate(host, port);
+					if (processor)
+					{
+						processor->setConcurrentSender(ClientEngine::nakedInstance());
+						clientPair.second->setQuestProcessor(processor);
+					}
+				}
+			}
 		}
 
 		void setSharedQuestProcessor(IQuestProcessorPtr sharedQuestProcessor)
 		{			
 			_sharedQuestProcessor = sharedQuestProcessor;
 			_sharedQuestProcessor->setConcurrentSender(ClientEngine::nakedInstance());
+
+			std::unique_lock<std::mutex> lck(_mutex);
+			for (auto& clientPair: _clients)
+				clientPair.second->setQuestProcessor(_sharedQuestProcessor);
 		}
 
 		void setSharedQuestProcessThreadPool(TaskThreadPoolPtr questProcessPool)
 		{
 			_sharedQuestProcessPool = questProcessPool;
+
+			std::unique_lock<std::mutex> lck(_mutex);
+			for (auto& clientPair: _clients)
+				clientPair.second->setQuestProcessThreadPool(_sharedQuestProcessPool);
 		}
 
 		void updateEndpoints(const std::vector<std::string>& newEndpoints)	//-- FPZK Proxy needn't using this function.

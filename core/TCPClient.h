@@ -26,6 +26,7 @@ namespace fpnn
 		std::string _eccCurve;
 		std::string _serverPublicKey;
 
+		bool _sslEnabled;
 		//----------
 		int _ioChunkSize;
 
@@ -59,6 +60,7 @@ namespace fpnn
 			_AESKeyLen = reinforce ? 32 : 16;
 		}
 
+		bool enableSSL(bool enable = true);
 		inline void setIOChunckSize(int ioChunkSize) { _ioChunkSize = ioChunkSize; }
 		/*===============================================================================
 		  Call by Developer.

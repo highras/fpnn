@@ -36,6 +36,7 @@ namespace fpnn
 		bool read(TCPClientConnection * connection);
 		bool deliverAnswer(TCPClientConnection * connection, FPAnswerPtr answer);
 		bool deliverQuest(TCPClientConnection * connection, FPQuestPtr quest);
+		void closeConnection(TCPClientConnection * connection);
 
 	public:
 		TCPClientIOWorker() {}

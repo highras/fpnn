@@ -630,6 +630,8 @@ void UDPEpollServer::clean()
 
 	//call user defined function after server exit
 	_serverMasterProcessor->getQuestProcessor()->serverStopped();
+	// force release business processor
+	_serverMasterProcessor->setQuestProcessor(nullptr);
 }
 
 void UDPEpollServer::clearRemnantCallbacks()

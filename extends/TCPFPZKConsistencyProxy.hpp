@@ -15,6 +15,11 @@ namespace fpnn
 		{
 			checkRevision("FPZK Consistency Proxy");
 		}
+		
+		virtual void beforeGetClient()
+		{
+			checkRevision("FPZK Consistency Proxy");
+		}
 
 	public:
 		/*
@@ -24,7 +29,13 @@ namespace fpnn
 		TCPFPZKConsistencyProxy(FPZKClientPtr fpzkClient, const std::string& serviceName,
 				ConsistencySuccessCondition condition, int requiredCount = 0, int64_t questTimeoutSeconds = -1):
 			TCPProxyCore(questTimeoutSeconds), TCPConsistencyProxy(condition, requiredCount, questTimeoutSeconds),
-			TCPFPZKProxyCore(fpzkClient, serviceName, questTimeoutSeconds)
+			TCPFPZKProxyCore(fpzkClient, serviceName, "", questTimeoutSeconds)
+		{
+		}
+		TCPFPZKConsistencyProxy(FPZKClientPtr fpzkClient, const std::string& serviceName, const std::string& cluster,
+				ConsistencySuccessCondition condition, int requiredCount = 0, int64_t questTimeoutSeconds = -1):
+			TCPProxyCore(questTimeoutSeconds), TCPConsistencyProxy(condition, requiredCount, questTimeoutSeconds),
+			TCPFPZKProxyCore(fpzkClient, serviceName, cluster, questTimeoutSeconds)
 		{
 		}
 		virtual ~TCPFPZKConsistencyProxy()
@@ -38,27 +49,6 @@ namespace fpnn
 			 * from _callbackMapSuite. When the last ConsistencyAnswerCallback destroyed, _callbackMapSuite's reference count will
 			 * come to zero, and _callbackMapSuite will be destroyed. 
 			 */
-		}
-
-		TCPClientPtr getClient(const std::string& endpoint, bool connect)
-		{
-			std::unique_lock<std::mutex> lck(_mutex);
-			checkRevision("FPZK Consistency Proxy");
-
-			auto iter = _clients.find(endpoint);
-			if (iter != _clients.end())
-			{
-				TCPClientPtr client = iter->second;
-				if (!connect || client->connected() || client->reconnect())
-					return client;
-			}
-			else
-			{
-				TCPClientPtr client = createTCPClient(endpoint, connect);
-				if (client)
-					return client;
-			}
-			return nullptr;
 		}
 	};
 	typedef std::shared_ptr<TCPFPZKConsistencyProxy> TCPFPZKConsistencyProxyPtr;

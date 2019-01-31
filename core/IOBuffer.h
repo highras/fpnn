@@ -7,6 +7,7 @@
 #include <queue>
 #include <mutex>
 #include <memory>
+#include "OpenSSLModule.h"
 #include "FPMessage.h"
 #include "Receiver.h"
 
@@ -61,6 +62,10 @@ namespace fpnn
 		{
 			return ((WebSocketReceiver*)_receiver)->getControlFrameCode();
 		}
+		void enrtySSLMode(SSLContext *sslContext)
+		{
+			_receiver->enrtySSLMode(sslContext);
+		}
 	};
 
 	class SendBuffer
@@ -79,17 +84,19 @@ namespace fpnn
 		bool _stopAppendData;
 		bool _encryptAfterFirstPackage;
 		Encryptor* _encryptor;
+		SSLContext* _sslContext;
 
 		CurrBufferProcessFunc _currBufferProcess;
 
 		void encryptData();
 		void addWebSocketWrap();
 		int realSend(int fd, bool& needWaitSendEvent);
+		int sslRealSend(int fd, bool& needWaitSendEvent);
 
 	public:
 		SendBuffer(std::mutex* mutex): _mutex(mutex), _sendToken(true), _offset(0), _currBuffer(0),
 			_sentBytes(0), _sentPackage(0), _stopAppendData(false), _encryptAfterFirstPackage(false),
-			_encryptor(NULL), _currBufferProcess(NULL) {}
+			_encryptor(NULL), _sslContext(NULL), _currBufferProcess(NULL) {}
 		~SendBuffer()
 		{
 			while (_outQueue.size())
@@ -113,6 +120,8 @@ namespace fpnn
 		void appendData(std::string* data);
 		void stopAppendData() { _stopAppendData = true; }
 		void entryWebSocketMode(std::string* data = NULL);	//-- if data not NULL, MUST set additionalSend in TCPServerIOWorker::read().
+		void enrtySSLMode(SSLContext *sslContext) { _sslContext = sslContext; }
+		bool empty();
 	};
 }
 

@@ -414,7 +414,7 @@ void ClientEngine::sendData(int socket, uint64_t token, std::string* data)
 	if (!_connectionMap.sendData(socket, token, data))
 	{
 		delete data;
-		LOG_ERROR("Data not send at socket %d. socket maybe closed.", socket);
+		LOG_WARN("Data not send at socket %d. socket maybe closed.", socket);
 	}
 }
 
@@ -447,6 +447,9 @@ bool ClientEngine::joinEpoll(BasicConnection* connection)
 	ev.data.fd = socket;
 	ev.events = EPOLLIN | EPOLLERR | EPOLLHUP | EPOLLET | EPOLLRDHUP | EPOLLONESHOT;
 
+	if (connection->_connectionInfo->isSSL())
+		ev.events = EPOLLOUT | EPOLLERR | EPOLLHUP | EPOLLET | EPOLLRDHUP | EPOLLONESHOT;
+
 	if (epoll_ctl(_epoll_fd, EPOLL_CTL_ADD, socket, &ev) != 0)
 	{
 		_connectionMap.remove(socket);
@@ -464,7 +467,10 @@ bool ClientEngine::waitForEvents(uint32_t baseEvent, const BasicConnection* conn
 	ev.events = baseEvent | EPOLLERR | EPOLLHUP | EPOLLET | EPOLLRDHUP | EPOLLONESHOT;
 
 	if (epoll_ctl(_epoll_fd, EPOLL_CTL_MOD, connection->socket(), &ev) != 0)
+	{
+		LOG_ERROR("Client engine wait socket event failed. Socket: %d, errno: %d", connection->socket(), errno);
 		return false;
+	}
 	else
 		return true;
 }

@@ -9,6 +9,17 @@
 
 using namespace fpnn;
 
+struct EncryptInfo
+{
+	bool ssl;
+	std::string curveName;
+	std::string publicKey;
+	bool packageMode;
+	bool reinforce;
+
+	EncryptInfo(): ssl(false), packageMode(true), reinforce(false) {}
+};
+
 class StressSource
 {
 	std::string _endpoint;
@@ -20,7 +31,9 @@ class StressSource
 	std::atomic<int64_t> _timecost;
 
 	std::vector<std::thread> _threads;
+	struct EncryptInfo _encryptInfo;
 
+	void processEncrypt(TCPClientPtr client);
 	void test_worker(int qps);
 
 protected:
@@ -49,6 +62,7 @@ public:
 
 	bool launch(int connections, int totalQPS);
 	void reportStatistics(int clientCount);
+	void checkEncryptInfo(const FPReaderPtr payload);
 };
 typedef std::shared_ptr<StressSource> StressSourcePtr;
 

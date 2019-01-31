@@ -25,7 +25,7 @@
 	如果 FPZK.client.subscribe.enable 为 false，2秒与 FPZK Server 同步一次，但 FPZKClient 只会启动一个线程。
 
 	FPZK.client.sync.syncPublicInfo = false (默认)
-	如果为 true，将额外汇报 domain、ipv4、ipv6、port、port6 (如果存在)
+	如果为 true，将额外汇报 domain、ipv4、ipv6、port、port6、sslport、sslport6 (如果存在)
 
 	FPZK.client.debugInfo.clusterChanged.enable = false
 	如果为 true，将输出集群变动的 debug 信息。
@@ -73,12 +73,14 @@ public:
 
 		int port;
 		int port6;
+		int sslport;
+		int sslport6;
 		std::string domain;
 		std::string ipv4;
 		std::string ipv6;
 
 		ServiceNode(): online(true), connCount(0), CPULoad(0.), loadAvg(0.),
-			registerTime(0), activedTime(0), port(0), port6(0) {}
+			registerTime(0), activedTime(0), port(0), port6(0), sslport(0), sslport6(0) {}
 	};
 
 	struct ServiceInfos
@@ -120,8 +122,6 @@ public:
 			_fpzk->resubscribe();
 		}
 
-		//virtual void connectionClose(const ConnectionInfo&) { connectionClosed(); }
-		//virtual void connectionErrorAndWillBeClosed(const ConnectionInfo&) { connectionClosed(); }
 		virtual void connectionWillClose(const ConnectionInfo&, bool) { connectionClosed(); }
 
 		FPZKQuestProcessor(FPZKClient* fpzk): _running(true), _fpzk(fpzk)
@@ -169,6 +169,8 @@ private:
 	std::string _cluster;
 	int _port;
 	int _port6;
+	int _sslport;
+	int _sslport6;
 	std::thread _syncThread;
 	bool _online;
 	bool _monitorDetail;
@@ -208,14 +210,14 @@ public:
 	static FPZKClientPtr create(const std::string& fpzkSrvList = "", const std::string& projectName = "", const std::string& projectToken = "");
 	~FPZKClient();
 
-	bool registerService(const std::string& serviceName = "", const std::string& version = "", const std::string& endpoint = "", bool online = true);
-	bool registerServiceSync(const std::string& serviceName = "", const std::string& version = "", const std::string& endpoint = "", bool online = true);
+	bool registerService(const std::string& serviceName = "", const std::string& cluster = "", const std::string& version = "", const std::string& endpoint = "", bool online = true);
+	bool registerServiceSync(const std::string& serviceName = "", const std::string& cluster = "", const std::string& version = "", const std::string& endpoint = "", bool online = true);
 	int64_t getServiceRevision(const std::string& serviceName, const std::string& cluster = "");
 	const ServiceInfosPtr getServiceInfos(const std::string& serviceName, const std::string& cluster = "", const std::string& version = "", bool onlineOnly = true);
 	std::vector<std::string> getServiceEndpoints(const std::string& serviceName, const std::string& cluster = "", const std::string& version = "", bool onlineOnly = true);
-	std::vector<std::string> getServiceEndpointsWithoutMyself(const std::string& version = "", bool onlineOnly = true);
+	std::vector<std::string> getServiceEndpointsWithoutMyself(const std::string& serviceName, const std::string& cluster = "", const std::string& version = "", bool onlineOnly = true);
 	int64_t getServiceChangedMSec(const std::string& serviceName, const std::string& cluster = "");
-	std::string getOldestServiceEndpoint(const std::string& version = "", bool onlineOnly = true);
+	std::string getOldestServiceEndpoint(const std::string& serviceName, const std::string& cluster = "", const std::string& version = "", bool onlineOnly = true);
 	
 	inline std::string registeredName() const { return _registeredName; }
 	inline std::string registeredCluster() const { return _cluster; }

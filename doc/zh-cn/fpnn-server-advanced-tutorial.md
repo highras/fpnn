@@ -1,7 +1,7 @@
 # FPNN Server Advanced Tutorial
 
 
-## * HTTP 支持
+## * HTTP/HTTPS 支持
 
 如果服务需要支持 HTTP POST & GET 访问，请在配置文件中增加一行：
 
@@ -26,6 +26,12 @@
 
 	curl -d '{"feedback":"Hello, FPNN!"}' http://localhost:6789/service/echo 
 
+
++ **HTTPS 支持**
+
+	在 HTTP 支持的基础上，请配置 SSL/TLS 参数。
+
+	详见：SSL/TLS 支持。
 
 
 
@@ -61,10 +67,39 @@ WebSocket 需要打开 HTTP 支持：
 
 WebSocket 支持 server push。
 
++ **wss 协议**
+
+	在 WebSocket 支持的基础上，请配置 SSL/TLS 参数。
+
+	详见：SSL/TLS 支持。
+
 注：
 
 + WebSocket 控制帧中如果包含 payload，payload 将会被忽略。
 
+
+
+
+
+## * SSL/TLS 支持
+
+如果服务器需要支持 HTTPS，或者 wss 协议，请在对应的 HTTP 支持，或 WebSocket 支持的基础上，在配置文件中增加以下项目：
+
+	FPNN.server.tcp.ipv4.ssl.listening.port =
+	FPNN.server.tcp.ipv4.ssl.listening.ip =
+
+	FPNN.server.tcp.ipv6.ssl.listening.port =
+	FPNN.server.tcp.ipv6.ssl.listening.ip =
+
+	# certificate 与 PrivateKey 均为文件路径
+	FPNN.server.security.ssl.certificate = 
+	FPNN.server.security.ssl.privateKey =
+
++ 其中，对 IP 的配置可选。
+	
+	IP 的配置用于配置 SSL/TLS 与普通 TCP/IP 不同的监听地址。
+
++ port 参数，IPv4 与 IPv6 至少需要配置一个。
 
 
 
@@ -84,39 +119,9 @@ WebSocket 支持 server push。
 
 ## * 链接关闭事件
 
-链接关闭事件，FPNN v1 与 v2 略有不同。v2 兼容 v1，但计划中的 v3 将不再兼容 v1。
+在 IQuestProcessor 的派生类中直接重载 connectionWillClose() 接口即可。
 
-1. FPNN v1
-
-	FPNN v1 中，链接关闭事件分为正常关闭，和异常关闭。
-
-		//-- 正常关闭
-		virtual void connectionClose(const ConnectionInfo&) {}  //-- Deprecated. Will be dropped in FPNN.v3.
-		//-- 异常关闭
-		virtual void connectionErrorAndWillBeClosed(const ConnectionInfo&) {}  //-- Deprecated. Will be dropped in FPNN.v3.
-
-	在 IQuestProcessor 的派生类中直接重载 connectionClose() 和 connectionErrorAndWillBeClosed() 接口即可。
-
-	注：
-
-	+ 如果需要处理关闭事件，两类关闭事件都必须处理，否则会有遗漏。
-	+ FPNN v2 兼容该两接口，但不推荐继续使用。FPNN v3 将去除该两接口。
-
-1. FPNN v2
-
-	FPNN v2 中，新增统一接口：
-
-		virtual void connectionWillClose(const ConnectionInfo& connInfo, bool closeByError);
-
-	并兼容 v1 版两个旧接口。
-
-	在 IQuestProcessor 的派生类中直接重载 connectionWillClose() 接口即可。
-
-	注：
-
-	+ FPNN v1 的 connectionWillClose() 与 FPNN v2 的 connectionClose() & connectionErrorAndWillBeClosed() 是互斥关系。
-	+ v1 & v2 接口都重载的情况下，v1 版的接口将不被调用。
-
+	virtual void connectionWillClose(const ConnectionInfo& connInfo, bool closeByError);
 
 
 
@@ -309,7 +314,7 @@ IAsyncAnswer 完整接口：
 
 	1. 如果在注册的接口函数之外 Push：
 
-		1. 调用 IQuestProcessor 的 genQuestSender() 函数，生成请求发送器对象；
+		1. 在连接建立事件，或者相关的注册接口函数中，调用 IQuestProcessor 的 genQuestSender() 函数，生成请求发送器对象；
 		1. 保存和传递请求发送器对象；
 		1. 调用请求发送器对象的 sendQuest() 系列函数，发送请求。
 		
@@ -403,7 +408,7 @@ IAsyncAnswer 完整接口：
 			}
 
 
-## * 主动关闭连接（FPNN v2 Only）
+## * 主动关闭连接
 
 直接调用 TCPEpollServer 的 closeConnection() 接口即可。
 
@@ -673,7 +678,7 @@ IAsyncAnswer 完整接口：
 
 
 
-## * IP 白名单（FPNN v2 Only）
+## * IP 白名单
 
 如果要限制或者指定可以访问服务的来源地址，或者来源网段，可以启用IP白名单功能。
 
@@ -707,11 +712,13 @@ IAsyncAnswer 完整接口：
 
 
 
-## * 加密模式（FPNN v2 Only）
+## * 加密模式
 
-FPNN v2 采用 ECC(椭圆曲线算法)进行秘钥协商，AES 算法的 CFB 模式进行加密。
+FPNN 采用 ECC(椭圆曲线算法)进行秘钥协商，AES 算法的 CFB 模式进行加密。  
 
-所有秘钥协商和加解密操作对业务透明。
++ 所有秘钥协商和加解密操作对业务透明。
++ 该功能独立于对 SSL/TLS 支持。
++ 为防止**无谓的消耗**系统资源，在 SSL/TLS 的链接上，不支持 FPNN 的加密功能。
 
 注：
 
@@ -850,7 +857,7 @@ FPZKClient 主要接口
 
 ## * 集群消息路由&内部负载均衡
 
-目前支持 一致性哈希(carp)、强一致性(Consistency，包含广播)、随机(Random)、轮流(Rotatory) 4 中消息路由及负载均衡方式。
+目前支持 广播代理(Broadcast)、一致性哈希(carp)、强一致性(Consistency)、随机(Random)、轮流(Rotatory)、最早注册/最久运行(Oldest) 6 种消息路由及负载均衡方式。
 具体请参见 [FPNN framework usage](../frame-usage.txt) “三、扩展” 的 “2. Proxies” 部分。
 
 

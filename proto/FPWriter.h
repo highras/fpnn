@@ -184,6 +184,7 @@ class FPQWriter : public FPWriter{
 class FPAWriter : public FPWriter{
 	public:
 		static FPAnswerPtr CloneAnswer(const FPAnswerPtr answer, const FPQuestPtr quest);
+		static FPAnswerPtr CloneAnswer(const std::string& payload, const FPQuestPtr quest);
 
 	public:
 		FPAWriter(size_t size, const FPQuestPtr quest)
@@ -242,7 +243,6 @@ class FPAWriter : public FPWriter{
 	FPAWriter aw(2, FPAnswer::FP_ST_ERROR, quest); \
 	aw.param("code", (int32_t)code); \
 	aw.param("ex", exx); \
-	LOG_ERROR("ERROR ANSWER: code(%d), exception(%s), QUEST(%s)", code, exx.c_str(), quest->info().c_str()); \
 	aw.take(); \
 	})
 

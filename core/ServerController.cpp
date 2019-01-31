@@ -39,6 +39,25 @@ void formatServerIPPort(std::stringstream& s, ServerPtr server)
 	}
 }
 
+void formatSSLIPPort(std::stringstream& s, TCPServerPtr server)
+{
+	int sslPort = server->sslPort();
+	if (sslPort)
+	{
+		s<<"\"IPv4(SSL)\":{";
+		s<<"\"listenIP\":"<<StringUtil::escapseString(server->sslIP())<<",";
+		s<<"\"listenPort\":"<<sslPort<<"},";
+	}
+
+	int sslPort6 = server->sslPort6();
+	if (sslPort6)
+	{
+		s<<"\"IPv6(SSL)\":{";
+		s<<"\"listenIP\":"<<StringUtil::escapseString(server->sslIP6())<<",";
+		s<<"\"listenPort\":"<<sslPort6<<"},";
+	}
+}
+
 void ServerController::serverInfos(std::stringstream& ss, bool show_interface_stat)
 {
 	std::shared_ptr<std::string> serverBaseInfos;
@@ -71,6 +90,7 @@ void ServerController::serverInfos(std::stringstream& ss, bool show_interface_st
 		{
 			s<<"\"tcp\":{";
 			formatServerIPPort(s, tcpServer);
+			formatSSLIPPort(s, tcpServer);
 			s<<"\"listenBacklog\":"<<tcpServer->backlog()<<",",
 			s<<"\"iobufferChunkSize\":"<<tcpServer->ioBufferChunkSize()<<",";
 			s<<"\"maxEvent\":"<<tcpServer->maxEvent()<<",";

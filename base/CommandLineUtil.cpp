@@ -12,7 +12,7 @@ using namespace fpnn;
 std::map<std::string, std::string> CommandLineParser::_recognizedParams;
 std::vector<std::string> CommandLineParser::_unrecognizedParams;
 
-void CommandLineParser::init(int argc, const char** argv, int beginIndex)
+void CommandLineParser::init(int argc, const char* const * argv, int beginIndex)
 {
 	char* lastKey = NULL;
 

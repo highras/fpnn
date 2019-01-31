@@ -1,3 +1,4 @@
+#include "PEM_DER_SAX.h"
 #include "StressSource.h"
 
 FPQuestPtr genQuest()
@@ -17,6 +18,36 @@ FPQuestPtr genQuest()
 	qw.param("map4",5.7);
 	qw.param("map5","中文");
 	return qw.take();
+}
+
+void StressSource::processEncrypt(TCPClientPtr client)
+{
+	if (_encryptInfo.ssl)
+		client->enableSSL();
+	else if (_encryptInfo.curveName.size())
+		client->enableEncryptor(_encryptInfo.curveName, _encryptInfo.publicKey, _encryptInfo.packageMode, _encryptInfo.reinforce);
+}
+
+void StressSource::checkEncryptInfo(const FPReaderPtr payload)
+{
+	_encryptInfo.ssl = payload->getBool("ssl", false);
+	if (_encryptInfo.ssl == false)
+	{
+		std::string eccPem = payload->getString("eccPem");
+		if (eccPem.size())
+		{
+			EccKeyReader reader;
+
+			PemSAX pemSAX;
+			if (pemSAX.parse(eccPem, &reader))
+			{
+				_encryptInfo.curveName = reader.curveName();
+				_encryptInfo.publicKey = reader.rawPublicKey();
+				_encryptInfo.packageMode = payload->getBool("packageMode", true);
+				_encryptInfo.reinforce = payload->getBool("reinforce", false);
+			}
+		}
+	}
 }
 
 bool StressSource::launch(int connections, int totalQPS)
@@ -48,6 +79,7 @@ void StressSource::test_worker(int qps)
 	StressSource* ins = this;
 
 	TCPClientPtr client = TCPClient::createClient(_endpoint);
+	processEncrypt(client);
 	client->connect();
 
 	while (_running)

@@ -41,9 +41,11 @@ namespace fpnn
 
 	public:
 		//-- If questTimeoutSeconds less then zero, mean using global settings.
-		TCPFPZKProxyCore(FPZKClientPtr fpzkClient, const std::string& serviceName, int64_t questTimeoutSeconds = -1):
+		TCPFPZKProxyCore(FPZKClientPtr fpzkClient, const std::string& serviceName, const std::string& cluster = "", int64_t questTimeoutSeconds = -1):
 			TCPProxyCore(questTimeoutSeconds), _rev(0), _fpzkClient(fpzkClient), _serviceName(serviceName)
 		{
+			if (!cluster.empty())
+				_serviceName.append("@").append(cluster);
 		}
 
 		virtual ~TCPFPZKProxyCore()

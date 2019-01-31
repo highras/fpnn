@@ -17,6 +17,9 @@ void WebSocketReceiver::freeFragmentedDataList()
 
 bool WebSocketReceiver::recv(int fd)
 {
+	if (_sslContext)
+		return sslRecv(fd);
+
 	while (_curr < _total)
 	{
 		int requireRead = _total - _curr;
@@ -47,6 +50,67 @@ bool WebSocketReceiver::recv(int fd)
 		
 		_curr += readBytes;
 		return true;
+	}
+	return true;
+}
+
+bool WebSocketReceiver::sslRecv(int fd)
+{
+	while (_curr < _total)
+	{
+		int requireRead = _total - _curr;
+		int readBytes = SSL_read(_sslContext->_ssl, _currBuf + _curr, requireRead);
+		if (readBytes <= 0)
+		{
+			int errorCode = SSL_get_error(_sslContext->_ssl, readBytes);
+			if (errorCode == SSL_ERROR_WANT_WRITE)
+			{
+				LOG_INFO("SSL/TSL re-negotiation occurred. SSL_read WANT_WRITE. socket: %d", fd);
+				_sslContext->_negotiate = SSLNegotiate::Read_Want_Write;
+				return true;
+			}
+			else if (errorCode == SSL_ERROR_WANT_READ)
+			{
+				//LOG_WARN("SSL/TSL re-negotiation occurred. SSL_read WANT_READ. socket: %d", fd);
+				//_sslContext->_negotiate = SSLNegotiate::Read_Want_Read;
+				return true;
+			}
+			else if (errorCode == SSL_ERROR_ZERO_RETURN)
+			{
+				//LOG_INFO("socket %d ssl is closed.", fd);
+				//-- TLS/SSL connection is colsed. But the underlying transport maybe hasn't been closed.
+				//-- Please Refer the SSL_get_error() doc on https://www.openssl.org.
+				return true;
+			}
+			else if (errorCode == SSL_ERROR_SYSCALL)
+			{
+				if (errno == EAGAIN || errno == EWOULDBLOCK)
+					return true;
+
+				if (errno == 0 || errno == ECONNRESET)
+				{
+					OpenSSLModule::logLastErrors();
+					return false;
+				}
+
+				LOG_ERROR("SSL read syscall error. socket %d. errno: %d", fd, errno);
+				OpenSSLModule::logLastErrors();
+				return false;
+			}
+			else if (errorCode == SSL_ERROR_SSL)
+			{
+				LOG_ERROR("SSL read error in openSSL library. SSL error code: SSL_ERROR_SSL. socket %d.", fd);
+				OpenSSLModule::logLastErrors();
+				return false;
+			}
+			else
+			{
+				LOG_ERROR("SSL read error. socket %d, SSL error code %d, errno: %d", fd, errorCode, errno);
+				return false;
+			}
+		}
+		
+		_curr += readBytes;
 	}
 	return true;
 }
@@ -284,13 +348,14 @@ bool WebSocketReceiver::fetch(FPQuestPtr& quest, FPAnswerPtr& answer, bool &isHT
 		{
 			desc = "webSocket quest";
 			quest = Decoder::decodeQuest((char*)fullyData._buf, fullyData._len);
+			rev = (quest != nullptr);
 		}
 		else
 		{
 			desc = "webSocket answer";
 			answer = Decoder::decodeAnswer((char*)fullyData._buf, fullyData._len);
+			rev = (answer != nullptr);
 		}
-		rev = true;
 	}
 	catch (const FpnnError& ex)
 	{

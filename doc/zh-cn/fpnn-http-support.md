@@ -1,4 +1,4 @@
-# FPNN HTTP & webSocket 支持
+# FPNN HTTP/HTTPS & webSocket (ws/wss) 支持
 
 ## 1. HTTP 支持概况
 
@@ -18,7 +18,14 @@ FPNN框架duplex模式下，仅Server端支持接收和回应来自客户端的H
 1. 目前不支持HTTP 1.1 标准中连续发送 HTTP 请求时，顺序回应的要求。回应的先后顺序取决于请求的完成先后。
 
 
-## 2. 相关配置
+## 2. HTTPS 支持概况
+
+FPNN 对 HTTPS 的支持与 HTTP 相同。
+
+启用 HTTP 支持后，配置相关的 ssl 参数，即可启用 HTTPS 功能。
+
+
+## 3. 相关配置
 
 1. **FPNN.server.http.supported**
 
@@ -39,8 +46,25 @@ FPNN框架duplex模式下，仅Server端支持接收和回应来自客户端的H
 
 	支持HTTP跨域访问
 
+1. **FPNN.server.tcp.ipv4.ssl.listening.port**
 
-## 3. 违背禁止情况可能出现的意外
+	TCP/IPv4 over SSL/TLS 监听端口
+
+1. **FPNN.server.tcp.ipv6.ssl.listening.port**
+
+	TCP/IPv6 over SSL/TLS 监听端口
+
+
+1. **FPNN.server.security.ssl.certificate**
+
+	SSL/TLS 证书
+
+1. **FPNN.server.security.ssl.privateKey**
+
+	SSL/TLS 私钥
+
+
+## 4. 违背禁止情况可能出现的意外
 
 1. FPNN 框架不具备组装 HTTP 请求包，和解释 HTTP 应答包的功能，因此 FPNN 框架无法发送 HTTP 请求包，和接收 HTTP 应答包。
 	要发送 HTTP 请求，请使用 libCurl。
@@ -60,21 +84,21 @@ FPNN框架duplex模式下，仅Server端支持接收和回应来自客户端的H
 	因此该意外不属于bug，而属于意料之内的情况。因此不会进行修正或者fix。
 
 
-## 4. FPNN HTTP 支持原理
+## 5. FPNN HTTP 支持原理
 
 HTTP 和 TCP 的大致处理流程  
 ![HTTP 和 TCP 的处理流程图](fpnn-http-tcp-flow.png)
 
 
-## 5. WebSocket 支持
-
-FPNN 从 2.0.1 版开始支持 WebSocket。
+## 6. WebSocket (ws/wss) 支持
 
 WebSocket 需要打开 HTTP 支持：
 
 	FPNN.server.http.supported = true
 
 `FPNN.server.http.closeAfterAnswered` 参数不影响 WebSocket 行为。
+
+WebSocket over SSL/TLS (wss) 需要配置 ssl 参数。
 
 WebSocket 支持 server push。
 

@@ -25,6 +25,7 @@ RPC框架也一样。
 * 支持 TCP 二进制私有协议
 * 支持 HTTP 1.0
 * 支持 WebSocket
+* 支持 SSL/TLS
 * 支持 msgpack 编码
 * 支持 json 格式
 * 支持 可选参数
@@ -136,10 +137,11 @@ RPC框架也一样。
 	1. [FPNN 客户端基础使用说明](doc/zh-cn/fpnn-client-basic-tutorial.md)
 	1. [FPNN 客户端高级使用说明](doc/zh-cn/fpnn-client-advanced-tutorial.md)
 
-1. 注意事项
+1. 注意事项 & 问题排查
 
 	注意事项请参见 [FPNN 注意事项](doc/zh-cn/fpnn-notices.md)
 
+	问题排查请参见 [FPNN 问题排查](doc/zh-cn/fpnn-troubleshooting.md)
 
 ## 五、全部文档索引
 

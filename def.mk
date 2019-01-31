@@ -3,8 +3,8 @@ OPTIMIZE=-O2
 LINKARGS=-ltcmalloc
 
 DEFAULTPLATFORM=-DHOST_PLATFORM_AWS
-#DEFAULTPLATFORM=-DHOST_PLATFORM_UCLOUD
-#DEFAULTPLATFORM=-DHOST_PLATFORM_QINGCLOUD
+#DEFAULTPLATFORM=-DHOST_PLATFORM_GCP
+#DEFAULTPLATFORM=-DHOST_PLATFORM_AZURE
 
 CFLAGS += $(DEFAULTPLATFORM)
 
@@ -12,8 +12,8 @@ CXXFLAGS += -std=c++11 $(DEFAULTPLATFORM)
 
 CPPFLAGS += -g -Wall -rdynamic -Werror -fPIC $(OPTIMIZE) 
 
-LIBS += $(OPTIMIZE) -lstdc++ -lcurl -lfpnn -lfpproto -lextends -lfpbase -lpthread -lz $(LINKARGS)
-#LIBS += $(OPTIMIZE) -static-libstdc++ -lcurl -lfpnn -lfpproto -lfpbase -lpthread $(LINKARGS)
+LIBS += $(OPTIMIZE) -lstdc++ -lcurl -lfpnn -lfpproto -lextends -lfpbase -lpthread -lz -lssl -lcrypto $(LINKARGS)
+#LIBS += $(OPTIMIZE) -static-libstdc++ -lcurl -lfpnn -lfpproto -lextends -lfpbase -lpthread -lz -lssl -lcrypto $(LINKARGS)
 
 #for apps
 $(EXES_CLIENT): $(OBJS_CLIENT)

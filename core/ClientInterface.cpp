@@ -89,7 +89,7 @@ void Client::dealAnswer(FPAnswerPtr answer, ConnectionInfoPtr connectionInfo)
 	BasicAnswerCallback* callback = ClientEngine::nakedInstance()->takeCallback(connectionInfo->socket, answer->seqNumLE());
 	if (!callback)
 	{
-		LOG_ERROR("Recv an invalied answer, seq is %u. %s", answer->seqNumLE(), connectionInfo->str().c_str());
+		LOG_WARN("Recv an invalid answer, seq: %u. Peer %s, Info: %s", answer->seqNumLE(), connectionInfo->str().c_str(), answer->info().c_str());
 		return;
 	}
 	if (callback->syncedCallback())		//-- check first, then fill result.

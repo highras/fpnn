@@ -122,13 +122,14 @@ bool EncryptedPackageReceiver::fetch(FPQuestPtr& quest, FPAnswerPtr& answer, boo
 		{
 			desc = "TCP quest";
 			quest = Decoder::decodeQuest(buf, dataLen);
+			rev = (quest != nullptr);
 		}
 		else
 		{
 			desc = "TCP answer";
 			answer = Decoder::decodeAnswer(buf, dataLen);
+			rev = (answer != nullptr);
 		}
-		rev = true;
 	}
 	catch (const FpnnError& ex)
 	{

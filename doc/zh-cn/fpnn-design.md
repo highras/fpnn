@@ -107,6 +107,12 @@
 	+ 加密的 FPNN 协议
 	+ WebSocket 协议
 
+	或者
+
+	+ 未加密的 FPNN 协议 over SSL/TLS
+	+ HTTP 协议 1.0 版本 over SSL/TLS （HTTPS 协议）
+	+ WebSocket 协议 over SSL/TLS （wss 协议）
+
 	统一端口支持多种协议的原因很简单：
 
 	运维、配置、使用方均简单。
@@ -114,24 +120,17 @@
 	注：开发者不应该因自身的懒惰而将复杂性转嫁给使用方。
 
 
-
-
-1. **IPv4 IPv6 双端口监听**
+1. **IPv4、IPv6、TCP/IPv4 over SSL/TLS、TCP/IPv6 over SSL/TLS 四端口监听**
 
 	目前 IPv4 网络还是主流。但业务上可能需要提供 IPv6 支持。因此很多情况下，IPv4 和 IPv6 运行着相同的业务。  
 	为了能有效平衡 IPv4 和 IPv6 的业务负载，同时减少对系统资源的消耗，如果选择开启 IPv6 端口，则同一 FPNN 服务进程将进行 IPv4 和 IPv6 双端口监听，而不是启动两个独立进程，分别监听 IPv4 和 IPv6。
 
 	另外，因为 IP 协议栈位于操作系统内核，所以 FPNN 目前不能在同一个端口上同时监听 IPv4 和 IPv6。
 
+	此外，对于 TCP 及上层协议，FPNN 使用 OpenSSL 提供对 SSL/TLS 的支持。  
+	因为 OpenSSL 的接口特性，FPNN 暂时无法在同一端口上同时支持使用 SSL/TLS 和不使用 SSL/TLS 的协议，因此普通 TCP 协议和 TCP over SSL/TLS 将使用不同的端口监听。
 
-1. **不支持STL/HTTPS**
-
-	+ 引入 libopenssl 会导致 FPNN 无法再在同一端口支持多种协议。
-	+ libopenssl 在多线程下会引入全局锁，这对运行时无全局锁的 FPNN 的性能和效率构成重大影响。
-	+ FPNN 自身提供基于 ECC（椭圆曲线加密算法）的秘钥交换（ECDH），和 AES CFB 模式的数据加密。相关细节请参考：[FPNN 安全体系](fpnn-security.md)
-
-	因此，在有更好的解决方案，和更强的需求前，FPNN 暂不支持 STL/HTTPS。仅在 <fpnn-folder>/extends/MultipleURLEngine.h 中，作为客户端使用 libopenssl。
-
+	注：IPv6、TCP/IPv4 over SSL/TLS、TCP/IPv6 over SSL/TLS 均可单独开启。具体请参见 [FPNN 标准配置模版](../conf.template)
 
 
 1. **不支持 HTTP 1.1 Keep-Alive**

@@ -4,6 +4,7 @@
 #include "uuid.h"
 #include "FPJson.h"
 #include "ignoreSignals.h"
+#include "FileSystemUtil.h"
 #include "CommandLineUtil.h"
 #include "StressController.h"
 
@@ -31,6 +32,10 @@ int showUsage(const char* appName)
 	cout<<"\t--answerPoolThread           Client work threads count of actor. Default is CPU count"<<endl;
 	cout<<"\t--perStressConnections       Total Connections for a stress task. Default is 100"<<endl;
 	cout<<"\t--perStressQPS               Total QPS for a stress task. Default is 50000"<<endl;
+	cout<<"\t--ssl                        Enable SSL/TLS as underlying protocol. This option without value and mutually exclusive with FPNN ECC options."<<endl;
+	cout<<"\t--eccPublicKey               ECC public key in PEM format. Enable FPNN ECC encryption. This option mutually exclusive with ssl option."<<endl;
+	cout<<"\t--eccEncryptMode             Value: [stream | package]. Default is package."<<endl;
+	cout<<"\t--eccReinforce               True means using 256 bits key, false means using 128 bits key."<<endl;
 	return -1;
 }
 
@@ -96,6 +101,26 @@ void StressController::prepareAutoTest(std::string& actorInstanceName, std::stri
 	perQPS = CommandLineParser::getInt("perStressQPS", 50000);
 }
 
+bool StressController::prepareEncryptInfo(struct EncryptInfo& info)
+{
+	info.ssl = CommandLineParser::exist("ssl");
+	std::string fileName = CommandLineParser::getString("eccPublicKey");
+	if (fileName.size())
+	{
+		if (FileSystemUtil::readFileContent(fileName, info.eccPemData) == false)
+		{
+			cout<<"Load ECC public key error. File: "<<fileName<<endl;
+			return false;
+		}
+
+		std::string encryptMode = CommandLineParser::getString("eccEncryptMode");
+		info.packagemode = (encryptMode != "stream");
+		info.reinforce = CommandLineParser::getBool("eccReinforce", false);
+	}
+
+	return true;
+}
+
 int StressController::interfaceQPS(TCPClientPtr client, const std::string& interface)
 {
 	FPAnswerPtr answer = client->sendQuest(FPQWriter::emptyQuest("*infos"));
@@ -117,9 +142,18 @@ void StressController::monitor()
 	int cpu;
 	struct MachineStatus ms;
 
+	struct EncryptInfo encryptInfo;
+	prepareEncryptInfo(encryptInfo);
+
 	int qpsTicket = 0;
 	std::string endpoint = CommandLineParser::getString("testEndpoint");
 	TCPClientPtr targetSrvClient = TCPClient::createClient(endpoint);
+	
+	if (encryptInfo.ssl)
+		targetSrvClient->enableSSL();
+	else if (encryptInfo.eccPemData.size())
+		targetSrvClient->enableEncryptorByPemData(encryptInfo.eccPemData, encryptInfo.packagemode, encryptInfo.reinforce);
+
 	targetSrvClient->connect();
 
 	while (_running)
@@ -193,6 +227,10 @@ void StressController::autoTest()
 	
 	prepareAutoTest(actorInstanceName, launchParams, perConnCount, perQPS);
 
+	struct EncryptInfo encryptInfo;
+	if (!prepareEncryptInfo(encryptInfo))
+		return;
+
 	struct LoadStatus targetStatus;
 	{
 		int port;
@@ -245,13 +283,41 @@ void StressController::autoTest()
 
 			newInstanceCount++;
 
-			FPWriter pw(3);
-			pw.param("endpoint", targetStatus.endpoint);
-			pw.param("connections", perConnCount);
-			pw.param("totalQPS", perQPS);
+			if (encryptInfo.ssl)
+			{
+				FPWriter pw(4);
+				pw.param("endpoint", targetStatus.endpoint);
+				pw.param("connections", perConnCount);
+				pw.param("totalQPS", perQPS);
+				pw.param("ssl", true);
 
-			printActionHint("add new stress");
-			sendAction(actorInstanceName, macStatus.pidEpMap[pid], pid, "beginStress", pw, "Stress instance");
+				printActionHint("add new stress");
+				sendAction(actorInstanceName, macStatus.pidEpMap[pid], pid, "beginStress", pw, "SSL Stress instance");
+			}
+			else if (encryptInfo.eccPemData.size())
+			{
+				FPWriter pw(6);
+				pw.param("endpoint", targetStatus.endpoint);
+				pw.param("connections", perConnCount);
+				pw.param("totalQPS", perQPS);
+
+				pw.param("eccPem", encryptInfo.eccPemData);
+				pw.param("packageMode", encryptInfo.packagemode);
+				pw.param("reinforce", encryptInfo.reinforce);
+
+				printActionHint("add new stress");
+				sendAction(actorInstanceName, macStatus.pidEpMap[pid], pid, "beginStress", pw, "FPNN ECC Stress instance");
+			}
+			else
+			{
+				FPWriter pw(3);
+				pw.param("endpoint", targetStatus.endpoint);
+				pw.param("connections", perConnCount);
+				pw.param("totalQPS", perQPS);
+
+				printActionHint("add new stress");
+				sendAction(actorInstanceName, macStatus.pidEpMap[pid], pid, "beginStress", pw, "Stress instance");
+			}
 			sleep(1);
 
 			int intervalSeconds = 5 * 60;

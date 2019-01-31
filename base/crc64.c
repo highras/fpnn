@@ -142,7 +142,7 @@ static const uint64_t crc64_tab[256] = {
 	UINT64_C(0x536fa08fdfd90e51), UINT64_C(0x29b7d047efec8728),
 };
 
-inline uint64_t crc64_update(uint64_t oldcrc, const void *buf, size_t size)
+uint64_t crc64_update(uint64_t oldcrc, const void *buf, size_t size)
 {
 	const uint8_t *p = (const uint8_t *)buf;
 	uint_fast64_t crc = oldcrc;
@@ -158,7 +158,7 @@ uint64_t crc64_checksum(const void *buf, size_t size)
 	return crc64_update(0, buf, size);
 }
 
-inline uint64_t crc64_update_cstr(uint64_t oldcrc, const char *str)
+uint64_t crc64_update_cstr(uint64_t oldcrc, const char *str)
 {
 	const uint8_t *p = (const uint8_t *)str;
 	uint_fast64_t crc = oldcrc;

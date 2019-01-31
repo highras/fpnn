@@ -47,13 +47,15 @@ void UDPRecvBuffer::decodeBuffer(int dataLen, struct UDPReceivedResults &result)
 			{
 				desc = "UDP quest";
 				FPQuestPtr quest = Decoder::decodeQuest(buffHeader, currPackageLen);
-				result.questList.push_back(quest);
+				if (quest)
+					result.questList.push_back(quest);
 			}
 			else// if (FPMessage::isAnswer(buffHeader))
 			{
 				desc = "UDP answer";
 				FPAnswerPtr answer = Decoder::decodeAnswer(buffHeader, currPackageLen);
-				result.answerList.push_back(answer);
+				if (answer)
+					result.answerList.push_back(answer);
 			}
 			/*else
 			{

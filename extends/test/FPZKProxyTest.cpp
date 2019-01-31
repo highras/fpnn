@@ -9,6 +9,8 @@
 #include "TCPFPZKRotatoryProxy.hpp"
 #include "TCPFPZKRandomProxy.hpp"
 #include "TCPFPZKConsistencyProxy.hpp"
+#include "TCPFPZKBroadcastProxy.hpp"
+#include "TCPFPZKOldestProxy.hpp"
 #include "IQuestProcessor.h"
 
 using namespace std;
@@ -18,14 +20,21 @@ std::shared_ptr<TCPFPZKCarpProxy> carpProxy;
 std::shared_ptr<TCPFPZKRotatoryProxy> equProxy;
 std::shared_ptr<TCPFPZKRandomProxy> randomProxy;
 std::shared_ptr<TCPFPZKConsistencyProxy> consistencyProxy;
+std::shared_ptr<TCPFPZKBroadcastProxy> broadcastProxy;
+std::shared_ptr<TCPFPZKOldestProxy> oldestProxy;
 
 class QuestProcessor: public IQuestProcessor
 {
 	QuestProcessorClassPrivateFields(QuestProcessor)
 public:
 	virtual void connected(const ConnectionInfo& ci) { cout<<"client connected. ci: "<<ci.str()<<", self: "<<this<<endl; }
-	virtual void connectionClose(const ConnectionInfo& ci) { cout<<"client close event processed. ci: "<<ci.str()<<", self: "<<this<<endl; }
-	virtual void connectionErrorAndWillBeClosed(const ConnectionInfo& ci) { cout<<"client error event processed. ci: "<<ci.str()<<", self: "<<this<<endl; }
+	virtual void connectionWillClose(const ConnectionInfo& ci, bool closeByError)
+	{
+		if (!closeByError)
+			cout<<"client close event processed. ci: "<<ci.str()<<", self: "<<this<<endl;
+		else
+			cout<<"client error event processed. ci: "<<ci.str()<<", self: "<<this<<endl;
+	}
 
 	FPAnswerPtr serverQuest(const FPReaderPtr args, const FPQuestPtr quest, const ConnectionInfo& ci)
 	{
@@ -75,6 +84,7 @@ int proxyTypeId = 0;
 bool syncQuest = true;
 bool duplex = false;
 bool sharedDuplex = false;
+bool continuousTesting = false;
 
 void syncProcess()
 {
@@ -110,6 +120,20 @@ void syncProcess()
 				answer = consistencyProxy->sendQuest(quest);
 				if (consistencyProxy->empty())
 					cout<<"consistencyProxy is empty"<<endl;
+			}
+			else if (proxyTypeId == 5)
+			{
+				std::map<std::string, FPAnswerPtr> results = broadcastProxy->sendQuest(quest);
+				if (broadcastProxy->empty())
+					cout<<"broadcastProxy is empty"<<endl;
+
+				answer = FPAWriter::emptyAnswer(quest);
+			}
+			else if (proxyTypeId == 6)
+			{
+				answer = oldestProxy->sendQuest(quest);
+				if (oldestProxy->empty())
+					cout<<"oldestProxy is empty"<<endl;
 			}
 
 			if (quest->isTwoWay()){
@@ -219,6 +243,43 @@ void asyncProcess()
 				if (consistencyProxy->empty())
 					cout<<"consistencyProxy is empty"<<endl;
 			}
+			else if (proxyTypeId == 5)
+			{
+				struct TestBroadcastCallback: public BroadcastAnswerCallback
+				{
+					FPQuestPtr _quest;
+					TestCallback* _cb;
+
+					virtual ~TestBroadcastCallback() {}
+
+					virtual void onCompleted(std::map<std::string, FPAnswerPtr>& answerMap)
+					{
+						FPAnswerPtr answer = FPAWriter::emptyAnswer(_quest);
+						_cb->onAnswer(answer);
+						delete _cb;
+					}
+				};
+
+				TestBroadcastCallback* tbcb = new TestBroadcastCallback();
+				tbcb->_quest = quest;
+				tbcb->_cb = cb;
+
+				stat = broadcastProxy->sendQuest(quest, tbcb);
+				if (broadcastProxy->empty())
+					cout<<"broadcastProxy is empty"<<endl;
+
+				if (!stat)
+				{
+					tbcb->_cb = NULL;
+					delete tbcb;
+				}
+			}
+			else if (proxyTypeId == 6)
+			{
+				stat = oldestProxy->sendQuest(quest, cb);
+				if (oldestProxy->empty())
+					cout<<"oldestProxy is empty"<<endl;
+			}
 
 			async_sendQuest++;
 		}
@@ -237,35 +298,37 @@ void asyncProcess()
 
 void prepareProxy()
 {
-        std::string fpzkSrvs = Setting::getString("FPNN.fpzk.servers");
-        std::string project = Setting::getString("FPNN.fpzk.project");
-        std::string prjToken = Setting::getString("FPNN.fpzk.project_token");
-        std::string service = Setting::getString("FPNN.fpzk.service_name");
+	std::string fpzkSrvs = Setting::getString("FPNN.fpzk.servers");
+	std::string project = Setting::getString("FPNN.fpzk.project");
+	std::string prjToken = Setting::getString("FPNN.fpzk.project_token");
+	std::string service = Setting::getString("FPNN.fpzk.service_name");
+	std::string cluster = Setting::getString("FPNN.fpzk.cluster");
 
 	std::string proxyType = Setting::getString("FPNN.proxy.type", "");
 	syncQuest = Setting::getBool("FPNN.proxy.sync", true);
 	duplex = Setting::getBool("FPNN.proxy.duplex", false);
 	sharedDuplex = Setting::getBool("FPNN.proxy.duplex.shared", false);
+	continuousTesting = Setting::getBool("FPNN.test.continuousTesting", false);
 
-        auto fpzkClient = FPZKClient::create(fpzkSrvs, project, prjToken);
+	auto fpzkClient = FPZKClient::create(fpzkSrvs, project, prjToken);
 	
 	TCPProxyCore* pbm = NULL;
 	if (proxyType == "1" || proxyType == "carpProxy")
 	{
 		proxyTypeId = 1;
-		carpProxy.reset(new TCPFPZKCarpProxy(fpzkClient, service, false));
+		carpProxy.reset(new TCPFPZKCarpProxy(fpzkClient, service, cluster, false));
 		pbm = carpProxy.get();
 	}
 	else if (proxyType == "2" || proxyType == "rotatoryProxy")
 	{
 		proxyTypeId = 2;
-		equProxy.reset(new TCPFPZKRotatoryProxy(fpzkClient, service, false));
+		equProxy.reset(new TCPFPZKRotatoryProxy(fpzkClient, service, cluster, false));
 		pbm = equProxy.get();
 	}
 	else if (proxyType == "3" || proxyType == "randomProxy")
 	{
 		proxyTypeId = 3;
-		randomProxy.reset(new TCPFPZKRandomProxy(fpzkClient, service));
+		randomProxy.reset(new TCPFPZKRandomProxy(fpzkClient, service, cluster));
 		pbm = randomProxy.get();
 	}
 	else if (proxyType == "4" || proxyType == "consistencyProxy")
@@ -273,11 +336,11 @@ void prepareProxy()
 		proxyTypeId = 4;
 		std::string condition = Setting::getString("FPNN.proxy.consistencyProxy.successCondition", "");
 		if (condition == "all")
-			consistencyProxy.reset(new TCPFPZKConsistencyProxy(fpzkClient, service, ConsistencySuccessCondition::AllQuestsSuccess));
+			consistencyProxy.reset(new TCPFPZKConsistencyProxy(fpzkClient, service, cluster, ConsistencySuccessCondition::AllQuestsSuccess));
 		else if (condition == "half")
-			consistencyProxy.reset(new TCPFPZKConsistencyProxy(fpzkClient, service, ConsistencySuccessCondition::HalfQuestsSuccess));
+			consistencyProxy.reset(new TCPFPZKConsistencyProxy(fpzkClient, service, cluster, ConsistencySuccessCondition::HalfQuestsSuccess));
 		else if (condition == "one")
-			consistencyProxy.reset(new TCPFPZKConsistencyProxy(fpzkClient, service, ConsistencySuccessCondition::OneQuestSuccess));
+			consistencyProxy.reset(new TCPFPZKConsistencyProxy(fpzkClient, service, cluster, ConsistencySuccessCondition::OneQuestSuccess));
 		else
 		{
 			cout<<"Bad success condition type!"<<endl;
@@ -285,6 +348,18 @@ void prepareProxy()
 		}
 		
 		pbm = consistencyProxy.get();
+	}
+	else if (proxyType == "5" || proxyType == "broadcastProxy")
+	{
+		proxyTypeId = 5;
+		broadcastProxy.reset(new TCPFPZKBroadcastProxy(fpzkClient, service, cluster));
+		pbm = broadcastProxy.get();
+	}
+	else if (proxyType == "6" || proxyType == "oldestProxy")
+	{
+		proxyTypeId = 6;
+		oldestProxy.reset(new TCPFPZKOldestProxy(fpzkClient, service, cluster));
+		pbm = oldestProxy.get();
 	}
 	else
 	{
@@ -326,7 +401,10 @@ int main(int argc, const char* argv[])
 		async_start = exact_real_msec();
 
 	for(int i=0;i<thread_num;++i){
-		threads.push_back(thread(syncQuest ? syncProcess : asyncProcess));
+		if (continuousTesting)
+			threads.push_back(thread(syncProcess));
+		else
+			threads.push_back(thread(syncQuest ? syncProcess : asyncProcess));
 	}   
 
 	for(unsigned int i=0; i<threads.size();++i){

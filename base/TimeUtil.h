@@ -15,6 +15,16 @@ namespace TimeUtil{
 	std::string getDateTime();
 	std::string getDateTime(int64_t t);
 	
+	//example: "yyyy-MM-dd"
+	//example: "yyyy/MM/dd"
+	std::string getDateStr(char sep = '-');
+	std::string getDateStr(int64_t t, char sep = '-');
+
+	//example: "yyyy-MM-dd-HH"
+	//example: "yyyy/MM/dd/HH"
+	std::string getDateHourStr(char sep = '-');
+	std::string getDateHourStr(int64_t t, char sep = '-');
+
 	//example: "yyyy-MM-dd-HH-mm-ss"
 	//example: "yyyy/MM/dd/HH/mm/ss"
 	std::string getTimeStr(char sep = '-');

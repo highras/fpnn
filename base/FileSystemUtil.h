@@ -37,6 +37,18 @@ namespace fpnn
 		
 		/* Only normal file, or symbolic which point a normal file, or sub-directories when excludeSubDirectories == false. */
 		std::vector<std::string> getFilesInDirectory(const char* directoryPath, bool excludeSubDirectories = true);
+
+		//get all file in this directory and all sub directories
+		std::vector<std::string> getFilesInDirectories(const char* directoryPath);
+
+		//find files in this directory and all sub directories
+		std::vector<std::string> findFilesInDirectories(const char* directoryPath, const char* name);
+
+		//delete all file in this directory and the directory if this directory is empty
+		bool deleteFilesInDirectory(const char* directoryPath);
+
+		//delelte all file in this directory and all files in subdirectories
+		bool deleteFilesInDirectories(const char* directoryPath);
 	}
 
 	class FileLocker
