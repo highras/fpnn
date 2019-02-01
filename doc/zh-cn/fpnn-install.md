@@ -32,12 +32,23 @@ FPNN 采用 C++11 编写，如果采用其他版本的编译器，需要支持 C
 		yum install -y gperftools
 
 
-## 3. 编译 FPNN 框架
+## 3. 平台适配
+
+FPNN 框架在 亚马逊 AWS、谷歌 GCP、微软 Azure 三个平台上，可自动获取网络相关配置。
+
+FPNN 默认启动 亚马逊 AWS 支持。若非 亚马逊 AWS 平台，请修改 FPNN 全局预置配置文件 [def.mk](../../def.mk) 中，DEFAULTPLATFORM 参数。
+
+若非 亚马逊 AWS、谷歌 GCP、微软 Azure 三个平台，请禁用 DEFAULTPLATFORM 参数。  
+并在服务实际运行时，参考 [FPNN 注意事项](fpnn-notices.md) “平台配置”部分，增加配置文件配置条目。
+
+
+
+## 4. 编译 FPNN 框架
 
 在 <fpnn-folder>/ 内执行`make`即可。
 
 
-## 4. 项目开发
+## 5. 项目开发
 
 请参见
 

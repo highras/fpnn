@@ -55,6 +55,8 @@ FPNN 自动化分布式测试工具需要在 **DATS (Distributed Automated Testi
 
 1. 测试数据摘要
 
+	v0.8.2 版测试数据:
+
 	| 机型 | CPU | 内存（GB） | 链接数量 | QPS | 平均响应时间（usec） |
 	|-----|-----|-----------|---------|-----|------------------|
 	| AWS m4.xlarge | 4 | 16 | 600 | 279,718 | 62,366 |
@@ -62,28 +64,135 @@ FPNN 自动化分布式测试工具需要在 **DATS (Distributed Automated Testi
 	| AWS m4.2xlarge | 8 | 32 | 900 | 417,895 | 47,861 |
 	| AWS m4.2xlarge | 8 | 32 | 12,000 | 592,472 | 731,977 |
 
+
+	v0.9.0 版测试数据 (Standard):
+
+	| 机型 | CPU | 内存（GB） | 链接数量 | QPS | 平均响应时间（usec） |
+	|-----|-----|-----------|---------|-----|------------------|
+	| AWS m4.xlarge | 4 | 16 | 600 | 281,384 | 73,610 |
+	| AWS m4.xlarge | 4 | 16 | 700 | 327,003 | 92,278 |
+	| AWS m4.xlarge | 4 | 16 | 4,000 | 197,249 | 920,704 |
+	| AWS m4.2xlarge | 8 | 32 | 900 | 422,034 | 55,175 |
+	| AWS m4.2xlarge | 8 | 32 | 1,400 | 648,722 | 98,224 |
+	| AWS m4.2xlarge | 8 | 32 | 8,000 | 376,788 | 869,732 |
+
+
+	v0.9.0 版测试数据 (SSL/TLS):
+
+	| 机型 | CPU | 内存（GB） | 链接数量 | QPS | 平均响应时间（usec） |
+	|-----|-----|-----------|---------|-----|------------------|
+	| AWS m4.xlarge | 4 | 16 | 500 | 235,137 | 50,778 |
+	| AWS m4.xlarge | 4 | 16 | 4,000 | 189,512 | 901,040 |
+	| AWS m4.2xlarge | 8 | 32 | 900 | 421,072 | 55,121 |
+	| AWS m4.2xlarge | 8 | 32 | 7,000 | 348,544 | 696,445 |
+
+
+	v0.9.0 版测试数据 (ECC-Encrypted - package mode 256 bits):
+
+	| 机型 | CPU | 内存（GB） | 链接数量 | QPS | 平均响应时间（usec） |
+	|-----|-----|-----------|---------|-----|------------------|
+	| AWS m4.xlarge | 4 | 16 | 500 | 215,388 | 56,423 |
+	| AWS m4.xlarge | 4 | 16 | 4,000 | 199,099 | 916,827 |
+	| AWS m4.2xlarge | 8 | 32 | 900 | 421,831 | 58,147 |
+	| AWS m4.2xlarge | 8 | 32 | 7,000 | 347,387 | 797,381 |
+
+
+	v0.9.0 版测试数据 (ECC-Encrypted - stream mode 256 bits):
+
+	| 机型 | CPU | 内存（GB） | 链接数量 | QPS | 平均响应时间（usec） |
+	|-----|-----|-----------|---------|-----|------------------|
+	| AWS m4.xlarge | 4 | 16 | 500 | 235,130 | 55,825 |
+	| AWS m4.xlarge | 4 | 16 | 4,000 | 197,173 | 959,657 |
+	| AWS m4.2xlarge | 8 | 32 | 900 | 421,958 | 58,496 |
+	| AWS m4.2xlarge | 8 | 32 | 7,000 | 298,293 | 642,534 |
+
+
 1. 完整测试数据
 
 	以下为 CSV 格式文件，请使用电子表格软件打开。
 
 	**注意**：如果使用 Micorsoft Excel 导入，请选择 “**分隔符号**” 而非默认的 “**固定宽度**”。
 
-	[AWS m4.xlarge，单位压力100链接，4工作线程](../performances/0.8.2/stress.aws.m4.xlarge.100.w4.csv)
+	* v0.8.2 版测试数据:
 
-	[AWS m4.xlarge，单位压力100链接，8工作线程](../performances/0.8.2/stress.aws.m4.xlarge.100.w8.csv)
+		[AWS m4.xlarge，单位压力100链接，4工作线程](../performances/0.8.2/stress.aws.m4.xlarge.100.w4.csv)
 
-	[AWS m4.xlarge，单位压力1000链接，4工作线程](../performances/0.8.2/stress.aws.m4.xlarge.1000.w4.csv)
+		[AWS m4.xlarge，单位压力100链接，8工作线程](../performances/0.8.2/stress.aws.m4.xlarge.100.w8.csv)
 
-	[AWS m4.xlarge，单位压力1000链接，8工作线程](../performances/0.8.2/stress.aws.m4.xlarge.1000.w8.csv)
+		[AWS m4.xlarge，单位压力1000链接，4工作线程](../performances/0.8.2/stress.aws.m4.xlarge.1000.w4.csv)
+
+		[AWS m4.xlarge，单位压力1000链接，8工作线程](../performances/0.8.2/stress.aws.m4.xlarge.1000.w8.csv)
 
 
-	[AWS m4.2xlarge，单位压力100链接，8工作线程](../performances/0.8.2/stress.aws.m4.2xlarge.100.w8.csv)
+		[AWS m4.2xlarge，单位压力100链接，8工作线程](../performances/0.8.2/stress.aws.m4.2xlarge.100.w8.csv)
 
-	[AWS m4.2xlarge，单位压力100链接，16工作线程](../performances/0.8.2/stress.aws.m4.2xlarge.100.w16.csv)
+		[AWS m4.2xlarge，单位压力100链接，16工作线程](../performances/0.8.2/stress.aws.m4.2xlarge.100.w16.csv)
 
-	[AWS m4.2xlarge，单位压力1000链接，8工作线程](../performances/0.8.2/stress.aws.m4.2xlarge.1000.w8.csv)
+		[AWS m4.2xlarge，单位压力1000链接，8工作线程](../performances/0.8.2/stress.aws.m4.2xlarge.1000.w8.csv)
 
-	[AWS m4.2xlarge，单位压力1000链接，16工作线程](../performances/0.8.2/stress.aws.m4.2xlarge.1000.w16.csv)
+		[AWS m4.2xlarge，单位压力1000链接，16工作线程](../performances/0.8.2/stress.aws.m4.2xlarge.1000.w16.csv)
+
+	* v0.9.0 版测试数据:
+
+		+ Standard:
+
+			[AWS m4.xlarge，单位压力100链接，4工作线程](../performances/0.9.0/standard/stress.aws.m4.xlarge.100.w4.csv)
+
+			[AWS m4.xlarge，单位压力1000链接，4工作线程](../performances/0.9.0/standard/stress.aws.m4.xlarge.1000.w4.csv)
+
+			[AWS m4.2xlarge，单位压力100链接，8工作线程](../performances/0.9.0/standard/stress.aws.m4.2xlarge.100.w8.csv)
+
+			[AWS m4.2xlarge，单位压力1000链接，8工作线程](../performances/0.9.0/standard/stress.aws.m4.2xlarge.1000.w8.csv)
+
+		+ SSL/TLS:
+
+			[AWS m4.xlarge，单位压力100链接，4工作线程](../performances/0.9.0/ssl/stress.aws.m4.xlarge.100.w4.ssl.csv)
+
+			[AWS m4.xlarge，单位压力1000链接，4工作线程](../performances/0.9.0/ssl/stress.aws.m4.xlarge.1000.w4.ssl.csv)
+
+			[AWS m4.2xlarge，单位压力100链接，8工作线程](../performances/0.9.0/ssl/stress.aws.m4.2xlarge.100.w8.ssl.csv)
+
+			[AWS m4.2xlarge，单位压力1000链接，8工作线程](../performances/0.9.0/ssl/stress.aws.m4.2xlarge.1000.w8.ssl.csv)
+
+		+ ECC-Encrypted (ECC-AES-128, package):
+
+			[AWS m4.xlarge，单位压力100链接，4工作线程](../performances/0.9.0/eccEncrypted/stress.aws.m4.xlarge.100.w4.ecc.package.128bits.csv)
+
+			[AWS m4.xlarge，单位压力1000链接，4工作线程](../performances/0.9.0/eccEncrypted/stress.aws.m4.xlarge.1000.w4.ecc.package.128bits.csv)
+
+			[AWS m4.2xlarge，单位压力100链接，8工作线程](../performances/0.9.0/eccEncrypted/stress.aws.m4.2xlarge.100.w8.ecc.package.128bits.csv)
+
+			[AWS m4.2xlarge，单位压力1000链接，8工作线程](../performances/0.9.0/eccEncrypted/stress.aws.m4.2xlarge.1000.w8.ecc.package.128bits.csv)
+
+		+ ECC-Encrypted (ECC-AES-256, package):
+
+			[AWS m4.xlarge，单位压力100链接，4工作线程](../performances/0.9.0/eccEncrypted/stress.aws.m4.xlarge.100.w4.ecc.package.256bits.csv)
+
+			[AWS m4.xlarge，单位压力1000链接，4工作线程](../performances/0.9.0/eccEncrypted/stress.aws.m4.xlarge.1000.w4.ecc.package.256bits.csv)
+
+			[AWS m4.2xlarge，单位压力100链接，8工作线程](../performances/0.9.0/eccEncrypted/stress.aws.m4.2xlarge.100.w8.ecc.package.256bits.csv)
+
+			[AWS m4.2xlarge，单位压力1000链接，8工作线程](../performances/0.9.0/eccEncrypted/stress.aws.m4.2xlarge.1000.w8.ecc.package.256bits.csv)
+
+		+ ECC-Encrypted (ECC-AES-128, stream):
+
+			[AWS m4.xlarge，单位压力100链接，4工作线程](../performances/0.9.0/eccEncrypted/stress.aws.m4.xlarge.100.w4.ecc.stream.128bits.csv)
+
+			[AWS m4.xlarge，单位压力1000链接，4工作线程](../performances/0.9.0/eccEncrypted/stress.aws.m4.xlarge.1000.w4.ecc.stream.128bits.csv)
+
+			[AWS m4.2xlarge，单位压力100链接，8工作线程](../performances/0.9.0/eccEncrypted/stress.aws.m4.2xlarge.100.w8.ecc.stream.128bits.csv)
+
+			[AWS m4.2xlarge，单位压力1000链接，8工作线程](../performances/0.9.0/eccEncrypted/stress.aws.m4.2xlarge.1000.w8.ecc.stream.128bits.csv)
+
+		+ ECC-Encrypted (ECC-AES-256, stream):
+
+			[AWS m4.xlarge，单位压力100链接，4工作线程](../performances/0.9.0/eccEncrypted/stress.aws.m4.xlarge.100.w4.ecc.stream.256bits.csv)
+
+			[AWS m4.xlarge，单位压力1000链接，4工作线程](../performances/0.9.0/eccEncrypted/stress.aws.m4.xlarge.1000.w4.ecc.stream.256bits.csv)
+
+			[AWS m4.2xlarge，单位压力100链接，8工作线程](../performances/0.9.0/eccEncrypted/stress.aws.m4.2xlarge.100.w8.ecc.stream.256bits.csv)
+
+			[AWS m4.2xlarge，单位压力1000链接，8工作线程](../performances/0.9.0/eccEncrypted/stress.aws.m4.2xlarge.1000.w8.ecc.stream.256bits.csv)
 
 
 ### 2. 海量链接测试
@@ -172,6 +281,8 @@ FPNN 自动化分布式测试工具需要在 **DATS (Distributed Automated Testi
 
 1. 测试数据摘要
 
+	v0.8.2 版测试数据:
+
 	| 机型 | CPU | 内存（GB） | 链接数量 | QPS | 平均响应时间（usec） |
 	|-----|-----|-----------|---------|-----|------------------|
 	| AWS m4.xlarge | 4 | 16 | 1,200,000 | 23,978 | 435 |
@@ -181,6 +292,8 @@ FPNN 自动化分布式测试工具需要在 **DATS (Distributed Automated Testi
 	以下为 CSV 格式文件，请使用电子表格软件打开。
 
 	**注意**：如果使用 Micorsoft Excel 导入，请选择 “**分隔符号**” 而非默认的 “**固定宽度**”。
+
+	v0.8.2 版测试数据:
 
 	[AWS m4.xlarge，固定模式，单位压力100线程，10000客户端，单客户端100秒一个请求](../performances/0.8.2/massClient.aws.m4.xlarge.100.1w.0.01.csv)
 
