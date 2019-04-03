@@ -1,4 +1,4 @@
-# FPNN 介绍
+# FPNN (Fast Programmable Nexus Network ) 介绍
 
 **FPNN一句话总结：**
 
