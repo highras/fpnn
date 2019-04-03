@@ -1,9 +1,10 @@
-# FPNN (Fast Programmable Nexus Network ) 介绍
+# FPNN 介绍
 
 **FPNN一句话总结：**
 
 + **客户端**：一个API解决所有操作
 + **服务器**：一个类继承解决所有RPC，同步异步，编码解码问题。
++ **FPNN**: Fast Programmable Nexus Network
 
 ## 一、开发背景
 
