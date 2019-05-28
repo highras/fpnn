@@ -18,34 +18,114 @@ struct timeval diff_timeval(struct timeval start, struct timeval finish)
 	return diff;
 }
 
-
-void SegmentTimeAnalyst::reformData(std::map<int, struct TimeCost>& result)
+void SegmentTimeAnalyst::showAnalysis()
 {
-	HashMap<std::string, struct TimeFragment>::node_type* node = _map.next_node(NULL);
-	while (node)
+	for (int i = 0; i < _index; i++)
 	{
-		struct TimeCost tc;
-		tc.desc = node->key;
-		tc.cost = diff_timeval(node->data.start, node->data.end);
-		
-		result[node->data.index] = tc;
-		
-		node = _map.next_node(node);
+		auto it = _results.find(i);
+		if (it != _results.end())
+		{
+			struct TimeCost& tc = it->second;
+			if (!tc.mark)
+			{
+				struct timeval cost = diff_timeval(tc.start, tc.end);
+
+				UXLOG("Time cost", "[id %d][%s][%d][%s] range: [%lld - %lld], cost %ld sec %f ms", _id, _desc.c_str(), i, tc.desc.c_str(),
+					tc.start.tv_sec * 1000 + tc.start.tv_usec/1000,
+					tc.end.tv_sec * 1000 + tc.end.tv_usec/1000,
+					cost.tv_sec, ((float)cost.tv_usec/1000));
+			}
+			else
+			{
+				UXLOG("Time cost", "[id %d][%s][%d][%s] occurred ms: %lld", _id, _desc.c_str(), i, tc.desc.c_str(), tc.start.tv_sec * 1000 + tc.start.tv_usec/1000);
+			}
+		}
+		else
+		{
+			struct SequentCost& sc = _sequentResults[i];
+			if (sc.count == 0)
+			{
+				LOG_ERROR("Invalid Fragement [id %d][%s][%d][%s], count is 0.", _id, _desc.c_str(), i, sc.desc.c_str());
+				continue;
+			}
+			else if (sc.start.tv_sec != 0)
+			{
+				LOG_ERROR("Invalid Fragement [id %d][%s][%d][%s], count is %lld, but not completed.", _id, _desc.c_str(), i, sc.desc.c_str(), sc.count);
+				continue;
+			}
+
+			long long usec = sc.total.tv_sec * 1000 * 1000 + sc.total.tv_usec;
+			usec /= sc.count;
+
+			long long sec = usec / (1000 * 10000);
+			UXLOG("Time cost", "[id %d][%s][%d][%s] count %lld, total cost %ld sec %f ms, avg %lld sec %f ms", _id, _desc.c_str(), i, sc.desc.c_str(),
+					sc.count,
+					sc.total.tv_sec, ((float)sc.total.tv_usec/1000),
+					sec, ((float)(usec - sec * 1000 * 1000)/1000));
+		}
 	}
 }
 
-void SegmentTimeAnalyst::showAnalysis()
+void SegmentTimeAnalyst::endSegment(int index)
 {
-	std::map<int, struct TimeCost> results;
-	
-	reformData(results);
-	
-	for (int i = 0; i < _index; i++)
+	gettimeofday(&(_results[index].end), NULL);
+}
+
+void SegmentTimeAnalyst::endFragment(int index)
+{
+	struct timeval end;
+	gettimeofday(&end, NULL);
+
+	struct SequentCost& sc = _sequentResults[index];
+	struct timeval cost = diff_timeval(sc.start, end);
+
+	sc.total.tv_sec += cost.tv_sec;
+	sc.total.tv_usec += cost.tv_usec;
+	if (sc.total.tv_usec >= 1000 * 1000)
 	{
-		struct TimeCost& tc = results[i];
-		
-		LOG_INFO("[Time cost][id %d][%s][%s] cost %ld sec %f ms", _id, _desc.c_str(), tc.desc.c_str(), tc.cost.tv_sec, ((float)tc.cost.tv_usec/1000));
+		sc.total.tv_usec -= 1000 * 1000;
+		sc.total.tv_sec += 1;
 	}
+
+	sc.start = {0, 0};
+	sc.count += 1;
+}
+
+int SegmentTimeAnalyst::addSegment(const std::string& desc, bool isMark)
+{
+	struct TimeCost tc;
+	tc.mark = isMark;
+	tc.desc = desc;
+	gettimeofday(&tc.start, NULL);
+
+	int index = _index++;
+	_results[index] = tc;
+
+	return index;
+}
+
+int SegmentTimeAnalyst::addFragment(const std::string& desc)
+{
+	auto it = _indexMap.find(desc);
+	if (it != _indexMap.end())
+	{
+		int index = it->second;
+		struct SequentCost& sc = _sequentResults[index];
+		gettimeofday(&sc.start, NULL);
+		return index;
+	}
+
+	struct SequentCost sc;
+	sc.count = 0;
+	sc.total = {0, 0};
+	sc.desc = desc;
+	gettimeofday(&sc.start, NULL);
+
+	int index = _index++;
+	_sequentResults[index] = sc;
+	_indexMap[desc] = index;
+
+	return index;
 }
 
 TimeCostAlarm::~TimeCostAlarm()

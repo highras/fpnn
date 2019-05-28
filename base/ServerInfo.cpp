@@ -137,9 +137,9 @@ const std::string& ServerInfo::getServerLocalIP4(){
 		if(getAZUREInfo(AZURE_BASE_HOST))
 			return _serverLocalIP4;
 #else
-		std::string localIPv4 = NetworkUtil::getLocalIP4();
-		if (localIPv4.length())
-			return localIPv4;
+		_serverLocalIP4 = NetworkUtil::getLocalIP4();
+		if (_serverLocalIP4.length())
+			return _serverLocalIP4;
 		else
 		{
 			std::cout<<"Unknow platform"<<std::endl;
@@ -168,9 +168,9 @@ const std::string& ServerInfo::getServerPublicIP4(){
 		if(getAZUREInfo(AZURE_BASE_HOST))
 			return _serverPubliceIP4;
 #else
-		std::string localIPv4 = NetworkUtil::getPublicIP4();
-		if (localIPv4.length())
-			return localIPv4;
+		_serverPubliceIP4 = NetworkUtil::getPublicIP4();
+		if (_serverPubliceIP4.length())
+			return _serverPubliceIP4;
 		else
 		{
 			std::cout<<"Unknow platform"<<std::endl;

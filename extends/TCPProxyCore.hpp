@@ -151,6 +151,11 @@ namespace fpnn
 			std::unique_lock<std::mutex> lck(_mutex);
 			return _endpoints.empty();
 		}
+		std::vector<std::string> endpoints()
+		{
+			std::unique_lock<std::mutex> lck(_mutex);
+			return _endpoints;
+		}
 	};
 }
 

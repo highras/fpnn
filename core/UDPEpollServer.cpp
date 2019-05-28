@@ -466,7 +466,7 @@ void UDPEpollServer::deliverAnswer(ConnectionInfoPtr connInfo, FPAnswerPtr answe
 	else
 	{
 		delete callback;
-		LOG_ERROR("UDP server received an answer, but process answers is desiabled. Answer will be dropped. %s", connInfo->str().c_str());
+		LOG_ERROR("UDP server received an answer, but process answers is disabled. Answer will be dropped. %s", connInfo->str().c_str());
 	}
 }
 

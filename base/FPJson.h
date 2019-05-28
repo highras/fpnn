@@ -335,6 +335,8 @@ public:
 	operator long double() const throw(FpnnJsonNodeTypeMissMatchError) { return wantReal(); }
 	operator std::string() const throw(FpnnJsonNodeTypeMissMatchError) { return wantString(); }
 
+	operator char() const throw(FpnnJsonNodeTypeMissMatchError)               { return (char)              wantInt(); }
+	operator unsigned char() const throw(FpnnJsonNodeTypeMissMatchError)      { return (unsigned char)     wantInt(); }
 	operator short() const throw(FpnnJsonNodeTypeMissMatchError)              { return (short)             wantInt(); }
 	operator unsigned short() const throw(FpnnJsonNodeTypeMissMatchError)     { return (unsigned short)    wantInt(); }
 	operator int() const throw(FpnnJsonNodeTypeMissMatchError)                { return (int)               wantInt(); }

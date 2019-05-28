@@ -18,5 +18,5 @@ void MidGenerator::init(int32_t rand){
 }
 
 int64_t MidGenerator::genMid(){
-	return (slack_real_sec() << 32) + _pip + (_sn++ & 0XFFFFFF);
+	return (slack_real_sec() << 32) | (_pip & 0XFF000000) | (_sn++ & 0XFFFFFF);
 }

@@ -13,23 +13,6 @@ class Setting
 		static MapType _map;
 		static std::string _config_file;
 	public:
-		struct EndpointST{
-			std::string name;
-			std::string proto;
-			std::string host;
-			int port;
-			int timeout;
-		};
-
-		struct MysqlConnST{
-			std::string proto;
-			std::string user;
-			std::string passwd;
-			std::string host;
-			int port;
-			std::string db;
-			int timeout;
-		};
 
 		static std::string getString(const std::string& name, const std::string& dft = std::string(), const MapType& map = _map);
 		static intmax_t getInt(const std::string& name, intmax_t dft = 0, const MapType& map = _map);
@@ -49,11 +32,6 @@ class Setting
 
 		static void printInfo();
 		static std::string getConfigFile() { return _config_file; }
-
-		/* name @tcp:localhost:11008^10 */
-		bool parseEndpoint(const std::string& endpoint, EndpointST& st);
-		/* mysql://dev:dev@127.0.0.1:3306/db^10 */
-		bool parseDBSetting(const std::string& mysqlConn, MysqlConnST& st);
 
 		static std::string getString(const std::vector<std::string>& priority, const std::string& dft = std::string(), const MapType& map = _map);
 		static intmax_t getInt(const std::vector<std::string>& priority, intmax_t dft = 0, const MapType& map = _map);

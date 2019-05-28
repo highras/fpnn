@@ -718,7 +718,7 @@ void TCPEpollServer::clearConnectionQuestCallbacks(TCPServerConnection* connecti
 			else
 			{
 				delete callback;
-				LOG_ERROR("CallbackMap of server connection is enabled, but process answers is desiabled. Answer will be dropped.");
+				LOG_ERROR("CallbackMap of server connection is enabled, but process answers is disabled. Answer will be dropped.");
 			}
 		}
 	}
@@ -845,7 +845,7 @@ void TCPEpollServer::dealAnswer(int socket, FPAnswerPtr answer)
 	else
 	{
 		delete callback;
-		LOG_ERROR("Server received an answer, but process answers is desiabled. Answer will be dropped. socket: %d", socket);
+		LOG_ERROR("Server received an answer, but process answers is disabled. Answer will be dropped. socket: %d", socket);
 	}
 }
 

@@ -6,8 +6,7 @@
 #include <atomic>
 #include <string>
 #include <map>
-#include "HashMap.h"
-#include "jenkins.h"
+#include <unordered_map>
 
 struct timeval diff_timeval(struct timeval start, struct timeval finish);
 
@@ -15,36 +14,40 @@ namespace fpnn {
 class SegmentTimeAnalyst
 {
 private:
-	struct TimeFragment
+	struct SequentCost
 	{
-		int index;
+		long long count;
+		std::string desc;
 		struct timeval start;
-		struct timeval end;
-		
-		TimeFragment(int index_): index(index_), start{0, 0}, end{0, 0} {}
-		TimeFragment(const TimeFragment& r): index(r.index)
-		{
-			start = r.start;
-			end = r.end;
-		}
+		struct timeval total;
 	};
-	
+
 	struct TimeCost
 	{
+		bool mark;
 		std::string desc;
-		struct timeval cost;
+		struct timeval start;
+		struct timeval end;
 	};
 
 	int _id;
 	int _index;
 	std::string _desc;
-	HashMap<std::string, struct TimeFragment>   _map;
+	std::unordered_map<std::string, int> _indexMap;
+	std::map<int, struct TimeCost> _results;
+	std::map<int, struct SequentCost> _sequentResults;
 	
-	void reformData(std::map<int, struct TimeCost>& result);
 	void showAnalysis();
-	
+	void endSegment(int index);
+	void endFragment(int index);
+	int addSegment(const std::string& desc, bool isMark);
+	int addFragment(const std::string& desc);
+
+	friend class SegmentTimeMonitor;
+	friend class FragmentTimeMonitor;
+
 public:
-	SegmentTimeAnalyst(const std::string& desc): _index(0), _desc(desc), _map(16)
+	SegmentTimeAnalyst(const std::string& desc): _index(0), _desc(desc)
 	{
 		static std::atomic<int> globalIDGenerator(0);
 		_id = globalIDGenerator.fetch_add(1);
@@ -60,19 +63,83 @@ public:
 	
 	inline void start(const std::string& desc)
 	{
-		struct TimeFragment tf(_index);
-		_map.insert(desc, tf);
-		
-		_index += 1;
-		
-		HashMap<std::string, struct TimeFragment>::node_type* node = _map.find(desc);
-		gettimeofday(&(node->data.start), NULL);
+		_indexMap[desc] = addSegment(desc, false);
 	}
 	
 	inline void end(const std::string& desc)
 	{
-		HashMap<std::string, struct TimeFragment>::node_type* node = _map.find(desc);
-		gettimeofday(&(node->data.end), NULL);
+		auto it = _indexMap.find(desc);
+		if (it != _indexMap.end())
+			endSegment(it->second);
+	}
+
+	inline void mark(const std::string& desc)
+	{
+		addSegment(desc, true);
+	}
+
+	inline void fragmentStart(const std::string& desc)
+	{
+		addFragment(desc);
+	}
+
+	inline void fragmentEnd(const std::string& desc)
+	{
+		auto it = _indexMap.find(desc);
+		if (it != _indexMap.end())
+			endFragment(it->second);
+	}
+};
+
+struct SegmentTimeMonitor
+{
+private:
+	int _index;
+	bool _done;
+	SegmentTimeAnalyst* _analyst;
+
+public:
+	SegmentTimeMonitor(SegmentTimeAnalyst* analyst, const std::string& desc): _done(false), _analyst(analyst)
+	{
+		_index = _analyst->addSegment(desc, false);
+	}
+
+	~SegmentTimeMonitor()
+	{
+		if (!_done)
+			end();
+	}
+
+	void end()
+	{
+		_done = true;
+		_analyst->endSegment(_index);
+	}
+};
+
+struct FragmentTimeMonitor
+{
+private:
+	int _index;
+	bool _done;
+	SegmentTimeAnalyst* _analyst;
+
+public:
+	FragmentTimeMonitor(SegmentTimeAnalyst* analyst, const std::string& desc): _done(false), _analyst(analyst)
+	{
+		_index = _analyst->addFragment(desc);
+	}
+
+	~FragmentTimeMonitor()
+	{
+		if (!_done)
+			end();
+	}
+
+	void end()
+	{
+		_done = true;
+		_analyst->endFragment(_index);
 	}
 };
 
