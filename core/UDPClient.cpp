@@ -130,6 +130,7 @@ int UDPClient::connectIPv4Address(ConnectionInfoPtr currConnInfo)
 
 	if (serverAddr->sin_addr.s_addr == INADDR_NONE)
 	{
+		::close(socketfd);
 		free(serverAddr);
 		return 0;
 	}
@@ -160,6 +161,7 @@ int UDPClient::connectIPv6Address(ConnectionInfoPtr currConnInfo)
 
 	if (inet_pton(AF_INET6, currConnInfo->ip.c_str(), &serverAddr->sin6_addr) != 1)
 	{
+		::close(socketfd);
 		free(serverAddr);
 		return 0;
 	}
