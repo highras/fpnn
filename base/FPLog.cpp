@@ -43,7 +43,12 @@ void FPLogBase::push(FPLogEntry* log) {
                 _localIP4 = ServerInfo::getServerLocalIP4();
             
             snprintf(log->_body, FPLOG_BUF_SIZE, "[%s]~[ERROR]~[]~[%s]~[]: FPLog Queue Limit", TimeUtil::getDateTimeMS().c_str(), _localIP4.c_str());
+
+            FPLogEntry* frontLog = _queue.front();
+            if (frontLog)
+                delete frontLog;
             _queue.pop();
+
             _queue.push(log);
             _queueLimitTime = now;
             _condition.notify_one();
