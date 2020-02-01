@@ -2,7 +2,7 @@
 
 1. 平台配置
 
-	FPNN 在 亚马逊 AWS、谷歌 GCP、微软 Azure 3个平台上，将自动获取网络相关配置。
+	FPNN 在 亚马逊 AWS、谷歌 GCP、微软 Azure、腾讯云 四个平台上，将自动获取网络相关配置。
 
 	FPNN 默认启动 亚马逊 AWS 支持。如果需要更改，请修改 FPNN 全局预置配置文件 [def.mk](../../def.mk) 中，DEFAULTPLATFORM 参数即可。
 

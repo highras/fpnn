@@ -5,7 +5,7 @@
 	请依次检查以下项目：
 
 	* [def.mk](../../def.mk) 中对于平台参数 DEFAULTPLATFORM 的配置是否正确
-	* 若当前平台不属于 亚马逊 AWS、谷歌 GCP、微软 Azure，则配置文件中是否配置了以下条目：
+	* 若当前平台不属于 亚马逊 AWS、谷歌 GCP、微软 Azure、腾讯云，则配置文件中是否配置了以下条目：
 
 			# 服务的主机名称
 			FP.server.hostname =
