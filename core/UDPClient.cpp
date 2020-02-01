@@ -35,6 +35,10 @@ public:
 		catch (const FpnnError& ex){
 			LOG_ERROR("UDP client processQuest() error:(%d)%s. %s", ex.code(), ex.what(), _connectionInfo->str().c_str());
 		}
+		catch (const std::exception& ex)
+		{
+			LOG_ERROR("UDP client processQuest() error: %s. %s", ex.what(), _connectionInfo->str().c_str());
+		}
 		catch (...)
 		{
 			LOG_ERROR("Fatal error occurred when UDP client processQuest() function. %s", _connectionInfo->str().c_str());
@@ -86,6 +90,11 @@ void UDPClient::dealQuest(FPQuestPtr quest, ConnectionInfoPtr connectionInfo)		/
 				{
 					LOG_ERROR("Generate error answer for UDP duplex client worker queue full failed. No answer returned, peer need to wait timeout. %s, exception:(%d)%s",
 						connectionInfo->str().c_str(), ex.code(), ex.what());
+				}
+				catch (const std::exception& ex)
+				{
+					LOG_ERROR("Generate error answer for UDP duplex client worker queue full failed. No answer returned, peer need to wait timeout. %s, exception: %s",
+						connectionInfo->str().c_str(), ex.what());
 				}
 				catch (...)
 				{

@@ -1,5 +1,6 @@
 # FPNN Server Advanced Tutorial
 
+[TOC]
 
 ## * HTTP/HTTPS 支持
 
@@ -258,10 +259,10 @@ IAsyncAnswer 完整接口：
 	        virtual bool sendAnswer(FPAnswerPtr);
 	        virtual bool isSent();
 	         
-	        virtual void cacheTraceInfo(const std::string&, const std::string& raiser = "");
-	        virtual void cacheTraceInfo(const char *, const char* raiser = "");
-	        virtual bool sendErrorAnswer(int code = 0, const std::string& ex = "", const std::string& raiser = "");
-	        virtual bool sendErrorAnswer(int code = 0, const char* ex = "", const char* raiser = "");
+	        virtual void cacheTraceInfo(const std::string&);
+	        virtual void cacheTraceInfo(const char *);
+	        virtual bool sendErrorAnswer(int code = 0, const std::string& ex = "");
+	        virtual bool sendErrorAnswer(int code = 0, const char* ex = "");
 	        virtual bool sendEmptyAnswer();
 	    };
 	 
@@ -521,17 +522,17 @@ IAsyncAnswer 完整接口：
 		 
 		    virtual bool isSent() { return _realAsync->isSent(); }
 		 
-		    virtual void cacheTraceInfo(const std::string& info, const std::string& raiser = "") { return _realAsync->cacheTraceInfo(info, raiser); }
-		    virtual void cacheTraceInfo(const char *info, const char* raiser = "") { return _realAsync->cacheTraceInfo(info, raiser); }
+		    virtual void cacheTraceInfo(const std::string& info) { return _realAsync->cacheTraceInfo(info); }
+		    virtual void cacheTraceInfo(const char *info) { return _realAsync->cacheTraceInfo(info); }
 		         
-		    virtual bool sendErrorAnswer(int code = 0, const std::string& ex = "", const std::string& raiser = "")
+		    virtual bool sendErrorAnswer(int code = 0, const std::string& ex = "")
 		    {
-		        FPAnswerPtr answer = FPAWriter::errorAnswer(getQuest(), code, ex, raiser);
+		        FPAnswerPtr answer = FPAWriter::errorAnswer(getQuest(), code, ex);
 		        return sendAnswer(answer);
 		    }
-		    virtual bool sendErrorAnswer(int code = 0, const char* ex = "", const char* raiser = "")
+		    virtual bool sendErrorAnswer(int code = 0, const char* ex = "")
 		    {
-		        FPAnswerPtr answer = FPAWriter::errorAnswer(getQuest(), code, ex, raiser);
+		        FPAnswerPtr answer = FPAWriter::errorAnswer(getQuest(), code, ex);
 		        return sendAnswer(answer);
 		    }
 		    virtual bool sendEmptyAnswer()
@@ -812,12 +813,32 @@ FPZKClient 模块提供向 FPZKServer 集群注册服务，或者获取指定集
 	 
 	+ FPZK.client.subscribe.enable = true (默认)
 
-		- 如果 FPZK.client.subscribe.enable 为 true，支持服务器变动实时通知，但 FPZKClient 会启动两个线程。（仅对 FPZK v2 有效）
+		- 如果 FPZK.client.subscribe.enable 为 true，支持服务器变动实时通知，但 FPZKClient 会启动两个线程。（FPZK v2 及后续版本有效）
 		- 如果 FPZK.client.subscribe.enable 为 false，2秒与 FPZK Server 同步一次，但 FPZKClient 只会启动一个线程。
+
+	+ FPZK.client.sync.externalVisible = true (默认)
+
+		是否同步到其他 region。即，本实例其他 region 是否可见。
+
+		- FPZK Server 低版本将忽略该参数。
 
 	+ FPZK.client.sync.syncPublicInfo = false (默认)
 
-		如果为 true，将额外汇报 domain、ipv4、ipv6、port、port6 (如果存在)
+		如果为 true，将额外汇报 ipv4、ipv6、domain、sslport、sslport6 (如果存在)
+
+	+ FPZK.client.sync.syncPerformanceInfo = false (默认)
+
+		如果为 true，将额外汇报当前机器连接总数，当前系统按 CPU 平均的负载和使用率。
+
+	+ FPZK.client.sync.syncEndpoint = true
+
+		配合 FPZK Server v3 使用。当 FPZK.client.sync.externalVisible = true 时，将在各个 region 之间同步服务所在 region 内部使用的内网 endpoint。
+
+		- 如果内网没有打通，而是通过公网访问，请配置为 false。
+
+		- 如果该参数为 false，且 FPZK.client.sync.externalVisible = true，则 FPZK.client.sync.syncPublicInfo 将被强制开启。
+
+		- FPZK Server 低版本将忽略该参数。
 
 	+ FPZK.client.debugInfo.clusterChanged.enable = false
 
@@ -833,20 +854,27 @@ FPZKClient 主要接口
 	 
 	    //-- 注册服务。如果仅获取其他集群的数据，则无需调用该接口。
 	    bool registerService(const std::string& serviceName = "", const std::string& version = "", const std::string& endpoint = "", bool online = true);
+	    bool registerServiceSync(const std::string& serviceName = "", const std::string& cluster = "", const std::string& version = "", const std::string& endpoint = "", bool online = true);
 	 
 	    //-- 获取其他集群的状态数据
 	    int64_t getServiceRevision(const std::string& serviceName, const std::string& cluster = "");
 	    const ServiceInfosPtr getServiceInfos(const std::string& serviceName, const std::string& cluster = "", const std::string& version = "", bool onlineOnly = true);
 	    std::vector<std::string> getServiceEndpoints(const std::string& serviceName, const std::string& cluster = "", const std::string& version = "", bool onlineOnly = true);
 	    std::vector<std::string> getServiceEndpointsWithoutMyself(const std::string& version = "", bool onlineOnly = true);
+	    int64_t getServiceChangedMSec(const std::string& serviceName, const std::string& cluster = "");
+		std::string getOldestServiceEndpoint(const std::string& serviceName, const std::string& cluster = "", const std::string& version = "", bool onlineOnly = true);
+
+		inline void setServiceAlteredCallback(ServicesAlteredCallbackPtr callback);
+		inline void setServiceAlteredCallback(std::function<void (std::map<std::string, ServiceInfosPtr>& serviceInfos)> function);
 	     
-	    inline void monitorDetail(bool monitor);    //-- 获取 domain、ipv4、ipv6、port、port6 (如果存在) 等信息
-	    inline void monitorDetail(bool monitor, const std::string& service);    //-- 获取 domain、ipv4、ipv6、port、port6 (如果存在) 等信息
-	    inline void monitorDetail(bool monitor, const std::set<std::string>& detailServices); //-- 获取 domain、ipv4、ipv6、port、port6 (如果存在) 等信息
-	    inline void monitorDetail(bool monitor, const std::vector<std::string>& detailServices);  //-- 获取 domain、ipv4、ipv6、port、port6 (如果存在) 等信息
+	    inline void monitorDetail(bool monitor);													//-- 及时更新 链接数量、系统负载 等信息
+	    inline void monitorDetail(bool monitor, const std::string& service);						//-- 及时更新 链接数量、系统负载 等信息
+	    inline void monitorDetail(bool monitor, const std::set<std::string>& detailServices);		//-- 及时更新 链接数量、系统负载 等信息
+	    inline void monitorDetail(bool monitor, const std::vector<std::string>& detailServices);	//-- 及时更新 链接数量、系统负载 等信息
 	 
 	    inline void setOnline(bool online);
-	    inline void unregisterService();    //-- 取消注册
+	    inline void unregisterService();    	//-- 取消注册
+	    inline void unregisterServiceSync();	//-- 取消注册
 	};
 
 具体请参见 <fpnn-folder>/extends/FPZKClient.h。

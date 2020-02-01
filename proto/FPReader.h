@@ -48,6 +48,17 @@ namespace fpnn{
 			const msgpack::object& wantObject(const std::string& k){
 				return _find(k.c_str());
 			}
+			bool existKey(const char *k){
+				try{
+					_find(k);
+					return true;
+				}
+				catch(...){}
+				return false;
+			}
+			bool existKey(const std::string& k){
+				return existKey(k.c_str());
+			}
 
 			//the following function will not throw exception
 			template<typename TYPE>
@@ -192,6 +203,7 @@ namespace fpnn{
 				return false;
 			}
 			bool isExt(const std::string& k)		{ return isExt(k.c_str()); }
+			//TODO
 			bool isNil(const char* k){ 
 				msgpack::type::object_type otype = getObjectType(k);
 				if(otype == msgpack::type::NIL)
@@ -209,7 +221,7 @@ namespace fpnn{
 			}
 			FPReader(const msgpack::object& obj):_object(obj){
 				if(_object.type != msgpack::type::MAP) 
-					throw FPNN_ERROR_CODE_FMT(FpnnProtoError, FPNN_EC_PROTO_MAP_VALUE, "NOT a MAP object: %d", _object.type);
+					throw FPNN_ERROR_CODE_FMT(FpnnProtoError, FPNN_EC_PROTO_MAP_VALUE, "NOT a MAP object: %s", json().c_str());
 			}
 			virtual ~FPReader() {}
 		public:
@@ -230,10 +242,23 @@ namespace fpnn{
 			}
 		private:
 			void unpack(const char* buf, size_t len){
-				_oh = msgpack::unpack(buf, len);
-				_object = _oh.get();
+				try{
+					_oh = msgpack::unpack(buf, len);
+					_object = _oh.get();
+				}   
+				catch(const std::exception& ex){
+					std::string hex = FPMessage::Hex(std::string(buf, len));
+					LOG_ERROR("unpack, exception: %s, len: %d, buf: %s", ex.what(), len, hex.c_str());
+					throw FPNN_ERROR_CODE_FMT(FpnnProtoError, FPNN_EC_PROTO_INVALID_PACKAGE, "Invalid Package, len: %d, buf: %s", len, hex.c_str()); 
+				}   
+				catch(...){
+					std::string hex = FPMessage::Hex(std::string(buf, len));
+					LOG_ERROR("unpack, exception, len: %d, buf: %s", len, hex.c_str());
+					throw FPNN_ERROR_CODE_FMT(FpnnProtoError, FPNN_EC_PROTO_INVALID_PACKAGE, "Invalid Package, len: %d, buf: %s", len, hex.c_str());
+				}   
+
 				if(_object.type != msgpack::type::MAP) 
-					throw FPNN_ERROR_CODE_FMT(FpnnProtoError, FPNN_EC_PROTO_MAP_VALUE, "NOT a MAP object: %d", _object.type);
+					throw FPNN_ERROR_CODE_FMT(FpnnProtoError, FPNN_EC_PROTO_MAP_VALUE, "NOT a MAP object: %s", json().c_str());
 			}
 
 			const msgpack::object& _find(const char* key);
@@ -245,6 +270,7 @@ namespace fpnn{
 			msgpack::object_handle _oh;
 			msgpack::object _object;
 			static msgpack::object _nilObj;
+			//_nilObj.type == msgpack::type::NIL
 
 			static intmax_t _intDef;
 			static uintmax_t _uintDef;

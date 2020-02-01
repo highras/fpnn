@@ -192,50 +192,50 @@ private:
     static FPLogBasePtr _logger;
 };
 
-#define LOG_INFO( fmt, args...) if(fpLogLevel>=FP_LEVEL_INFO) {\
-                                    FPLog::log(FP_LEVEL_INFO,__FILE__,__LINE__,__func__, "", fmt, ##args);}
+#define LOG_INFO( fmt, args...) if(fpnn::fpLogLevel>=fpnn::FP_LEVEL_INFO) {\
+                                    fpnn::FPLog::log(fpnn::FP_LEVEL_INFO,__FILE__,__LINE__,__func__, "", fmt, ##args);}
 
-#define LOG_ERROR( fmt, args...) if(fpLogLevel>=FP_LEVEL_ERROR) {\
-                                    FPLog::log(FP_LEVEL_ERROR,__FILE__,__LINE__,__func__, "", fmt, ##args);}
+#define LOG_ERROR( fmt, args...) if(fpnn::fpLogLevel>=fpnn::FP_LEVEL_ERROR) {\
+                                    fpnn::FPLog::log(fpnn::FP_LEVEL_ERROR,__FILE__,__LINE__,__func__, "", fmt, ##args);}
 
-#define LOG_WARN( fmt, args...)  if(fpLogLevel>=FP_LEVEL_WARN) {\
-                                    FPLog::log(FP_LEVEL_WARN,__FILE__,__LINE__,__func__, "", fmt, ##args);}
+#define LOG_WARN( fmt, args...)  if(fpnn::fpLogLevel>=fpnn::FP_LEVEL_WARN) {\
+                                    fpnn::FPLog::log(fpnn::FP_LEVEL_WARN,__FILE__,__LINE__,__func__, "", fmt, ##args);}
 
-#define LOG_DEBUG( fmt, args...) if(fpLogLevel>=FP_LEVEL_DEBUG) {\
-                                    FPLog::log(FP_LEVEL_DEBUG,__FILE__,__LINE__,__func__, "", fmt, ##args);}
+#define LOG_DEBUG( fmt, args...) if(fpnn::fpLogLevel>=fpnn::FP_LEVEL_DEBUG) {\
+                                    fpnn::FPLog::log(fpnn::FP_LEVEL_DEBUG,__FILE__,__LINE__,__func__, "", fmt, ##args);}
 
-#define LOG_FATAL( fmt, args...) if(fpLogLevel>=FP_LEVEL_FATAL) {\
-                                    FPLog::log(FP_LEVEL_FATAL,__FILE__,__LINE__,__func__, "", fmt, ##args);}
+#define LOG_FATAL( fmt, args...) if(fpnn::fpLogLevel>=fpnn::FP_LEVEL_FATAL) {\
+                                    fpnn::FPLog::log(fpnn::FP_LEVEL_FATAL,__FILE__,__LINE__,__func__, "", fmt, ##args);}
 
 
-#define XLOG_INFO( tag, fmt, args...) if(fpLogLevel>=FP_LEVEL_INFO) {\
-                                    FPLog::log(FP_LEVEL_INFO,__FILE__,__LINE__,__func__, tag, fmt, ##args);}
+#define XLOG_INFO( tag, fmt, args...) if(fpnn::fpLogLevel>=fpnn::FP_LEVEL_INFO) {\
+                                    fpnn::FPLog::log(fpnn::FP_LEVEL_INFO,__FILE__,__LINE__,__func__, tag, fmt, ##args);}
 
-#define XLOG_ERROR( tag, fmt, args...) if(fpLogLevel>=FP_LEVEL_ERROR) {\
-                                    FPLog::log(FP_LEVEL_ERROR,__FILE__,__LINE__,__func__, tag, fmt, ##args);}
+#define XLOG_ERROR( tag, fmt, args...) if(fpnn::fpLogLevel>=fpnn::FP_LEVEL_ERROR) {\
+                                    fpnn::FPLog::log(fpnn::FP_LEVEL_ERROR,__FILE__,__LINE__,__func__, tag, fmt, ##args);}
 
-#define XLOG_WARN( tag, fmt, args...)  if(fpLogLevel>=FP_LEVEL_WARN) {\
-                                    FPLog::log(FP_LEVEL_WARN,__FILE__,__LINE__,__func__, tag, fmt, ##args);}
+#define XLOG_WARN( tag, fmt, args...)  if(fpnn::fpLogLevel>=fpnn::FP_LEVEL_WARN) {\
+                                    fpnn::FPLog::log(fpnn::FP_LEVEL_WARN,__FILE__,__LINE__,__func__, tag, fmt, ##args);}
 
-#define XLOG_DEBUG( tag, fmt, args...) if(fpLogLevel>=FP_LEVEL_DEBUG) {\
-                                    FPLog::log(FP_LEVEL_DEBUG,__FILE__,__LINE__,__func__, tag, fmt, ##args);}
+#define XLOG_DEBUG( tag, fmt, args...) if(fpnn::fpLogLevel>=fpnn::FP_LEVEL_DEBUG) {\
+                                    fpnn::FPLog::log(fpnn::FP_LEVEL_DEBUG,__FILE__,__LINE__,__func__, tag, fmt, ##args);}
 
-#define XLOG_FATAL( tag, fmt, args...) if(fpLogLevel>=FP_LEVEL_FATAL) {\
-                                    FPLog::log(FP_LEVEL_FATAL,__FILE__,__LINE__,__func__, tag, fmt, ##args);}
+#define XLOG_FATAL( tag, fmt, args...) if(fpnn::fpLogLevel>=fpnn::FP_LEVEL_FATAL) {\
+                                    fpnn::FPLog::log(fpnn::FP_LEVEL_FATAL,__FILE__,__LINE__,__func__, tag, fmt, ##args);}
 
 //log it, do not consider fpLogLevel
-#define UXLOG( tag, fmt, args...) FPLog::log(FP_LEVEL_INFO,__FILE__,__LINE__,__func__, tag, fmt, ##args);
+#define UXLOG( tag, fmt, args...) fpnn::FPLog::log(fpnn::FP_LEVEL_INFO,__FILE__,__LINE__,__func__, tag, fmt, ##args);
 
 // log BI data, no format string added before the log 
-#define TLOG(tag, body) FPLog::logTag(tag, body);
+#define TLOG(tag, body) fpnn::FPLog::logTag(tag, body);
 
 // use for stat log, the final route_name is: "rtmGated.stat"
-#define LOG_STAT(tag, fmt, args...) FPLog::logRoute("stat",__FILE__,__LINE__,__func__,tag, fmt, ##args);
+#define LOG_STAT(tag, fmt, args...) fpnn::FPLog::logRoute("stat",__FILE__,__LINE__,__func__,tag, fmt, ##args);
 
 // can specify the route_name, if LOG_ROUTE("xxx", ...) the final route_name is: "rtmGated.xxx"
-#define LOG_ROUTE(route, tag, fmt, args...) FPLog::logRoute(route,__FILE__,__LINE__,__func__,tag, fmt, ##args);
+#define LOG_ROUTE(route, tag, fmt, args...) fpnn::FPLog::logRoute(route,__FILE__,__LINE__,__func__,tag, fmt, ##args);
 
-#define LOG_SAMPLE(tag, fmt, args...) FPLog::logRoute("sample",__FILE__,__LINE__,__func__,tag, fmt, ##args);
+#define LOG_SAMPLE(tag, fmt, args...) fpnn::FPLog::logRoute("sample",__FILE__,__LINE__,__func__,tag, fmt, ##args);
 
 }
 

@@ -106,7 +106,7 @@ bool HttpParser::parseHeader(ChainBuffer* cb, int header_length)
 		elems.clear();
 		StringUtil::split(method, "/", elems);
 		if(elems.size() != 2)
-			throw FPNN_ERROR_CODE_FMT(FpnnHTTPError, FPNN_EC_CORE_HTTP_ERROR, "Unknown HTTP protocol-4 (%s)", line);
+			throw FPNN_ERROR_CODE_FMT(FpnnHTTPError, FPNN_EC_CORE_HTTP_ERROR, "Invalid FPNN HTTP method path format (%s)", line);
 
 		if(elems[0].compare("service") != 0)
 			throw FPNN_ERROR_CODE_FMT(FpnnHTTPError, FPNN_EC_CORE_HTTP_ERROR, "Not Valid FPNN HTTP protocol (%s)", line);

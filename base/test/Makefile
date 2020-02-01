@@ -5,20 +5,23 @@ EXE_ParamTemplateThreadPoolTest = ParamTemplateThreadPoolTest
 EXE_TaskThreadPoolTest = TaskThreadPoolTest
 EXE_LambdaTaskThreadPoolTest = LambdaTaskThreadPoolTest
 EXE_HashSpeedTest = hashSpeedTest
+EXE_TwoTimeHashTest = twoTimeHashTest 
 EXE_RijndaelDemo = rijndaelDemo
 
 EXES_JSONTEST = FPJsonParseTest
 EXES_JSONFUNCTIONALTEST = FPJsonFunctionalTest
-EXES_JSONADVANCEDTEST = FPJsonAdvancedTest
+EXES_JSONADVANCEDTEST_Modify = FPJsonAdvancedTest_modify
+EXES_JSONADVANCEDTEST_Fetch = FPJsonAdvancedTest_fetch
+EXES_JSONADVANCEDTEST_Fetch_v2 = FPJsonAdvancedTest_fetch_v2
 
 EXES_ResourceCenterTest = ResourceCenterTest
 EXES_FPTimerTest = FPTimerTest
 
 EXE_LIBS = -L.. -lfpbase -lcurl -lpthread
 
-JSON_Module = $(EXES_JSONTEST) $(EXES_JSONFUNCTIONALTEST) $(EXES_JSONADVANCEDTEST)
+JSON_Module = $(EXES_JSONTEST) $(EXES_JSONFUNCTIONALTEST) $(EXES_JSONADVANCEDTEST_Modify) $(EXES_JSONADVANCEDTEST_Fetch) $(EXES_JSONADVANCEDTEST_Fetch_v2)
 EXES = $(EXE_MemoryPoolTest) $(EXE_ObjectPoolTest) $(EXE_ParamThreadPoolPoolTest) $(EXE_ParamTemplateThreadPoolTest) \
-	$(EXE_TaskThreadPoolTest) $(EXE_LambdaTaskThreadPoolTest) $(EXE_ParamThreadPoolTest) $(EXE_HashSpeedTest) $(EXE_RijndaelDemo) \
+	$(EXE_TaskThreadPoolTest) $(EXE_LambdaTaskThreadPoolTest) $(EXE_ParamThreadPoolTest) $(EXE_HashSpeedTest) $(EXE_TwoTimeHashTest) $(EXE_RijndaelDemo) \
 	$(EXES_ResourceCenterTest) $(EXES_FPTimerTest)
 
 all:
@@ -29,6 +32,7 @@ all:
 	g++ --std=c++11 -I.. -o $(EXE_TaskThreadPoolTest) TaskThreadPoolTest.cpp $(EXE_LIBS)
 	g++ --std=c++11 -I.. -o $(EXE_LambdaTaskThreadPoolTest) LambdaTaskThreadPoolTest.cpp $(EXE_LIBS)
 	g++ --std=c++11 -I.. -o $(EXE_HashSpeedTest) hashSpeedTest.cpp $(EXE_LIBS)
+	g++ --std=c++11 -I.. -o $(EXE_TwoTimeHashTest) twoTimeHashTest.cpp $(EXE_LIBS)
 	g++ --std=c++11 -I.. -o $(EXE_RijndaelDemo) rijndaelDemo.cpp $(EXE_LIBS)
 	g++ -O2 -o queueListPerformanceTest_O2 queueListPerformanceTest.cpp $(EXE_LIBS)
 	g++ -O2 -ltcmalloc -o queueListPerformanceTest_O2_tcmalloc queueListPerformanceTest.cpp $(EXE_LIBS)
@@ -41,7 +45,9 @@ all:
 
 	g++ --std=c++11 -I.. -o $(EXES_JSONTEST) FPJsonParseTest.cpp -L.. -lfpbase
 	g++ --std=c++11 -I.. -o $(EXES_JSONFUNCTIONALTEST) FPJsonFunctionalTest.cpp -L.. -lfpbase
-	g++ --std=c++11 -I.. -o $(EXES_JSONADVANCEDTEST) FPJsonAdvancedTest.cpp -L.. -lfpbase
+	g++ --std=c++11 -I.. -o $(EXES_JSONADVANCEDTEST_Modify) FPJsonAdvancedTest_modify.cpp -L.. -lfpbase
+	g++ --std=c++11 -I.. -o $(EXES_JSONADVANCEDTEST_Fetch) FPJsonAdvancedTest_fetch.cpp -L.. -lfpbase
+	g++ --std=c++11 -I.. -o $(EXES_JSONADVANCEDTEST_Fetch_v2) FPJsonAdvancedTest_fetch_v2.cpp -L.. -lfpbase
 
 	g++ --std=c++11 -I.. -o $(EXES_ResourceCenterTest) ResourceCenterTest.cpp $(EXE_LIBS)
 	g++ --std=c++11 -I.. -o $(EXES_FPTimerTest) FPTimerTest.cpp $(EXE_LIBS)

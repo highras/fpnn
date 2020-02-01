@@ -2,6 +2,7 @@
 #include <endian.h>
 #include "FPLog.h"
 #include "IOBuffer.h"
+#include "NetworkUtility.h"
 
 using namespace fpnn;
 
@@ -153,7 +154,7 @@ int SendBuffer::sslRealSend(int fd, bool& needWaitSendEvent)
 			}
 			else if (errorCode == SSL_ERROR_WANT_READ)
 			{
-				LOG_INFO("SSL/TSL re-negotiation occurred. SSL_write WANT_READ. socket: %d", fd);
+				LOG_INFO("SSL/TSL re-negotiation occurred. SSL_write WANT_READ. socket: %d, address: %s", fd, NetworkUtil::getPeerName(fd).c_str());
 				_sslContext->_negotiate = SSLNegotiate::Write_Want_Read;
 				
 				std::unique_lock<std::mutex> lck(*_mutex);

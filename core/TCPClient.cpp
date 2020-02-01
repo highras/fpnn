@@ -96,6 +96,11 @@ public:
 			LOG_ERROR("processQuest() error:(%d)%s. Connection will be closed by client. %s", ex.code(), ex.what(), _connectionInfo->str().c_str());
 			_fatal = true;
 		}
+		catch (const std::exception& ex)
+		{
+			LOG_ERROR("processQuest() error: %s. Connection will be closed by client. %s", ex.what(), _connectionInfo->str().c_str());
+			_fatal = true;
+		}
 		catch (...)
 		{
 			LOG_ERROR("Fatal error occurred in processQuest() function. Connection will be closed by client. %s", _connectionInfo->str().c_str());
@@ -148,6 +153,11 @@ void TCPClient::dealQuest(FPQuestPtr quest, ConnectionInfoPtr connectionInfo)		/
 				{
 					LOG_ERROR("Generate error answer for duplex client worker queue full failed. No answer returned, peer need to wait timeout. %s, exception:(%d)%s",
 						connectionInfo->str().c_str(), ex.code(), ex.what());
+				}
+				catch (const std::exception& ex)
+				{
+					LOG_ERROR("Generate error answer for duplex client worker queue full failed. No answer returned, peer need to wait timeout. %s, exception: %s",
+						connectionInfo->str().c_str(), ex.what());
 				}
 				catch (...)
 				{
@@ -407,7 +417,7 @@ bool TCPClient::connect()
 		qw.param("bits", _AESKeyLen * 8); 
 		FPQuestPtr quest = qw.take();
 
-		Config::ClientQuestLog(quest, newConnInfo->ip.c_str(), newConnInfo->port);
+		Config::ClientQuestLog(quest, newConnInfo->ip, newConnInfo->port);
 
 		FPAnswerPtr answer;
 		//if (timeout == 0)

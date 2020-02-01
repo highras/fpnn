@@ -3,6 +3,7 @@
 #include "Config.h"
 #include "Decoder.h"
 #include "Receiver.h"
+#include "NetworkUtility.h"
 
 using namespace fpnn;
 
@@ -65,19 +66,19 @@ bool WebSocketReceiver::sslRecv(int fd)
 			int errorCode = SSL_get_error(_sslContext->_ssl, readBytes);
 			if (errorCode == SSL_ERROR_WANT_WRITE)
 			{
-				LOG_INFO("SSL/TSL re-negotiation occurred. SSL_read WANT_WRITE. socket: %d", fd);
+				LOG_INFO("SSL/TSL re-negotiation occurred. SSL_read WANT_WRITE. socket: %d, address: %s", fd, NetworkUtil::getPeerName(fd).c_str());
 				_sslContext->_negotiate = SSLNegotiate::Read_Want_Write;
 				return true;
 			}
 			else if (errorCode == SSL_ERROR_WANT_READ)
 			{
-				//LOG_WARN("SSL/TSL re-negotiation occurred. SSL_read WANT_READ. socket: %d", fd);
+				//LOG_WARN("SSL/TSL re-negotiation occurred. SSL_read WANT_READ. socket: %d, address: %s", fd, NetworkUtil::getPeerName(fd).c_str());
 				//_sslContext->_negotiate = SSLNegotiate::Read_Want_Read;
 				return true;
 			}
 			else if (errorCode == SSL_ERROR_ZERO_RETURN)
 			{
-				//LOG_INFO("socket %d ssl is closed.", fd);
+				//LOG_INFO("socket %d ssl is closed, address: %s", fd, NetworkUtil::getPeerName(fd).c_str());
 				//-- TLS/SSL connection is colsed. But the underlying transport maybe hasn't been closed.
 				//-- Please Refer the SSL_get_error() doc on https://www.openssl.org.
 				return true;
@@ -93,19 +94,19 @@ bool WebSocketReceiver::sslRecv(int fd)
 					return false;
 				}
 
-				LOG_ERROR("SSL read syscall error. socket %d. errno: %d", fd, errno);
+				LOG_ERROR("SSL read syscall error. socket %d, address: %s, errno: %d", fd, NetworkUtil::getPeerName(fd).c_str(), errno);
 				OpenSSLModule::logLastErrors();
 				return false;
 			}
 			else if (errorCode == SSL_ERROR_SSL)
 			{
-				LOG_ERROR("SSL read error in openSSL library. SSL error code: SSL_ERROR_SSL. socket %d.", fd);
+				LOG_ERROR("SSL read error in openSSL library. SSL error code: SSL_ERROR_SSL. socket %d, address: %s", fd, NetworkUtil::getPeerName(fd).c_str());
 				OpenSSLModule::logLastErrors();
 				return false;
 			}
 			else
 			{
-				LOG_ERROR("SSL read error. socket %d, SSL error code %d, errno: %d", fd, errorCode, errno);
+				LOG_ERROR("SSL read error. socket %d, address: %s, SSL error code %d, errno: %d", fd, NetworkUtil::getPeerName(fd).c_str(), errorCode, errno);
 				return false;
 			}
 		}
@@ -223,7 +224,7 @@ bool WebSocketReceiver::processPayloadSize(int fd)
 
 	if (_payloadSize + _currFragmentsTotalLength > (uint64_t)Config::_max_recv_package_length)
 	{
-		LOG_ERROR("WebSocket client want send huge TCP data (size: %llu) to server, from socket: %d. Connection will be closed by framework.", _payloadSize, fd);
+		LOG_ERROR("WebSocket client want send huge TCP data (size: %llu) to server, from socket: %d, address: %s. Connection will be closed by framework.", _payloadSize, fd, NetworkUtil::getPeerName(fd).c_str());
 		return false;
 	}
 
@@ -239,7 +240,7 @@ bool WebSocketReceiver::processMaskingKey(int fd)
 {
 	if (_payloadSize + _currFragmentsTotalLength > (uint64_t)Config::_max_recv_package_length)
 	{
-		LOG_ERROR("WebSocket client want send huge TCP data (size: %llu) to server, from socket: %d. Connection will be closed by framework.", _payloadSize, fd);
+		LOG_ERROR("WebSocket client want send huge TCP data (size: %llu) to server, from socket: %d, address: %s. Connection will be closed by framework.", _payloadSize, fd, NetworkUtil::getPeerName(fd).c_str());
 		return false;
 	}
 

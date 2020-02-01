@@ -6,6 +6,22 @@
 using namespace std;
 using namespace fpnn;
 
+class ServicesAlteredCallback: public FPZKClient::ServicesAlteredCallback
+{
+public:
+	virtual ~ServicesAlteredCallback() {}
+	virtual void serviceAltered(std::map<std::string, FPZKClient::ServiceInfosPtr>& serviceInfos)
+	{
+		cout<<"[Object Callabck] following services altered."<<endl;
+		for (auto& pp: serviceInfos)
+		{
+			cout<<"  service: "<<pp.first<<", revision: "<<pp.second->revision<<", current count: "<<pp.second->nodeMap.size()<<endl;
+			for (auto& pp2: pp.second->nodeMap)
+				cout<<"    ep: "<<pp2.first<<endl;
+		}
+	}
+};
+
 class QuestProcessor: public IQuestProcessor
 {
 	FPZKClientPtr _fpzk;
@@ -41,6 +57,8 @@ public:
 	}
 	QuestProcessor()
 	{
+		registerMethod("show", &QuestProcessor::show);
+
 		_fpzk = FPZKClient::create();	//-- Using default action to fetch parameters value
 		_fpzk->registerService();		//-- Using default action to fetch parameters value
 
@@ -48,7 +66,24 @@ public:
 		bool monitorDetail = Setting::getBool("FPZK.client.attentionServer.monitorDetail", false);
 		_fpzk->monitorDetail(monitorDetail);
 
-		registerMethod("show", &QuestProcessor::show);
+		if (Setting::getBool("FPZK.clinet.serviceAlteredCallback.functional", false))
+		{
+			_fpzk->setServiceAlteredCallback([](std::map<std::string, FPZKClient::ServiceInfosPtr>& serviceInfos){
+				cout<<"[Functional Callabck] following services altered."<<endl;
+				for (auto& pp: serviceInfos)
+				{
+					cout<<"  service: "<<pp.first<<", revision: "<<pp.second->revision<<", current count: "<<pp.second->nodeMap.size()<<endl;
+					for (auto& pp2: pp.second->nodeMap)
+						cout<<"    ep: "<<pp2.first<<endl;
+				}
+			});
+		}
+		if (Setting::getBool("FPZK.clinet.serviceAlteredCallback.object", false))
+		{
+			FPZKClient::ServicesAlteredCallbackPtr cb = std::make_shared<ServicesAlteredCallback>();
+			_fpzk->setServiceAlteredCallback(cb);
+		}
+		
 	}
 	virtual void serverStopped()
 	{

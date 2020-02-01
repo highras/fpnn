@@ -244,6 +244,75 @@ std::string fpnn::NetworkUtil::getFirstIPAddress(enum IPTypes type)
 std::string fpnn::NetworkUtil::getLocalIP4() { return getFirstIPAddress(IPv4_Local); }
 std::string fpnn::NetworkUtil::getPublicIP4() { return getFirstIPAddress(IPv4_Public); }
 
+/*
+std::string fpnn::NetworkUtil::getPeerName(int fd){
+	struct sockaddr_in name;
+	socklen_t namelen = sizeof(name);
+	char ipAddr[INET_ADDRSTRLEN] = {0};
+	if(!getpeername(fd, (struct sockaddr *)&name, &namelen)) {
+		const char* ip = inet_ntop(AF_INET, &name.sin_addr, ipAddr, sizeof(ipAddr));
+		if(ip) return std::string(ip) + ":" + std::to_string(ntohs(name.sin_port));
+	}
+	return std::to_string(fd);
+}*/
+
+std::string fpnn::NetworkUtil::getPeerName(int fd){
+
+	struct sockaddr_storage name = {0};
+	socklen_t namelen = sizeof(name);
+
+	if(!getpeername(fd, (struct sockaddr *)&name, &namelen)) {
+		if (name.ss_family == AF_INET)
+		{
+			char ipAddr[INET_ADDRSTRLEN] = {0};
+			struct sockaddr_in* name4 = (struct sockaddr_in*)&name;
+			const char* ip = inet_ntop(AF_INET, &(name4->sin_addr), ipAddr, sizeof(ipAddr));
+			if(ip) return std::string(ip) + ":" + std::to_string(ntohs(name4->sin_port));
+		}
+		else if (name.ss_family == AF_INET6)
+		{
+			char ipAddr[INET6_ADDRSTRLEN] = {0};
+			struct sockaddr_in6* name6 = (struct sockaddr_in6*)&name;
+			const char* ip = inet_ntop(AF_INET6, &(name6->sin6_addr), ipAddr, sizeof(ipAddr));
+			if(ip) return std::string("[") + std::string(ip) + "]:" + std::to_string(ntohs(name6->sin6_port));
+		}
+	}
+	return std::to_string(fd);
+}
+/*
+std::string fpnn::NetworkUtil::getSockName(int fd){
+	struct sockaddr_in name;
+	socklen_t namelen = sizeof(name);
+	if(!getsockname(fd, (struct sockaddr *)&name, &namelen)) {
+		char* ip = inet_ntoa(name.sin_addr);
+		if(ip) return std::string(ip) + ":" + std::to_string(ntohs(name.sin_port));
+	}
+	return std::to_string(fd);
+}
+*/
+std::string fpnn::NetworkUtil::getSockName(int fd){
+	struct sockaddr_storage name = {0};
+	socklen_t namelen = sizeof(name);
+
+	if(!getsockname(fd, (struct sockaddr *)&name, &namelen)) {
+		if (name.ss_family == AF_INET)
+		{
+			char ipAddr[INET_ADDRSTRLEN] = {0};
+			struct sockaddr_in* name4 = (struct sockaddr_in*)&name;
+			const char* ip = inet_ntop(AF_INET, &(name4->sin_addr), ipAddr, sizeof(ipAddr));
+			if(ip) return std::string(ip) + ":" + std::to_string(ntohs(name4->sin_port));
+		}
+		else if (name.ss_family == AF_INET6)
+		{
+			char ipAddr[INET6_ADDRSTRLEN] = {0};
+			struct sockaddr_in6* name6 = (struct sockaddr_in6*)&name;
+			const char* ip = inet_ntop(AF_INET6, &(name6->sin6_addr), ipAddr, sizeof(ipAddr));
+			if(ip) return std::string("[") + std::string(ip) + "]:" + std::to_string(ntohs(name6->sin6_port));
+		}
+	}
+	return std::to_string(fd);
+}
+
 
 #ifdef TEST_NETWORK_UTIL
 //g++ -g -DTEST_NETWORK_UTIL NetworkUtility.cpp -std=c++11 -lfpbase -L.

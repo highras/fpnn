@@ -51,6 +51,8 @@ namespace NetworkUtil
 	std::string getFirstIPAddress(enum IPTypes type);
 	std::string getLocalIP4();
 	std::string getPublicIP4();
+	std::string getPeerName(int fd);
+	std::string getSockName(int fd);
 }
 
 }

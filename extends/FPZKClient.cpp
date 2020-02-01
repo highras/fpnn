@@ -9,6 +9,8 @@
 #include "StringUtil.h"
 #include "MachineStatus.h"
 #include "NetworkUtility.h"
+#include "TCPEpollServer.h"
+#include "UDPEpollServer.h"
 #include "FPZKClient.h"
 
 using namespace fpnn;
@@ -55,7 +57,6 @@ TCPClientPtr FPZKClient::FPZKLinearProxy::getNextClient(int stopIndex)
 			_clients.erase(iter);
 		}
 	}
-	//_clients.erase(_endpoints[_index]);
 
 	_index++;
 	if (_index >= (int)_endpoints.size())
@@ -125,7 +126,6 @@ FPAnswerPtr FPZKClient::FPZKLinearProxy::sendQuest(FPQuestPtr quest)
 		{
 			case FPZKError::ProjectNotFound:
 			case FPZKError::ProjectTokenNotMatched:
-			case FPZKError::ProjectPermissionDenied:
 			case FPNN_EC_CORE_UNKNOWN_METHOD:
 				return answer;
 
@@ -139,7 +139,7 @@ FPAnswerPtr FPZKClient::FPZKLinearProxy::sendQuest(FPQuestPtr quest)
 					return answer;
 
 				usleep(200000);			//-- 200ms
-				LOG_INFO("------- delay 200 ms for subscribeServicesChange, count: %d", count);
+				LOG_INFO("------- delay 200 ms for subscribeServicesChange, cycle count: %d", count);
 			}
 		}
 	}
@@ -150,50 +150,13 @@ FPAnswerPtr FPZKClient::FPZKLinearProxy::sendQuest(FPQuestPtr quest)
 //======================================//
 //-         Class FPZKClient           -//
 //======================================//
-//std::mutex FPZKClient::_mutex;
-//FPZKClientPtr FPZKClient::_instance = nullptr;
 
 FPZKClient::FPZKClient(const std::string& fpzkSrvList, const std::string& projectName, const std::string& projectToken):
 	_projectName(projectName), _projectToken(projectToken), _online(true), _monitorDetail(false),
-	_supportUnregister(true), _requireUnregistered(false), _requireSync(false), _supportSubscribe(true)
+	_requireUnregistered(false), _requireSync(false), _supportSubscribe(true)
 {
-	_syncForPublic = Setting::getBool("FPZK.client.sync.syncPublicInfo", false);
-
-	_domain = ServerInfo::getServerHostName();
-	_port = Setting::getInt(std::vector<std::string>{
-		"FPNN.server.tcp.ipv4.listening.port",
-		"FPNN.server.ipv4.listening.port",
-		"FPNN.server.listening.port"}, 0);
-	_ipv4 = ServerInfo::getServerLocalIP4();
-	_registeredEndpoint.append(_ipv4).append(":").append(std::to_string(_port));
-	_cluster = Setting::getString("FPNN.server.cluster.name", "");
-
-	_port6 = 0;
-	_sslport = 0;
-	_sslport6 = 0;
-	if (_syncForPublic)
-	{
-		_ipv4 = ServerInfo::getServerPublicIP4();
-		_port6 = Setting::getInt(std::vector<std::string>{
-			"FPNN.server.tcp.ipv6.listening.port",
-			"FPNN.server.ipv6.listening.port",
-			}, 0);
-		{
-			std::map<enum IPTypes, std::set<std::string>> ipDict;
-			if (getIPs(ipDict))
-			{
-				std::set<std::string>& global = ipDict[IPv6_Global];
-				if (global.size() > 0)
-					_ipv6 = *(global.begin());
-			}
-			if (_ipv6.empty())
-				_ipv6 = ServerInfo::getServerPublicIP6();
-		}
-
-		_sslport = Setting::getInt("FPNN.server.tcp.ipv4.ssl.listening.port", 0);
-		_sslport6 = Setting::getInt("FPNN.server.tcp.ipv6.ssl.listening.port", 0);
-	}
-
+	prepareSelfServiceInfo();
+	
 	std::vector<std::string> fpzkEndpoints;
 	StringUtil::split(fpzkSrvList, "\t ,", fpzkEndpoints);
 
@@ -210,6 +173,7 @@ FPZKClient::FPZKClient(const std::string& fpzkSrvList, const std::string& projec
 		_fpzkSrvProxy->setSharedQuestProcessor(_questProcessor);
 	}
 
+	_syncPerformanceInfo = Setting::getBool("FPZK.client.sync.syncPerformanceInfo", false);
 	_outputClusterChangeInfo = Setting::getBool("FPZK.client.debugInfo.clusterChanged.enable", false);
 
 	_startTime = slack_real_msec();
@@ -223,6 +187,73 @@ FPZKClient::~FPZKClient()
 	
 	_running = false;
 	_syncThread.join();
+}
+
+void FPZKClient::prepareSelfServiceInfo()
+{
+	_externalVisible = Setting::getBool("FPZK.client.sync.externalVisible", true);
+	_syncEndpointForPublic = Setting::getBool("FPZK.client.sync.syncEndpoint", true);
+
+	_syncForPublic = Setting::getBool("FPZK.client.sync.syncPublicInfo", false);
+	if (_externalVisible && !_syncEndpointForPublic)
+		_syncForPublic = true;
+
+	_port = Setting::getInt(std::vector<std::string>{
+		"FPNN.server.tcp.ipv4.listening.port",
+		"FPNN.server.ipv4.listening.port",
+		"FPNN.server.listening.port"}, 0);
+	_ipv4 = ServerInfo::getServerLocalIP4();
+	_registeredEndpoint.append(_ipv4).append(":").append(std::to_string(_port));
+	_cluster = Setting::getString("FPNN.server.cluster.name", "");
+
+	_port6 = Setting::getInt(std::vector<std::string>{
+		"FPNN.server.tcp.ipv6.listening.port",
+		"FPNN.server.ipv6.listening.port",
+		}, 0);
+
+	_uport = Setting::getInt(std::vector<std::string>{
+		"FPNN.server.udp.ipv4.listening.port",
+		"FPNN.server.ipv4.listening.port",
+		"FPNN.server.listening.port"}, 0);
+
+	_uport6 = Setting::getInt(std::vector<std::string>{
+		"FPNN.server.udp.ipv6.listening.port",
+		"FPNN.server.ipv6.listening.port",
+		}, 0);
+
+	_sslport = 0;
+	_sslport6 = 0;
+	
+	if (_syncForPublic)
+	{
+		_domain = ServerInfo::getServerHostName();
+		_ipv4 = ServerInfo::getServerPublicIP4();
+
+		_sslport = Setting::getInt("FPNN.server.tcp.ipv4.ssl.listening.port", 0);
+		_sslport6 = Setting::getInt("FPNN.server.tcp.ipv6.ssl.listening.port", 0);
+
+		{
+			std::map<enum IPTypes, std::set<std::string>> ipDict;
+			if (getIPs(ipDict))
+			{
+				std::set<std::string>& global = ipDict[IPv6_Global];
+				if (global.size() > 0)
+					_ipv6 = *(global.begin());
+			}
+			if (_ipv6.empty())
+			{
+				_ipv6 = ServerInfo::getServerPublicIP6();
+				if (_ipv6 == "unknown")
+					_ipv6.clear();
+				else if (strncasecmp("64:ff9b::", _ipv6.c_str(), 9) == 0)
+				{
+					_port6 = _port;
+					_uport6 = _uport;
+					_sslport6 = _sslport;
+				}
+			}
+		}
+	}
 }
 
 //---------- [Begin] Copied & reconstituted from old fpzk client version, which write by biao.zhang. ---------//
@@ -283,29 +314,44 @@ public:
 
 const FPZKClient::ServiceInfosPtr FPZKClient::checkCacheStatus(const std::string& serviceName)
 {
-	bool newInterest = false;
+	bool needResubscribe = _supportSubscribe && (_questProcessor->isSubscribing() == false);
+	if (!needResubscribe)
 	{
-		std::lock_guard<std::mutex> lck(_mutex);
-		auto it = _servicesMap.find(serviceName);
-		if (it != _servicesMap.end())
-			return it->second;
-
-		if (_interestServices.find(serviceName) == _interestServices.end())
+		bool newInterest = false;
 		{
-			newInterest = true;
-			_interestServices.insert(serviceName);
-		}
-	}
+			std::lock_guard<std::mutex> lck(_mutex);
 
-	std::set<std::string> interested{serviceName};
-	if (newInterest)
-	{
-		subscribe(interested);
-		if (_supportSubscribe == false)
+			auto it = _servicesMap.find(serviceName);
+			if (it != _servicesMap.end())
+				return it->second;
+
+			if (_interestServices.find(serviceName) == _interestServices.end())
+			{
+				newInterest = true;
+				_interestServices.insert(serviceName);
+			}
+		}
+
+		std::set<std::string> interested{serviceName};
+		if (newInterest && _supportSubscribe)
+			subscribe(interested);
+		else
 			fetchInterestServices(interested);
 	}
 	else
-		fetchInterestServices(interested);
+	{
+		std::set<std::string> interested;
+		{
+			std::lock_guard<std::mutex> lck(_mutex);
+
+			if (_interestServices.find(serviceName) == _interestServices.end())
+				_interestServices.insert(serviceName);
+
+			interested = _interestServices;
+		}
+
+		subscribe(interested);
+	}
 
 	std::lock_guard<std::mutex> lck(_mutex);
 	{
@@ -339,18 +385,11 @@ void FPZKClient::subscribe(const std::set<std::string>& serviceNames)
 	if (ar.status())
 	{
 		int code = ar.getInt("code");
-		if (code == FPNN_EC_CORE_UNKNOWN_METHOD)
-		{
-			_supportSubscribe = false;
-			return;
-		}
-
 		std::string ex = ar.getString("ex");
-		std::string raiser = ar.getString("raiser");
 		if (code == FPZKError::ProjectNotFound || code == FPZKError::ProjectTokenNotMatched) {
-			LOG_FATAL("subscribeServicesChange failed. code: %d, ex: %s, raiser: %s", code, ex.c_str(), raiser.c_str());
+			LOG_FATAL("subscribeServicesChange failed. code: %d, ex: %s", code, ex.c_str());
 		} else {
-			LOG_ERROR("subscribeServicesChange failed. code: %d, ex: %s, raiser: %s", code, ex.c_str(), raiser.c_str());
+			LOG_ERROR("subscribeServicesChange failed. code: %d, ex: %s", code, ex.c_str());
 		}
 		return;
 	}
@@ -358,43 +397,83 @@ void FPZKClient::subscribe(const std::set<std::string>& serviceNames)
 	updateServicesMapCache(&ar);
 }
 
+void FPZKClient::adjustSelfPortInfo()
+{
+	if (_port == _uport)
+	{
+		if (TCPEpollServer::instance() && UDPEpollServer::instance() == nullptr)
+			_uport = 0;
+		else if (TCPEpollServer::instance() == nullptr && UDPEpollServer::instance())
+			_port = 0;
+	}
+
+	if (_port6 == _uport6)
+	{
+		if (TCPEpollServer::instance() && UDPEpollServer::instance() == nullptr)
+			_uport6 = 0;
+		else if (TCPEpollServer::instance() == nullptr && UDPEpollServer::instance())
+			_port6 = 0;
+	}
+}
+
 bool FPZKClient::syncSelfStatus(float perCPUUsage)
 {
-	int cpuCount = get_nprocs();
-	int connNum = MachineStatus::getConnectionCount();
-	float perCPULoad = MachineStatus::getCPULoad()/cpuCount;
+	int connNum = 0;
+	float perCPULoad = 0.;
+
+	if (_syncPerformanceInfo)
+	{
+		int cpuCount = get_nprocs();
+		connNum = MachineStatus::getConnectionCount();
+		perCPULoad = MachineStatus::getCPULoad()/cpuCount;
+	}
 
 	FPQuestPtr quest;
-	bool onlineStatus = true;
 	std::set<std::string> queriedServices;
 	{
 		std::lock_guard<std::mutex> lck(_mutex);
+
+		adjustSelfPortInfo();
+
 		if (_registeredName.length())
 		{
-			int addedInfoCount = _syncForPublic ? 7 : 0;
+			int totalCount = 23;
+			if (!_syncForPublic)
+				totalCount -= 5;
+			if (!_syncPerformanceInfo)
+				totalCount -= 3;
 
-			FPQWriter qw(12 + addedInfoCount, "syncServerInfo");
+			FPQWriter qw(totalCount, "syncServerInfo");
 			qw.param("project", _projectName);
 			qw.param("projectToken", _projectToken);
 
 			qw.param("serviceName", _registeredName);
+			qw.param("cluster", _cluster);
 			qw.param("srvVersion", _registeredVersion);
 			qw.param("endpoint", _registeredEndpoint);
-			qw.param("cluster", _cluster);
+			
+			if (_syncPerformanceInfo)
+			{
+				qw.param("connNum", connNum);
+				qw.param("perCPULoad", perCPULoad);
+				qw.param("perCPUUsage", perCPUUsage);
+			}
 
-			qw.param("connNum", connNum);
-			qw.param("perCPULoad", perCPULoad);
-			qw.param("perCPUUsage", perCPUUsage);
+			qw.param("online", _online);
+			qw.param("startTime", _startTime);
+
+			qw.param("port", _port);
+			qw.param("port6", _port6);
+			qw.param("uport", _uport);
+			qw.param("uport6", _uport6);
+
+			qw.param("externalVisible", _externalVisible);
+			qw.param("publishEndpoint", _syncEndpointForPublic);
 
 			qw.param("interests", _interestServices);
-			qw.param("online", _online);
-
-			qw.param("startTime", _startTime);
 
 			if (_syncForPublic)
 			{
-				qw.param("port", _port);
-				qw.param("port6", _port6);
 				qw.param("domain", _domain);
 				qw.param("ipv4", _ipv4);
 				qw.param("ipv6", _ipv6);
@@ -403,7 +482,6 @@ bool FPZKClient::syncSelfStatus(float perCPUUsage)
 			}
 
 			quest = qw.take();
-			onlineStatus = _online;
 		}
 		else
 		{
@@ -433,30 +511,39 @@ bool FPZKClient::syncSelfStatus(float perCPUUsage)
 	{
 		int code = ar.getInt("code");
 		std::string ex = ar.getString("ex");
-		std::string raiser = ar.getString("raiser");
 		if (code == FPZKError::ProjectNotFound || code == FPZKError::ProjectTokenNotMatched) {
-			LOG_FATAL("syncServerInfo failed. code: %d, ex: %s, raiser: %s", code, ex.c_str(), raiser.c_str());
+			LOG_FATAL("syncServerInfo failed. code: %d, ex: %s", code, ex.c_str());
 		} else {
-			LOG_ERROR("syncServerInfo failed. code: %d, ex: %s, raiser: %s", code, ex.c_str(), raiser.c_str());
+			LOG_ERROR("syncServerInfo failed. code: %d, ex: %s", code, ex.c_str());
 		}
 		return false;
 	}
 
 	std::map<std::string, int64_t> rvMap = ar.get("revisionMap", std::map<std::string, int64_t>());
+	
+	for (auto& revpair: rvMap)
+		queriedServices.erase(revpair.first);
+
+	for (auto& service: queriedServices)
+	{
+		_servicesMap.erase(service);
+		LOG_INFO("Services %s cluster is empty in FPZK clinet cache!",  service.c_str());
+	}
+
+	updateChangedAndMonitoredServices(rvMap);
+	return true;
+}
+
+void FPZKClient::updateChangedAndMonitoredServices(const std::map<std::string, int64_t>& rvMap)
+{
 	std::set<std::string> needUpdateServices;
 	{
 		std::lock_guard<std::mutex> lck(_mutex);
-		if (_requireUnregistered && !_supportUnregister && !onlineStatus)
-		{
-			_requireUnregistered = false;
-			_registeredName.clear();
-		}
 
-		if (_monitorDetail == false || _detailServices.size())
+		if (_monitorDetail == false)
 		{
 			for (auto& revpair: rvMap)
 			{
-				queriedServices.erase(revpair.first);
 				auto it = _servicesMap.find(revpair.first);
 				if (it != _servicesMap.end())
 				{
@@ -467,28 +554,14 @@ bool FPZKClient::syncSelfStatus(float perCPUUsage)
 					needUpdateServices.insert(revpair.first);
 			}
 
-			if (_monitorDetail)
-				needUpdateServices.insert(_detailServices.begin(), _detailServices.end());
+			needUpdateServices.insert(_detailServices.begin(), _detailServices.end());
 		}
 		else
-		{
-			for (auto& revpair: rvMap)
-				queriedServices.erase(revpair.first);
-
 			needUpdateServices = _interestServices;
-		}
-
-		for (auto& service: queriedServices)
-		{
-			_servicesMap.erase(service);
-			LOG_INFO("Services %s cluster is empty in FPZK clinet cache!",  service.c_str());
-		}
 	}
 
 	if(!needUpdateServices.empty())
 		fetchInterestServices(needUpdateServices);
-
-	return true;
 }
 
 void FPZKClient::resubscribe()
@@ -530,11 +603,10 @@ void FPZKClient::fetchInterestServices(const std::set<std::string>& serviceNames
 	{
 		int code = ar.getInt("code");
 		std::string ex = ar.getString("ex");
-		std::string raiser = ar.getString("raiser");
 		if (code == FPZKError::ProjectNotFound || code == FPZKError::ProjectTokenNotMatched) {
-			LOG_FATAL("getServiceInfo failed. code: %d, ex: %s, raiser: %s", code, ex.c_str(), raiser.c_str());
+			LOG_FATAL("getServiceInfo failed. code: %d, ex: %s", code, ex.c_str());
 		} else {
-			LOG_ERROR("getServiceInfo failed. code: %d, ex: %s, raiser: %s", code, ex.c_str(), raiser.c_str());
+			LOG_ERROR("getServiceInfo failed. code: %d, ex: %s", code, ex.c_str());
 		}
 		return;
 	}
@@ -617,18 +689,23 @@ void FPZKClient::updateServicesMapCache(FPReader* reader)
 			std::string endpoint;
 			ServiceNode sn;
 
+			/*
+			  Fields：
+				"endpoint", "region", "srvVersion", "registerTime", "lastMTime", "online",
+				"connNum", "loadAvg", "cpuUsage",
+				"ipv4", "ipv6", "domain", 
+				"port", "port6", "sslport", "sslport6", "uport", "uport6"
+			*/
+
 			for (int k = 0; k < (int)nodeInfos.size(); k++)
 			{
 				if(nodeInfoFields[k] =="endpoint")
 					endpoint = nodeInfos[k];
+				else if(nodeInfoFields[k] =="region")
+					sn.region = nodeInfos[k];
 				else if(nodeInfoFields[k] =="srvVersion")
 					sn.version = nodeInfos[k];
-				else if(nodeInfoFields[k] =="connNum")
-					sn.connCount = stoi(nodeInfos[k]);
-				else if(nodeInfoFields[k] =="loadAvg")
-					sn.loadAvg = stof(nodeInfos[k]);
-				else if(nodeInfoFields[k] =="cpuUsage")
-					sn.CPULoad = stof(nodeInfos[k]);
+
 				else if(nodeInfoFields[k] =="registerTime")
 					sn.registerTime = stoll(nodeInfos[k]);
 				else if(nodeInfoFields[k] =="lastMTime")
@@ -636,20 +713,35 @@ void FPZKClient::updateServicesMapCache(FPReader* reader)
 				else if(nodeInfoFields[k] =="online")
 					sn.online = (nodeInfos[k] == "true"? true : false);
 
-				else if(nodeInfoFields[k] =="port")
-					sn.port = stoi(nodeInfos[k]);
-				else if(nodeInfoFields[k] =="port6")
-					sn.port6 = stoi(nodeInfos[k]);
-				else if(nodeInfoFields[k] =="domain")
-					sn.domain = nodeInfos[k];
+				else if(nodeInfoFields[k] =="connNum")
+					sn.connCount = stoi(nodeInfos[k]);
+				else if(nodeInfoFields[k] =="loadAvg")
+					sn.loadAvg = stof(nodeInfos[k]);
+				else if(nodeInfoFields[k] =="cpuUsage")
+					sn.CPULoad = stof(nodeInfos[k]);
+				
 				else if(nodeInfoFields[k] =="ipv4")
 					sn.ipv4 = nodeInfos[k];
 				else if(nodeInfoFields[k] =="ipv6")
 					sn.ipv6 = nodeInfos[k];
+				else if(nodeInfoFields[k] =="domain")
+					sn.domain = nodeInfos[k];
+				
+
+				else if(nodeInfoFields[k] =="port")
+					sn.port = stoi(nodeInfos[k]);
+				else if(nodeInfoFields[k] =="port6")
+					sn.port6 = stoi(nodeInfos[k]);
+				
 				else if(nodeInfoFields[k] =="sslport")
 					sn.sslport = stoi(nodeInfos[k]);
 				else if(nodeInfoFields[k] =="sslport6")
 					sn.sslport6 = stoi(nodeInfos[k]);
+
+				else if(nodeInfoFields[k] =="uport")
+					sn.uport = stoi(nodeInfos[k]);
+				else if(nodeInfoFields[k] =="uport6")
+					sn.uport6 = stoi(nodeInfos[k]);
 			}
 
 			if (endpoint.length())
@@ -662,9 +754,28 @@ void FPZKClient::updateServicesMapCache(FPReader* reader)
 		updatedServices[service] = sip;
 	}
 
+	ServicesAlteredCallbackPtr alteredCb;
+	std::map<std::string, ServiceInfosPtr> alteredServices;
 	{
 		std::lock_guard<std::mutex> lck(_mutex);
 		{
+			//-- prepare services altered notification.
+			if (_serviceAlteredCallback)
+			{
+				alteredCb = _serviceAlteredCallback;
+
+				for (auto& service: invalidServices)
+					alteredServices[service] = std::make_shared<ServiceInfos>();
+
+				for (auto& updatedPair: updatedServices)
+				{
+					auto it = _servicesMap.find(updatedPair.first);
+					if (it == _servicesMap.end() || it->second->revision != updatedPair.second->revision)
+						alteredServices[updatedPair.first] = updatedPair.second;
+				}
+			}
+
+			//-- Normal update FPZK client's caches
 			for (auto& service: invalidServices)
 			{
 				_servicesMap.erase(service);
@@ -676,16 +787,17 @@ void FPZKClient::updateServicesMapCache(FPReader* reader)
 		}
 	}
 
+	if (alteredCb && alteredServices.size())
+	{
+		ServicesAlteredCallbackTaskPtr t(new ServicesAlteredCallbackTask);
+
+		t->_callback = alteredCb;
+		t->_alteredServices.swap(alteredServices);
+		ClientEngine::wakeUpAnswerCallbackThreadPool(t);
+	}
+
 	if (_outputClusterChangeInfo)
 		logClusterChange(updatedServices, invalidServices);
-}
-void FPZKClient::doUnregisterService()
-{
-	if (_supportUnregister)
-		unregisterSelf();
-
-	if (!_supportUnregister)
-		syncSelfStatus(0);
 }
 void FPZKClient::unregisterSelf()
 {
@@ -718,38 +830,33 @@ void FPZKClient::unregisterSelf()
 	if (ar.status())
 	{
 		int code = ar.getInt("code");
-		if (code == FPNN_EC_CORE_UNKNOWN_METHOD)
-		{
-			_supportUnregister = false;
-			return;
-		}
-
 		std::string ex = ar.getString("ex");
-		std::string raiser = ar.getString("raiser");
 		if (code == FPZKError::ProjectNotFound || code == FPZKError::ProjectTokenNotMatched) {
-			LOG_FATAL("unregisterService failed. code: %d, ex: %s, raiser: %s", code, ex.c_str(), raiser.c_str());
+			LOG_FATAL("unregisterService failed. code: %d, ex: %s", code, ex.c_str());
 		} else {
-			LOG_ERROR("unregisterService failed. code: %d, ex: %s, raiser: %s", code, ex.c_str(), raiser.c_str());
+			LOG_ERROR("unregisterService failed. code: %d, ex: %s", code, ex.c_str());
 		}
 		return;
 	}
 
+	std::lock_guard<std::mutex> lck(_mutex);
 	_requireUnregistered = false;
 	_registeredName.clear();
 }
+
 void FPZKClient::syncFunc()
 {
 	CPUUsage cpuUsage;
 
 	while (_running)
 	{
-		int cyc = 5 * 2;		//- 2 seconds
+		int cyc = 10 * 2;		//- 2 seconds
 		while (!_requireSync && _running && cyc--)
-			usleep(200*1000);
+			usleep(100*1000);
 
 		_requireSync = false;
 		if (_requireUnregistered)
-			doUnregisterService();
+			unregisterSelf();
 
 		if (!_running)
 			return;
@@ -861,7 +968,12 @@ const FPZKClient::ServiceInfosPtr FPZKClient::getServiceInfos(const std::string&
 			continue;
 
 		if (version.length() && version != nodePair.second.version)
+		{
+			if (nodePair.second.online)
+				revSip->onlineCount -= 1;
+
 			continue;
+		}
 
 		revSip->nodeMap[nodePair.first] = nodePair.second;
 	}
@@ -888,10 +1000,10 @@ std::vector<std::string> FPZKClient::getServiceEndpoints(const std::string& serv
 	return revc;
 }
 
-std::vector<std::string> FPZKClient::getServiceEndpointsWithoutMyself(const std::string& serviceName, const std::string& cluster, const std::string& version, bool onlineOnly){
+std::vector<std::string> FPZKClient::getServiceEndpointsWithoutMyself(const std::string& serviceName, const std::string& cluster, const std::string& version, bool onlineOnly) {
 	std::vector<std::string> revc = getServiceEndpoints(serviceName, cluster, version, onlineOnly);
-	for(size_t i = 0; i < revc.size(); ++i){
-		if(revc[i] == _registeredEndpoint){
+	for (size_t i = 0; i < revc.size(); ++i) {
+		if (revc[i] == _registeredEndpoint) {
 			revc.erase(revc.begin() + i);
 			break;
 		}
@@ -899,7 +1011,7 @@ std::vector<std::string> FPZKClient::getServiceEndpointsWithoutMyself(const std:
 	return revc;
 }
 
-std::string FPZKClient::getOldestServiceEndpoint(const std::string& serviceName, const std::string& cluster, const std::string& version, bool onlineOnly){
+std::string FPZKClient::getOldestServiceEndpoint(const std::string& serviceName, const std::string& cluster, const std::string& version, bool onlineOnly) {
 	std::string endpoint;
 	int32_t cur = slack_real_sec() + 1000;
 	const ServiceInfosPtr sip = checkCacheStatus(clusteredServiceName(serviceName, cluster));
@@ -913,7 +1025,7 @@ std::string FPZKClient::getOldestServiceEndpoint(const std::string& serviceName,
 			if (version.length() && version != nodePair.second.version)
 				continue;
 
-			if(nodePair.second.registerTime < cur){
+			if (nodePair.second.registerTime < cur) {
 				cur = nodePair.second.registerTime;
 				endpoint = nodePair.first;
 			}

@@ -5,6 +5,7 @@
 #include "TCPEpollServer.h"
 #include "ServerIOWorker.h"
 #include "ConnectionReclaimer.h"
+#include "NetworkUtility.h"
 
 using namespace fpnn;
 
@@ -38,7 +39,7 @@ bool TCPServerConnection::waitForAllEvents()
 
 	if (epoll_ctl(_epoll_fd, EPOLL_CTL_MOD, _connectionInfo->socket, &ev) != 0)
 	{
-		LOG_ERROR("Server wait socket event failed. Socket: %d, errno: %d", _connectionInfo->socket, errno);
+		LOG_ERROR("Server wait socket event failed. Socket: %d, address: %s, errno: %d", _connectionInfo->socket, NetworkUtil::getPeerName(_connectionInfo->socket).c_str(), errno);
 		return false;
 	}
 	else
@@ -56,7 +57,7 @@ bool TCPServerConnection::waitForRecvEvent()
 
 	if (epoll_ctl(_epoll_fd, EPOLL_CTL_MOD, _connectionInfo->socket, &ev) != 0)
 	{
-		LOG_ERROR("Server wait socket event failed. Socket: %d, errno: %d", _connectionInfo->socket, errno);
+		LOG_ERROR("Server wait socket event failed. Socket: %d, address: %s, errno: %d", _connectionInfo->socket, NetworkUtil::getPeerName(_connectionInfo->socket).c_str(), errno);
 		return false;
 	}
 	else
@@ -91,7 +92,7 @@ bool TCPServerIOWorker::read(TCPServerConnection * connection, bool& additionalS
 		if (connection->recvPackage(needNextEvent) == false)
 		{
 			connection->_recvBuffer.returnToken();
-			LOG_ERROR("Error occurred when server receiving. Connection will be closed soon. %s", connection->_connectionInfo->str().c_str());
+			LOG_WARN("Error occurred when server receiving. Connection will be closed soon. %s", connection->_connectionInfo->str().c_str());
 			return false;
 		}
 		
@@ -109,7 +110,7 @@ bool TCPServerIOWorker::read(TCPServerConnection * connection, bool& additionalS
 		bool status = connection->_recvBuffer.fetch(quest, answer, isHTTP);
 		if (status == false)
 		{
-			LOG_ERROR("Server receiving & decoding data error. Connection will be closed soon. %s", connection->_connectionInfo->str().c_str());
+			LOG_WARN("Server receiving & decoding data error. Connection will be closed soon. %s", connection->_connectionInfo->str().c_str());
 			return false;
 		}
 		if (isHTTP == false)
@@ -242,13 +243,13 @@ bool TCPServerIOWorker::processECDH(TCPServerConnection * connection, FPQuestPtr
 	}
 	catch (const FpnnError& ex)
 	{
-		LOG_ERROR("%s Connection will be closed by server. %s, exception:(%d)%s",
+		LOG_ERROR("%s Connection will be closed by server when ECDH. %s, exception:(%d)%s",
 			reason, connection->_connectionInfo->str().c_str(), ex.code(), ex.what());
 		return false;
 	}
 	catch (...)
 	{
-		LOG_ERROR("%s Connection will be closed by server. %s", reason, connection->_connectionInfo->str().c_str());
+		LOG_ERROR("%s Connection will be closed by server when ECDH. %s", reason, connection->_connectionInfo->str().c_str());
 		return false;
 	}
 }
@@ -325,7 +326,7 @@ bool TCPServerIOWorker::deliverQuest(TCPServerConnection * connection, FPQuestPt
 	{
 		if (Config::_server_user_methods_force_encrypted && !connection->isEncrypted())
 		{
-			LOG_ERROR("All user methods reuiqre encrypted. Unencrypted connection will visit %s. Connection will be closed by server. %s",
+			LOG_WARN("All user methods reuiqre encrypted. Unencrypted connection will visit %s. Connection will be closed by server. %s",
 				questMethod.c_str(), connection->_connectionInfo->str().c_str());
 
 			delete requestPackage;

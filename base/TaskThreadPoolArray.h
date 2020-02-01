@@ -54,7 +54,7 @@ public:
 		int realMax = maxCount / count;
 		size_t realMaxQueueLength = maxQueueLength / count;
 
-		if (!realInit) realInit = 1;
+		if (initCount && !realInit) realInit = 1;
 		if (!realPerfect) realPerfect = 1;
 		if (!realMax) realMax = 1;
 		if (perAppendCount && !realAppend) realAppend = 1;

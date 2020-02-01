@@ -1,5 +1,7 @@
 # FPNN Client Advanced Tutorial
 
+[TOC]
+
 ## * 请求超时
 
 FPNN 中，客户端一共有3类请求超时。分别是 全局配置中的请求超时，client 实例的请求超时，sendQuest() 接口的请求超时。  
@@ -178,27 +180,15 @@ TCPClient 的接口
 
 * duplex 的提前返回
 
-	+ FPNN v.2.0.2  之前版本，默认情况下，duplex client 不允许提前返回。
-
-		在 duplex client 中启用提前返回，请调用 TCPClient::enableAdvanceAnswer() 系列接口。
-
-	+ FPNN v.2.0.2 及之后版本，自动启用提前返回，无需调用接口启用。
-
-	其余细节与服务端的提前返回完全相同，请参考 [FPNN 服务端高级使用说明](fpnn-server-advanced-tutorial.md) 相关部分。
+	具体细节与服务端的提前返回完全相同，请参考 [FPNN 服务端高级使用说明](fpnn-server-advanced-tutorial.md) 相关部分。
 
 
 * duplex 的异步返回
 
-	+ FPNN v.2.0.2  之前版本，默认情况下，duplex client 不允许异步返回。
-	
-		在 duplex client 中启用异步返回，请调用 TCPClient::enableAdvanceAnswer() 系列接口。
-
-	+ FPNN v.2.0.2 及之后版本，自动启用异步返回，无需调用接口启用。
-
-	其余细节与服务端的提前返回完全相同，请参考 [FPNN 服务端高级使用说明](fpnn-server-advanced-tutorial.md) 相关部分。
+	具体细节与服务端的异步返回完全相同，请参考 [FPNN 服务端高级使用说明](fpnn-server-advanced-tutorial.md) 相关部分。
 
 
 	+ 追踪异步返回异常
 
-		所有细节与服务端的提前返回完全相同，请参考 [FPNN 服务端高级使用说明](fpnn-server-advanced-tutorial.md) 相关部分。
+		具体细节与服务端的异步返回完全相同，请参考 [FPNN 服务端高级使用说明](fpnn-server-advanced-tutorial.md) 相关部分。
 

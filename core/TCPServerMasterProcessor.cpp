@@ -66,7 +66,11 @@ FPAnswerPtr TCPServerMasterProcessor::tune(const FPReaderPtr args, const FPQuest
 	}
 	catch (const FpnnError& ex){
 		LOG_ERROR("Error in tune:(%d)%s", ex.code(), ex.what());
-	}   
+	}
+	catch (const std::exception& ex)
+	{
+		LOG_ERROR("Error in tune: %s", ex.what());
+	}
 	catch (...)
 	{   
 		LOG_ERROR("Unknown Error when quest user tune");
@@ -116,6 +120,15 @@ void TCPServerMasterProcessor::dealQuest(RequestPackage * requestPackage)
 					answer = FpnnErrorAnswer(quest, ex.code(), std::string(ex.what()) + ", " + requestPackage->_connectionInfo->str());
 			}
 		}
+		catch (const std::exception& ex)
+		{
+			LOG_ERROR("processQuest() Exception: %s. %s", ex.what(), requestPackage->_connectionInfo->str().c_str());
+			if (quest->isTwoWay())
+			{
+				if (_questProcessor->getQuestAnsweredStatus() == false)
+					answer = FpnnErrorAnswer(quest, FPNN_EC_CORE_UNKNOWN_ERROR, std::string(ex.what()) + ", " + requestPackage->_connectionInfo->str());
+			}
+		}
 		catch (...)
 		{
 			LOG_ERROR("Unknow error when calling processQuest() function. %s", requestPackage->_connectionInfo->str().c_str());
@@ -160,6 +173,11 @@ void TCPServerMasterProcessor::dealQuest(RequestPackage * requestPackage)
 			answer = FpnnErrorAnswer(quest, ex.code(), std::string(ex.what()) + ", " + requestPackage->_connectionInfo->str());
 			raw = answer->raw();
 		}
+		catch (const std::exception& ex)
+		{
+			answer = FpnnErrorAnswer(quest, FPNN_EC_CORE_UNKNOWN_ERROR, std::string(ex.what()) + ", " + requestPackage->_connectionInfo->str());
+			raw = answer->raw();
+		}
 		catch (...)
 		{
 			/**  close the connection is to complex, so, return a error answer. It alway success? */
@@ -185,11 +203,20 @@ void TCPServerMasterProcessor::run(RequestPackage * requestPackage)
 			return;
 		}
 		catch (const FpnnError& ex){
-			LOG_ERROR("Fatal error occurred when deal quest:(%d)%s. Connection will be closed by server. %s", ex.code(), ex.what(), requestPackage->_connectionInfo->str().c_str());
+			LOG_ERROR("Fatal error occurred when deal quest:(%d)%s, seq: %u. Connection will be closed by server. %s",
+				ex.code(), ex.what(), requestPackage->_quest->seqNumLE(), requestPackage->_connectionInfo->str().c_str());
+		}
+		catch (const std::exception& ex)
+		{
+			FPQuestPtr quest = requestPackage->_quest;
+			LOG_ERROR("Fatal error occurred when deal quest, method: %s, seq: %u. Error: %s, Connection will be closed by server. %s",
+				quest->method().c_str(), quest->seqNumLE(), ex.what(), requestPackage->_connectionInfo->str().c_str());
 		}
 		catch (...)
 		{
-			LOG_ERROR("Fatal error occurred when deal quest. Connection will be closed by server. %s", requestPackage->_connectionInfo->str().c_str());
+			FPQuestPtr quest = requestPackage->_quest;
+			LOG_ERROR("Fatal error occurred when deal quest, method: %s, seq: %u. Connection will be closed by server. %s",
+				quest->method().c_str(), quest->seqNumLE(), requestPackage->_connectionInfo->str().c_str());
 		}
 
 		//exception processor
@@ -233,6 +260,10 @@ void TCPServerMasterProcessor::run(RequestPackage * requestPackage)
 		catch (const FpnnError& ex){
 			LOG_ERROR("connected() error:(%d)%s. %s", ex.code(), ex.what(), requestPackage->_connectionInfo->str().c_str());
 		}
+		catch (const std::exception& ex)
+		{
+			LOG_ERROR("connected() error: %s. %s", ex.what(), requestPackage->_connectionInfo->str().c_str());
+		}
 		catch (...)
 		{
 			LOG_ERROR("Unknown error when calling connected() function. %s", requestPackage->_connectionInfo->str().c_str());
@@ -260,6 +291,10 @@ void TCPServerMasterProcessor::run(RequestPackage * requestPackage)
 		}
 		catch (const FpnnError& ex){
 			LOG_ERROR("connectionWillClose(..., %s) error:(%d)%s. %s", paramDesc, ex.code(), ex.what(), requestPackage->_connectionInfo->str().c_str());
+		}
+		catch (const std::exception& ex)
+		{
+			LOG_ERROR("connectionWillClose(..., %s) error: %s. %s", paramDesc, ex.what(), requestPackage->_connectionInfo->str().c_str());
 		}
 		catch (...)
 		{

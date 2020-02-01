@@ -122,6 +122,12 @@ bool ClientEngine::initClientVaribles(){
 	return true;
 }
 
+int getCPUCount()
+{
+	int cpuCount = get_nprocs();
+	return (cpuCount < 2) ? 2 : cpuCount;
+}
+
 void ClientEngine::prepare()
 {
 	const size_t minIOBufferChunkSize = 64;
@@ -146,8 +152,16 @@ void ClientEngine::prepare()
 		_ioPool->init(_ioThreadMin, 1, _ioThreadMin, _ioThreadMax);
 	}
 
-	if (!_questProcessPool.inited() && _duplexThreadMin > 0 && _duplexThreadMax > 0)
-		configQuestProcessThreadPool(_duplexThreadMin, 1, _duplexThreadMin, _duplexThreadMax, _questProcessPoolMaxQueueLength);
+	if (!_questProcessPool.inited())
+	{
+		if (_duplexThreadMin > 0 && _duplexThreadMax > 0)
+			configQuestProcessThreadPool(_duplexThreadMin, 1, _duplexThreadMin, _duplexThreadMax, _questProcessPoolMaxQueueLength);
+		else
+		{
+			int cpuCount = getCPUCount();
+			configQuestProcessThreadPool(0, 1, cpuCount, cpuCount, _questProcessPoolMaxQueueLength);
+		}
+	}
 }
 
 bool ClientEngine::init()
@@ -414,7 +428,7 @@ void ClientEngine::sendData(int socket, uint64_t token, std::string* data)
 	if (!_connectionMap.sendData(socket, token, data))
 	{
 		delete data;
-		LOG_WARN("Data not send at socket %d. socket maybe closed.", socket);
+		LOG_WARN("Data not send at socket %d, address: %s. socket maybe closed.", socket, NetworkUtil::getPeerName(socket).c_str());
 	}
 }
 
@@ -468,7 +482,7 @@ bool ClientEngine::waitForEvents(uint32_t baseEvent, const BasicConnection* conn
 
 	if (epoll_ctl(_epoll_fd, EPOLL_CTL_MOD, connection->socket(), &ev) != 0)
 	{
-		LOG_ERROR("Client engine wait socket event failed. Socket: %d, errno: %d", connection->socket(), errno);
+		LOG_ERROR("Client engine wait socket event failed. Socket: %d, address: %s, errno: %d", connection->socket(),NetworkUtil::getPeerName(connection->socket()).c_str(), errno);
 		return false;
 	}
 	else

@@ -66,6 +66,10 @@ IAsyncAnswerPtr IQuestProcessor::genAsyncAnswer()
 	if (gtl_answerStatus->_answered)
 		return nullptr;
 
+	//-- 后续判断。确保业务没有判断也能正常执行。
+	// if (gtl_answerStatus->_quest->isOneWay())
+	//	return nullptr;
+
 	IAsyncAnswerPtr async;
 
 	if (standardInterface(*(gtl_answerStatus->_connInfo)))

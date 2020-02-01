@@ -69,8 +69,12 @@ namespace fpnn
 		}
 		~ConnectionReclaimer()
 		{
-			_running = false;
-			_condition.notify_all();
+			{
+				_running = false;
+				std::unique_lock<std::mutex> lck(_mutex);
+				_condition.notify_all();
+			}
+			
 			_reclaimer.join();
 		}
 

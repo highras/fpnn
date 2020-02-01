@@ -23,6 +23,8 @@ class JsonStringEscaper
 	}
 	void slash(std::ostream& os, const char * start, int len, int & idx)
 	{
+		os << "\\\\";
+		/*
 		if (idx + 1 < len
 			&& (start[idx+1] == '"'
 				|| start[idx+1] == '\\'
@@ -40,6 +42,7 @@ class JsonStringEscaper
 		}
 		else
 			os << "\\\\";
+		*/
 
 	}
 	void jsonSpecialChars(std::ostream& os, const char * start, int len, int & idx)
@@ -100,36 +103,36 @@ public:
     	for (int i = 0; i < len; i++)
     	{
     		if ((p[i] & 0x80) == 0x00)
-    			(this->*_callMap[(unsigned char)(*p)])(os, p, len, i);
+    			(this->*_callMap[(unsigned char)(p[i])])(os, p, len, i);
     		else
     		{
-    			if ((i & mark2) == utf82 && i + 1 < len)
+    			if ((p[i] & mark2) == utf82 && i + 1 < len)
 				{
 					os << p[i] << p[i+1];
 					i += 1;
 				}
-				else if ((i & mark3) == utf83 && i + 2 < len)
+				else if ((p[i] & mark3) == utf83 && i + 2 < len)
 				{
 					os << p[i] << p[i+1] << p[i+2];
 					i += 2;
 				}
-				else if ((i & mark4) == utf84 && i + 3 < len)
+				else if ((p[i] & mark4) == utf84 && i + 3 < len)
 				{
 					os << p[i] << p[i+1] << p[i+2] << p[i+3];
 					i += 3;
 				}
-				else if ((i & mark5) == utf85 && i + 4 < len)
+				else if ((p[i] & mark5) == utf85 && i + 4 < len)
 				{
 					os << p[i] << p[i+1] << p[i+2] << p[i+3] << p[i+4];
 					i += 4;
 				}
-				else if ((i & mark6) == utf86 && i + 5 < len)
+				else if ((p[i] & mark6) == utf86 && i + 5 < len)
 				{
 					os << p[i] << p[i+1] << p[i+2] << p[i+3] << p[i+4] << p[i+5];
 					i += 5;
 				}
 				else
-					(this->*_callMap[(unsigned char)(*p)])(os, p, len, i);
+					(this->*_callMap[(unsigned char)(p[i])])(os, p, len, i);
     		}
     	}
 
@@ -170,6 +173,11 @@ std::ostream& Json::output(std::ostream& os) const
 	else if (_type == JSON_Integer)
 	{
 		intmax_t * data = (intmax_t*)_data;
+		os << (*data);
+	}
+	else if (_type == JSON_UInteger)
+	{
+		uintmax_t * data = (uintmax_t*)_data;
 		os << (*data);
 	}
 	else if (_type == JSON_Object)
@@ -299,7 +307,6 @@ JsonPtr Json::getNodeByIndex(int index)
 JsonPtr Json::getNode(const std::string& path, const std::string& delim)
 {
 	std::vector<std::string> sections;
-	//StringUtil::split(path, delim, sections);
 	pathSplit(path, delim, sections);
 
 	if (sections.empty())
@@ -318,7 +325,6 @@ JsonPtr Json::getParentNode(const std::string& path, const std::string& delim, s
 	nodeNotFound = false;
 
 	std::vector<std::string> sections;
-	//StringUtil::split(path, delim, sections);
 	pathSplit(path, delim, sections);
 
 	if (sections.empty())
@@ -358,7 +364,6 @@ JsonPtr Json::getParentNode(const std::string& path, const std::string& delim, s
 JsonPtr Json::createNode(const std::string& path, const std::string& delim, bool throwable)
 {
 	std::vector<std::string> sections;
-	//StringUtil::split(path, delim, sections);
 	pathSplit(path, delim, sections);
 
 	if (sections.empty())
@@ -454,6 +459,13 @@ void Json::clean()
 			break;
 		}
 
+		case JSON_UInteger:
+		{
+			uintmax_t * data = (uintmax_t*)_data;
+			delete data;
+			break;
+		}
+
 		case JSON_Real:
 		{
 			double * data = (double*)_data;
@@ -504,6 +516,21 @@ void Json::setInt(intmax_t value)
 	else
 	{
 		intmax_t *data = (intmax_t*)_data;
+		*data = value;
+	}
+}
+
+void Json::setUInt(uintmax_t value)
+{
+	if (_type != JSON_UInteger)
+	{
+		clean();
+		_type = JSON_UInteger;
+		_data = new uintmax_t(value);
+	}
+	else
+	{
+		uintmax_t *data = (uintmax_t*)_data;
 		*data = value;
 	}
 }
@@ -590,11 +617,6 @@ void Json::setDict()
 }
 
 //======================================//
-//-      Advanced set functions        -//
-//======================================//
-
-
-//======================================//
 //-       Basic push functions         -//
 //======================================//
 bool Json::pushNode(JsonPtr node)
@@ -634,11 +656,6 @@ JsonPtr Json::pushDict()
 }
 
 //======================================//
-//-      Advanced push functions       -//
-//======================================//
-
-
-//======================================//
 //-      Pathlized push Function       -//
 //======================================//
 void Json::pushNull(const std::string& path, const std::string& delim)
@@ -672,6 +689,15 @@ void Json::pushInt(const std::string& path, intmax_t value, const std::string& d
 {
 	JsonPtr node = createNode(path, delim, true);
 	if (node->pushInt(value))
+		return;
+
+	throw FPNN_ERROR_MSG(FpnnJsonNodeTypeMissMatchError, "Target node is not array.");
+}
+
+void Json::pushUInt(const std::string& path, uintmax_t value, const std::string& delim)
+{
+	JsonPtr node = createNode(path, delim, true);
+	if (node->pushUInt(value))
 		return;
 
 	throw FPNN_ERROR_MSG(FpnnJsonNodeTypeMissMatchError, "Target node is not array.");
@@ -735,6 +761,7 @@ bool Json::addNode(const std::string& key, JsonPtr node)
 	return true;
 }
 
+/*
 bool Json::dictAddNull(const std::string& key)
 {
 	JsonPtr node(new Json());
@@ -747,7 +774,7 @@ JsonPtr Json::dictAddArray(const std::string& key)
 	JsonPtr node(new Json());
 	node->setArray();
 	return (addNode(key, node) ? node : nullptr);
-}
+}*/
 
 JsonPtr Json::dictAddObject(const std::string& key)
 {
@@ -755,10 +782,6 @@ JsonPtr Json::dictAddObject(const std::string& key)
 	node->setDict();
 	return (addNode(key, node) ? node : nullptr);
 }
-
-//======================================//
-//-     Advanced add functions       -//
-//======================================//
 
 //======================================//
 //-     Pathlized add Function       -//
@@ -786,6 +809,15 @@ void Json::addInt(const std::string& path, intmax_t value, const std::string& de
 	JsonPtr node = createNode(path, delim, true);
 	if (node->type() == JSON_Uninit)
 		node->setInt(value);
+	else
+		throw FPNN_ERROR_MSG(FpnnJosnNodeExistError, "Node has existed.");
+}
+
+void Json::addUInt(const std::string& path, uintmax_t value, const std::string& delim)
+{
+	JsonPtr node = createNode(path, delim, true);
+	if (node->type() == JSON_Uninit)
+		node->setUInt(value);
 	else
 		throw FPNN_ERROR_MSG(FpnnJosnNodeExistError, "Node has existed.");
 }
@@ -840,15 +872,6 @@ JsonPtr Json::addDict(const std::string& path, const std::string& delim)
 	else
 		throw FPNN_ERROR_MSG(FpnnJosnNodeExistError, "Node has existed.");
 }
-
-//======================================//
-//-     Advanced merge functions       -//
-//======================================//
-
-//======================================//
-//-     Pathlized merge Function       -//
-//======================================//
-
 
 //======================================//
 //-         Remove sub-Node            -//
@@ -933,6 +956,28 @@ intmax_t Json::getInt(intmax_t dft) const
 	if (_type == JSON_Integer)
 		return *((intmax_t*)_data);
 
+	if (_type == JSON_UInteger)
+	{
+		intmax_t v = (intmax_t)(*((uintmax_t*)_data));
+		if (v >= 0)
+			return v;
+	}
+
+	return dft;
+}
+
+uintmax_t Json::getUInt(uintmax_t dft) const
+{
+	if (_type == JSON_UInteger)
+		return *((uintmax_t*)_data);
+
+	if (_type == JSON_Integer)
+	{
+		intmax_t v = *((intmax_t*)_data);
+		if (v >= 0)
+			return (uintmax_t)v;
+	}
+
 	return dft;
 }
 
@@ -983,6 +1028,28 @@ intmax_t Json::wantInt() const throw(FpnnJsonNodeTypeMissMatchError)
 {
 	if (_type == JSON_Integer)
 		return *((intmax_t*)_data);
+
+	if (_type == JSON_UInteger)
+	{
+		intmax_t v = (intmax_t)(*((uintmax_t*)_data));
+		if (v >= 0)
+			return v;
+	}
+
+	throw FPNN_ERROR_MSG(FpnnJsonNodeTypeMissMatchError, "Node type miss match.");
+}
+
+uintmax_t Json::wantUInt() const throw(FpnnJsonNodeTypeMissMatchError)
+{
+	if (_type == JSON_UInteger)
+		return *((uintmax_t*)_data);
+
+	if (_type == JSON_Integer)
+	{
+		intmax_t v = *((intmax_t*)_data);
+		if (v >= 0)
+			return (uintmax_t)v;
+	}
 
 	throw FPNN_ERROR_MSG(FpnnJsonNodeTypeMissMatchError, "Node type miss match.");
 }
@@ -1141,6 +1208,15 @@ intmax_t Json::getInt(const std::string& path, intmax_t dft, const std::string& 
 		return dft;
 }
 
+uintmax_t Json::getUInt(const std::string& path, uintmax_t dft, const std::string& delim)
+{
+	JsonPtr node = getNode(path, delim);
+	if (node)
+		return node->getUInt(dft);
+	else
+		return dft;
+}
+
 double Json::getReal(const std::string& path, double dft, const std::string& delim)
 {
 	JsonPtr node = getNode(path, delim);
@@ -1199,6 +1275,15 @@ intmax_t Json::wantInt(const std::string& path, const std::string& delim) throw(
 	JsonPtr node = getNode(path, delim);
 	if (node)
 		return node->wantInt();
+	
+	throw FPNN_ERROR_MSG(FpnnJosnNodeNotExistError, "Target node doesn't exist.");
+}
+
+uintmax_t Json::wantUInt(const std::string& path, const std::string& delim) throw(FpnnLogicError)
+{
+	JsonPtr node = getNode(path, delim);
+	if (node)
+		return node->wantUInt();
 	
 	throw FPNN_ERROR_MSG(FpnnJosnNodeNotExistError, "Target node doesn't exist.");
 }

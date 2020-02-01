@@ -77,7 +77,8 @@ namespace fpnn
 				}
 
 				TCPClientPtr client = createTCPClient(_endpoints[index], connect);
-				result[client].insert(key);
+				if (client)
+					result[client].insert(key);
 			}
 
 			if (result.empty())
@@ -117,7 +118,8 @@ namespace fpnn
 				}
 
 				TCPClientPtr client = createTCPClient(_endpoints[index], connect);
-				result[client].push_back(key);
+				if (client)
+					result[client].push_back(key);
 			}
 
 			if (result.empty())
@@ -157,7 +159,8 @@ namespace fpnn
 				}
 
 				TCPClientPtr client = createTCPClient(_endpoints[index], connect);
-				result[client].insert(key);
+				if (client)
+					result[client].insert(key);
 			}
 
 			if (result.empty())

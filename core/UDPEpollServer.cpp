@@ -121,10 +121,18 @@ bool UDPEpollServer::prepare()
 		int duplexThreadMax = Setting::getInt(std::vector<std::string>{
 			"FPNN.server.udp.duplex.thread.max.size", "FPNN.server.duplex.thread.max.size"}, 0);
 
-		if (_answerCallbackPool == nullptr && duplexThreadMin > 0 && duplexThreadMax > 0)
+		if (_answerCallbackPool == nullptr)
 		{
-			adjustThreadPoolParams(duplexThreadMin, duplexThreadMax, 1, 256);
-			enableAnswerCallbackThreadPool(duplexThreadMin, 1, duplexThreadMin, duplexThreadMax);
+			if (duplexThreadMin > 0 && duplexThreadMax > 0)
+			{
+				adjustThreadPoolParams(duplexThreadMin, duplexThreadMax, 1, 256);
+				enableAnswerCallbackThreadPool(duplexThreadMin, 1, duplexThreadMin, duplexThreadMax);
+			}
+			else
+			{
+				int cpuCount = getCPUCount();
+				enableAnswerCallbackThreadPool(0, 1, cpuCount, cpuCount);
+			}
 		}
 	}
 
@@ -331,11 +339,35 @@ void UDPEpollServer::updateSocketStatus(int socket, bool needWaitSendEvent)
 		ev.events |= EPOLLOUT;
 	
 	if (epoll_ctl(_epoll_fd, EPOLL_CTL_MOD, socket, &ev) != 0)
-		LOG_ERROR("Modify server listened UDP socket %d %s send event error.", socket, needWaitSendEvent ? "with" : "without");
+		LOG_ERROR("Modify server listened UDP socket: %d, address: %s %s send event error.", socket, NetworkUtil::getPeerName(socket).c_str(), needWaitSendEvent ? "with" : "without");
+}
+
+void UDPEpollServer::exitCheck()
+{
+	if (_serverMasterProcessor->getQuestProcessor())
+	{
+		//call user defined function after server exit
+		_serverMasterProcessor->getQuestProcessor()->serverWillStop();
+		_serverMasterProcessor->getQuestProcessor()->serverStopped();
+		// force release business processor
+		_serverMasterProcessor->setQuestProcessor(nullptr);
+	}
 }
 
 void UDPEpollServer::run()
 {
+	//-- force exit when startup() failed.
+	if (_epoll_fd == 0)
+	{
+		//call user defined function after server exit
+		_serverMasterProcessor->getQuestProcessor()->serverWillStop();
+		_serverMasterProcessor->getQuestProcessor()->serverStopped();
+		// force release business processor
+		_serverMasterProcessor->setQuestProcessor(nullptr);
+		
+		return;
+	}
+
 	_running = true;
 	_stopping = false;
 	_stopSignalNotified = false;

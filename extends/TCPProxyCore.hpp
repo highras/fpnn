@@ -146,7 +146,7 @@ namespace fpnn
 			afterUpdate();
 		}
 
-		bool empty()
+		virtual bool empty()
 		{
 			std::unique_lock<std::mutex> lck(_mutex);
 			return _endpoints.empty();

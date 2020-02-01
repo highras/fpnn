@@ -254,13 +254,22 @@ class JsonParser
 		bool realType = (dot > 0|| e > 0);
 		double d = 0;
 		intmax_t i = 0;
-		char *endptr = nullptr;
+		uintmax_t u = 0;
+		bool unsignedNumber = false;
+		char *endptr = NULL;
 
 		errno = 0;
 		if (realType)
 			d = strtod(_start, &endptr);
-		else
+		else if (*_start == '-')
 			i = strtoimax(_start, &endptr, 10);
+		else
+		{
+			u = strtoumax(_start, &endptr, 10);
+			i = (intmax_t)u;
+
+			unsignedNumber = i < 0;
+		}
 		
 		if (errno || endptr != _pos)
 			throw FPNN_ERROR_MSG(FpnnJosnInvalidContentError, "Json parser: content error, invalid number or huge number.");
@@ -268,6 +277,8 @@ class JsonParser
 		JsonPtr node;
 		if (realType)
 			node.reset(new Json(d));
+		else if (unsignedNumber)
+			node.reset(new Json(u));
 		else
 			node.reset(new Json(i));
 
@@ -329,6 +340,9 @@ JsonPtr JsonParser::generalProcess()
 
 JsonPtr JsonParser::parse(const char* json)
 {
+	if (!json || *json == 0)
+		throw FPNN_ERROR_MSG(FpnnJosnInvalidContentError, "Json parser: content error. Empty content.");
+
 	_pos = (char *)json;
 	JsonPtr root;
 

@@ -23,6 +23,7 @@
 #include "StringUtil.h"
 #include "ServerController.h"
 #include "OpenSSLModule.h"
+#include "NetworkUtility.h"
 
 using namespace fpnn;
 
@@ -205,8 +206,16 @@ bool TCPEpollServer::prepare()
 		_ioPool->updateHeldLogger();
 	}
 
-	if(_answerCallbackPool == nullptr && _duplexThreadMin > 0 && _duplexThreadMax > 0)
-		enableAnswerCallbackThreadPool(_duplexThreadMin, 1, _duplexThreadMin, _duplexThreadMax);
+	if (_answerCallbackPool == nullptr)
+	{
+		if (_duplexThreadMin > 0 && _duplexThreadMax > 0)
+			enableAnswerCallbackThreadPool(_duplexThreadMin, 1, _duplexThreadMin, _duplexThreadMax);
+		else
+		{
+			int cpuCount = getCPUCount();
+			enableAnswerCallbackThreadPool(0, 1, cpuCount, cpuCount);
+		}
+	}
 
 	if (!_ipv4.ip.empty())
 		_ipv4.ip = HostLookup::get(_ipv4.ip);
@@ -424,8 +433,32 @@ bool TCPEpollServer::initIPv6(struct SocketInfo& info)
 	return true;
 }
 
+void TCPEpollServer::exitCheck()
+{
+	if (_serverMasterProcessor->getQuestProcessor())
+	{
+		//call user defined function after server exit
+		_serverMasterProcessor->getQuestProcessor()->serverWillStop();
+		_serverMasterProcessor->getQuestProcessor()->serverStopped();
+		// force release business processor
+		_serverMasterProcessor->setQuestProcessor(nullptr);
+	}
+}
+
 void TCPEpollServer::run()
 {
+	//-- force exit when startup() failed.
+	if (_epoll_fd == 0)
+	{
+		//call user defined function after server exit
+		_serverMasterProcessor->getQuestProcessor()->serverWillStop();
+		_serverMasterProcessor->getQuestProcessor()->serverStopped();
+		// force release business processor
+		_serverMasterProcessor->setQuestProcessor(nullptr);
+
+		return;
+	}
+
 	_stopping = false;
 	_stopSignalNotified = false;
 	while (true)
@@ -816,7 +849,7 @@ void TCPEpollServer::sendData(int socket, uint64_t token, std::string* data)
 	if (!_connectionMap.sendData(socket, token, data))
 	{
 		delete data;
-		LOG_WARN("Data not send at socket %d. socket maybe closed.", socket);
+		LOG_WARN("Data not send at socket %d, address: %s. socket maybe closed.", socket, NetworkUtil::getPeerName(socket).c_str());
 	}
 }
 
@@ -825,7 +858,7 @@ void TCPEpollServer::dealAnswer(int socket, FPAnswerPtr answer)
 	BasicAnswerCallback* callback = _connectionMap.takeCallback(socket, answer->seqNumLE());
 	if (!callback)
 	{
-		LOG_WARN("Received error answer seq is %u at socket %d", answer->seqNumLE(), socket);
+		LOG_WARN("Received error answer seq is %u at socket %d, address: %s", answer->seqNumLE(), socket, NetworkUtil::getPeerName(socket).c_str());
 		return;
 	}
 	if (callback->syncedCallback())		//-- check first, then fill result.
@@ -845,7 +878,7 @@ void TCPEpollServer::dealAnswer(int socket, FPAnswerPtr answer)
 	else
 	{
 		delete callback;
-		LOG_ERROR("Server received an answer, but process answers is disabled. Answer will be dropped. socket: %d", socket);
+		LOG_ERROR("Server received an answer, but process answers is disabled. Answer will be dropped. socket: %d, address: %s", socket, NetworkUtil::getPeerName(socket).c_str());
 	}
 }
 

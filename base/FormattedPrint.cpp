@@ -1,4 +1,5 @@
 #include <iostream>
+#include <sstream>
 #include "FormattedPrint.h"
 
 std::string fpnn::formatBytesQuantity(unsigned long long quantity, int outputRankCount)
@@ -39,6 +40,26 @@ std::string fpnn::formatBytesQuantity(unsigned long long quantity, int outputRan
 		res.append("B");
 
 	return res;
+}
+
+std::string fpnn::visibleBinaryBuffer(const void* memory, size_t size, const std::string& delim)
+{
+	std::stringstream ss;
+	const char* data = (char*)memory;
+
+	for (size_t i = 0; i < size; i++)
+	{
+		if (i > 0 && i % 8 == 0)
+			ss<<delim;
+
+		char c = data[i];
+		if (c < '!' || c > '~')
+			ss<<'.';
+		else
+			ss<<c;
+	}
+
+	return ss.str();
 }
 
 void fpnn::printTable(const std::vector<std::string>& fields, const std::vector<std::vector<std::string>>& rows)

@@ -20,7 +20,6 @@ namespace fpnn
 		ConnectionInfoPtr _connectionInfo;
 		FPQuestPtr _quest;
 		std::string _traceInfo;
-		std::string _traceRaiser;
 		bool _sent;
 
 	public:
@@ -34,16 +33,16 @@ namespace fpnn
 
 		virtual ~AsyncAnswerImp()
 		{
-			if (_sent == false)
+			if (_sent == false && _quest->isTwoWay())
 			{
 				const char* defaultErrorInfo = "Answer is lost in normal logic. The error answer is sent for instead.";
-				FPAnswerPtr errAnswer = FpnnErrorAnswer(_quest, FPNN_EC_CORE_UNKNOWN_ERROR, (_traceInfo.empty() ? defaultErrorInfo : _traceInfo) + ", " +  _traceRaiser);
+				FPAnswerPtr errAnswer = FpnnErrorAnswer(_quest, FPNN_EC_CORE_UNKNOWN_ERROR, (_traceInfo.empty() ? defaultErrorInfo : _traceInfo));
 				try
 				{
 					sendAnswer(errAnswer);
 				}
 				catch (...) {
-					LOG_ERROR("AsyncAnswer send default answer failed. trace info: %s, trace raiser: %s", _traceInfo.c_str(), _traceRaiser.c_str());
+					LOG_ERROR("AsyncAnswer send default answer failed. trace info: %s", _traceInfo.c_str());
 				}
 
 			}
@@ -80,15 +79,13 @@ namespace fpnn
 		}
 		virtual bool isSent() { return _sent; }
 
-		virtual void cacheTraceInfo(const std::string& ex, const std::string& raiser = "")
+		virtual void cacheTraceInfo(const std::string& ex)
 		{
 			_traceInfo = ex;
-			_traceRaiser = raiser;
 		}
-		virtual void cacheTraceInfo(const char * ex, const char* raiser = "")
+		virtual void cacheTraceInfo(const char * ex)
 		{
 			_traceInfo = ex;
-			_traceRaiser = raiser;
 		}
 	};
 }

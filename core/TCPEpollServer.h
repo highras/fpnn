@@ -110,6 +110,7 @@ namespace fpnn
 		void							cleanForExistConnectionError(TCPServerConnection*, RequestPackage*, const char* log_info);
 		void							initFailClean(const char* fail_info);
 		void							clean();
+		void							exitCheck();
 		void							sendCloseEvent();
 
 	private:
@@ -143,6 +144,8 @@ namespace fpnn
 	public:
 		virtual ~TCPEpollServer()
 		{
+			exitCheck();
+			
 			if (_ioPool)
 				_ioPool->setServerIOWorker(nullptr);
 		}

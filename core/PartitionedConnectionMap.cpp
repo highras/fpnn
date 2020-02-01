@@ -86,6 +86,11 @@ namespace fpnn
 			LOG_ERROR("Quest Raw Exception:(%d)%s", ex.code(), ex.what());
 			return false;
 		}
+		catch (const std::exception& ex)
+		{
+			LOG_ERROR("Quest Raw Exception: %s", ex.what());
+			return false;
+		}
 		catch (...)
 		{
 			LOG_ERROR("Quest Raw Exception.");

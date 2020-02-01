@@ -58,6 +58,23 @@ void formatSSLIPPort(std::stringstream& s, TCPServerPtr server)
 	}
 }
 
+time_t calculateCompiledTime(ServerPtr server)
+{
+	if (!server)
+		return 0;
+
+	IQuestProcessorPtr processor = server->getQuestProcessor();
+	if (!processor)
+		return 0;
+
+	std::string orgDatetime;
+	orgDatetime.append(processor->getCompiledDate()).append(" ").append(processor->getCompiledTime());
+	
+	struct tm t;
+	strptime(orgDatetime.c_str(), "%b %d %Y %H:%M:%S", &t);
+	return mktime(&t);
+}
+
 void ServerController::serverInfos(std::stringstream& ss, bool show_interface_stat)
 {
 	std::shared_ptr<std::string> serverBaseInfos;
@@ -71,6 +88,10 @@ void ServerController::serverInfos(std::stringstream& ss, bool show_interface_st
 
 	if (serverBaseInfos == nullptr)
 	{
+		time_t compiledTime = calculateCompiledTime(tcpServer);
+		if (!compiledTime)
+			compiledTime = calculateCompiledTime(udpServer);
+
 		std::stringstream s;
 		s<<"{";
 
@@ -78,9 +99,11 @@ void ServerController::serverInfos(std::stringstream& ss, bool show_interface_st
 		s<<"\"base\":{";
 		s<<"\"name\":"<<StringUtil::escapseString(Config::_sName)<<",";
 		s<<"\"startTime\":"<<Config::_started<<",";
-		s<<"\"compileTime\":"<<Config::_compiled<<",";
 		s<<"\"startTimeStr\":"<<StringUtil::escapseString(TimeUtil::getDateTime(Config::_started))<<",";
-		s<<"\"compileTimeStr\":"<<StringUtil::escapseString(TimeUtil::getDateTime(Config::_compiled))<<",";
+		s<<"\"compileTime\":"<<compiledTime<<",";
+		s<<"\"compileTimeStr\":"<<StringUtil::escapseString(TimeUtil::getDateTime(compiledTime))<<",";
+		s<<"\"frameworkCompileTime\":"<<Config::_compiled<<",";
+		s<<"\"frameworkCompileTimeStr\":"<<StringUtil::escapseString(TimeUtil::getDateTime(Config::_compiled))<<",";
 		s<<"\"frameworkVersion\":"<<StringUtil::escapseString(Config::_version)<<",";/*record history of core*/
 		s<<std::boolalpha<<"\"presetSignal\":"<<Config::_server_preset_signals<<",";
 		s<<std::boolalpha<<"\"stat\":"<<Config::_server_stat<<"},"; //may be tuned

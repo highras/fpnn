@@ -139,7 +139,7 @@ bool UDPRecvBuffer::recvIPv6(int socket, struct UDPReceivedResults &result)
 		{
 			char hex[32 + 1];
 			hexlify(hex, &(addr->sin6_addr), 16);
-			LOG_ERROR("Format IPv6 address for UDP socket %d failed. clientAddr.sin6_addr: %s", socket, hex);
+			LOG_ERROR("Format IPv6 address for UDP socket: %d, address: %s failed. clientAddr.sin6_addr: %s", socket, NetworkUtil::getPeerName(socket).c_str(), hex);
 
 			free(addr);
 			return true;
@@ -221,8 +221,8 @@ void UDPSendBuffer::realSend(bool& needWaitSendEvent)
 				continue;
 			}
 
-			LOG_ERROR("Send UDP data on %s socket(%d) error: %d", unit.connInfo->isIPv4() ? "IPv4" : "IPv6",
-				unit.connInfo->socket, errno);
+			LOG_ERROR("Send UDP data on %s socket: %d, address: %s, error: %d", unit.connInfo->isIPv4() ? "IPv4" : "IPv6",
+				unit.connInfo->socket, NetworkUtil::getPeerName(unit.connInfo->socket).c_str(), errno);
 
 			//std::unique_lock<std::mutex> lck(*_mutex);
 			//_sendToken = true;
@@ -230,8 +230,8 @@ void UDPSendBuffer::realSend(bool& needWaitSendEvent)
 		}
 		else if ((size_t)sendBytes != unit.raw->length())
 		{
-			LOG_ERROR("Send UDP data on %s socket(%d) error. Want to send %d bytes, real sent %d bytes.",
-				unit.connInfo->isIPv4() ? "IPv4" : "IPv6", unit.connInfo->socket, (int)(unit.raw->length()), (int)sendBytes);
+			LOG_ERROR("Send UDP data on %s socket: %d, address: %s error. Want to send %d bytes, real sent %d bytes.",
+				unit.connInfo->isIPv4() ? "IPv4" : "IPv6", unit.connInfo->socket, NetworkUtil::getPeerName(unit.connInfo->socket).c_str(), (int)(unit.raw->length()), (int)sendBytes);
 		}
 	}
 }

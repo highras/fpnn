@@ -4,10 +4,11 @@
 
 void fpnn::printMemory(const void* memory, size_t size)
 {
-	char buf[8];
+	//char buf[8];
 	const char* data = (char*)memory;
 	size_t unit_size = sizeof(void*);
 	size_t range = size % unit_size;
+	char buf[unit_size];
 	
 	if (range)
 		range = size - range + unit_size;

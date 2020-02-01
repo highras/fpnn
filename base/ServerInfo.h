@@ -17,6 +17,7 @@ public:
 
 private:
 	static std::string getAWSInfo(const std::string& url);
+	static std::string getTencentInfo(const std::string& url);
 	static std::string getGCPInfo(const std::string& url);
 	static bool getAZUREInfo(const std::string& url);
     static std::string ipv4Toipv6(const std::string& ipv4);

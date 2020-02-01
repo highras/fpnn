@@ -748,3 +748,316 @@ public:
 
 		throw FPNN_ERROR_MSG(FpnnJsonNodeTypeMissMatchError, "Target node is not array.");
 	}
+
+//====================================================================//
+//--            Advanced Want functions
+//-- ** The following functions will throw exception: FpnnJsonNodeTypeMissMatchError **
+//====================================================================//
+private:
+	template<size_t N, class... Args>
+	struct WantTupleValues
+	{
+		static void wantValue(std::list<JsonPtr>::iterator it, size_t targetOffset, std::tuple<Args...>& tup)
+		{
+			if (N > targetOffset)
+			{
+				WantTupleValues<N-1, Args...>::wantValue(it, targetOffset, tup);
+			}
+			else
+			{
+				auto realIt = it;
+				for (size_t i = 0; i < targetOffset - 1; i++)
+					realIt++;
+
+				JsonPtr node = *(realIt);
+
+				typename std::tuple_element<N-1, std::tuple<Args...>>::type v;
+				std::get<N-1>(tup) = (decltype(v))(*node);
+
+				WantTupleValues<N-1, Args...>::wantValue(it, targetOffset - 1, tup);
+			}
+		}
+	};
+
+	template<class... Args>
+	struct WantTupleValues<1, Args...>
+	{
+		static void wantValue(std::list<JsonPtr>::iterator it, size_t targetOffset, std::tuple<Args...>& tup)
+		{
+			if (1 == targetOffset)
+			{
+				JsonPtr node = *it;
+
+				typename std::tuple_element<0, std::tuple<Args...>>::type v;
+				std::get<0>(tup) = (decltype(v))(*node);
+			}
+		}
+	};
+
+public:
+	template<class... Args>
+	std::tuple<Args...> wantTuple(std::tuple<Args...>& tup, bool compatibleMode = false)
+	{
+		if (_type != JSON_Array)
+			throw FPNN_ERROR_MSG(FpnnJsonNodeTypeMissMatchError, "Node type miss match.");
+
+		std::list<JsonPtr>* data = (std::list<JsonPtr>*)_data;
+		size_t unitCount = data->size();
+
+		if (!compatibleMode && unitCount != sizeof...(Args))
+			throw FPNN_ERROR_MSG(FpnnJsonNodeTypeMissMatchError, "Node type miss match.");
+
+		if (unitCount > sizeof...(Args))
+			unitCount = sizeof...(Args);
+
+		WantTupleValues<sizeof...(Args), Args...>::wantValue(data->begin(), unitCount, tup);
+		return tup;
+	}
+
+	template < class T, size_t N >
+	std::array<T, N> wantArray(bool compatibleMode = false)
+	{
+		if (_type != JSON_Array)
+			throw FPNN_ERROR_MSG(FpnnJsonNodeTypeMissMatchError, "Node type miss match.");
+
+		std::list<JsonPtr>* data = (std::list<JsonPtr>*)_data;
+
+		if (!compatibleMode && data->size() != N)
+			throw FPNN_ERROR_MSG(FpnnJsonNodeTypeMissMatchError, "Node type miss match.");
+
+		std::array<T, N> res;
+
+		size_t idx = 0;
+		for (auto& node: *data)
+		{
+			if (idx == N)
+				return res;
+
+			res[idx] = (T)(*node);
+			idx += 1;
+		}
+
+		return res;
+	}
+
+	template <class T, class Container = std::deque<T> >
+	std::queue<T, Container> wantQueue()
+	{
+		if (_type != JSON_Array)
+			throw FPNN_ERROR_MSG(FpnnJsonNodeTypeMissMatchError, "Node type miss match.");
+
+		std::list<JsonPtr>* data = (std::list<JsonPtr>*)_data;
+		std::queue<T, Container> res;
+
+		for (auto& node: *data)
+			res.push((T)(*node));
+
+		return res;
+	}
+
+	template < class T, class Alloc = std::allocator<T> >
+	std::deque<T, Alloc> wantDeque()
+	{
+		if (_type != JSON_Array)
+			throw FPNN_ERROR_MSG(FpnnJsonNodeTypeMissMatchError, "Node type miss match.");
+
+		std::list<JsonPtr>* data = (std::list<JsonPtr>*)_data;
+		std::deque<T, Alloc> res;
+
+		for (auto& node: *data)
+			res.push_back((T)(*node));
+
+		return res;
+	}
+
+	template < class T, class Alloc = std::allocator<T> >
+	std::list<T, Alloc> wantList()
+	{
+		if (_type != JSON_Array)
+			throw FPNN_ERROR_MSG(FpnnJsonNodeTypeMissMatchError, "Node type miss match.");
+
+		std::list<JsonPtr>* data = (std::list<JsonPtr>*)_data;
+		std::list<T, Alloc> res;
+
+		for (auto& node: *data)
+			res.push_back((T)(*node));
+
+		return res;
+	}
+
+	template < class T, class Alloc = std::allocator<T> >
+	std::vector<T, Alloc> wantVector()
+	{
+		if (_type != JSON_Array)
+			throw FPNN_ERROR_MSG(FpnnJsonNodeTypeMissMatchError, "Node type miss match.");
+
+		std::list<JsonPtr>* data = (std::list<JsonPtr>*)_data;
+		std::vector<T, Alloc> res;
+		res.reserve(data->size());
+
+		for (auto& node: *data)
+			res.push_back((T)(*node));
+
+		return res;
+	}
+
+	template < class T, class Compare = std::less<T>, class Alloc = std::allocator<T> >
+	std::set<T, Compare, Alloc> wantSet()
+	{
+		if (_type != JSON_Array)
+			throw FPNN_ERROR_MSG(FpnnJsonNodeTypeMissMatchError, "Node type miss match.");
+
+		std::list<JsonPtr>* data = (std::list<JsonPtr>*)_data;
+		std::set<T, Compare, Alloc> res;
+
+		for (auto& node: *data)
+			res.insert((T)(*node));
+
+		return res;
+	}
+
+	template < class Key, class Hash = std::hash<Key>, class Pred = std::equal_to<Key>, class Alloc = std::allocator<Key> >
+	std::unordered_set<Key, Hash, Pred, Alloc> wantUnorderedSet()
+	{
+		if (_type != JSON_Array)
+			throw FPNN_ERROR_MSG(FpnnJsonNodeTypeMissMatchError, "Node type miss match.");
+
+		std::list<JsonPtr>* data = (std::list<JsonPtr>*)_data;
+		std::unordered_set<Key, Hash, Pred, Alloc> res;
+
+		for (auto& node: *data)
+			res.insert((Key)(*node));
+
+		return res;
+	}
+	
+	template <class T, class Compare = std::less<std::string>, class Alloc = std::allocator<std::pair<const std::string, T> > >
+	std::map<std::string, T, Compare, Alloc> wantDict()
+	{
+		if (_type != JSON_Object)
+			throw FPNN_ERROR_MSG(FpnnJsonNodeTypeMissMatchError, "Node type miss match.");
+
+		std::map<std::string, JsonPtr>* data = (std::map<std::string, JsonPtr>*)_data;
+		std::map<std::string, T, Compare, Alloc> res;
+
+		for (auto& npair: *data)
+			res[npair.first] = (T)(*(npair.second));
+
+		return res;
+	}
+
+	template <class T, class Hash = std::hash<std::string>, class Pred = std::equal_to<std::string>, class Alloc = std::allocator<std::pair<const std::string, T> > >
+	std::unordered_map<std::string, T, Hash, Pred, Alloc> wantUnorderedDict()
+	{
+		if (_type != JSON_Object)
+			throw FPNN_ERROR_MSG(FpnnJsonNodeTypeMissMatchError, "Node type miss match.");
+
+		std::map<std::string, JsonPtr>* data = (std::map<std::string, JsonPtr>*)_data;
+		std::unordered_map<std::string, T, Hash, Pred, Alloc> res;
+
+		for (auto& npair: *data)
+			res[npair.first] = (T)(*(npair.second));
+
+		return res;
+	}
+
+public:
+	template<class... Args>
+	std::tuple<Args...> wantTuple(const std::string& path, std::tuple<Args...>& tup, bool compatibleMode = false, const std::string& delim = "./")
+	{
+		JsonPtr node = getNode(path, delim);
+		if (node)
+			return node->wantTuple<Args...>(tup, compatibleMode);
+		
+		throw FPNN_ERROR_MSG(FpnnJosnNodeNotExistError, "Target node doesn't exist.");
+	}
+
+	template < class T, size_t N >
+	std::array<T, N> wantArray(const std::string& path, bool compatibleMode = false, const std::string& delim = "./")
+	{
+		JsonPtr node = getNode(path, delim);
+		if (node)
+			return node->wantArray<T, N>(compatibleMode);
+		
+		throw FPNN_ERROR_MSG(FpnnJosnNodeNotExistError, "Target node doesn't exist.");
+	}
+
+	template <class T, class Container = std::deque<T> >
+	std::queue<T, Container> wantQueue(const std::string& path, const std::string& delim = "./")
+	{
+		JsonPtr node = getNode(path, delim);
+		if (node)
+			return node->wantQueue<T, Container>();
+		
+		throw FPNN_ERROR_MSG(FpnnJosnNodeNotExistError, "Target node doesn't exist.");
+	}
+
+	template < class T, class Alloc = std::allocator<T> >
+	std::deque<T, Alloc> wantDeque(const std::string& path, const std::string& delim = "./")
+	{
+		JsonPtr node = getNode(path, delim);
+		if (node)
+			return node->wantDeque<T, Alloc>();
+		
+		throw FPNN_ERROR_MSG(FpnnJosnNodeNotExistError, "Target node doesn't exist.");
+	}
+
+	template < class T, class Alloc = std::allocator<T> >
+	std::list<T, Alloc> wantList(const std::string& path, const std::string& delim = "./")
+	{
+		JsonPtr node = getNode(path, delim);
+		if (node)
+			return node->wantList<T, Alloc>();
+		
+		throw FPNN_ERROR_MSG(FpnnJosnNodeNotExistError, "Target node doesn't exist.");
+	}
+
+	template < class T, class Alloc = std::allocator<T> >
+	std::vector<T, Alloc> wantVector(const std::string& path, const std::string& delim = "./")
+	{
+		JsonPtr node = getNode(path, delim);
+		if (node)
+			return node->wantVector<T, Alloc>();
+		
+		throw FPNN_ERROR_MSG(FpnnJosnNodeNotExistError, "Target node doesn't exist.");
+	}
+
+	template < class T, class Compare = std::less<T>, class Alloc = std::allocator<T> >
+	std::set<T, Compare, Alloc> wantSet(const std::string& path, const std::string& delim = "./")
+	{
+		JsonPtr node = getNode(path, delim);
+		if (node)
+			return node->wantSet<T, Compare, Alloc>();
+		
+		throw FPNN_ERROR_MSG(FpnnJosnNodeNotExistError, "Target node doesn't exist.");
+	}
+
+	template < class Key, class Hash = std::hash<Key>, class Pred = std::equal_to<Key>, class Alloc = std::allocator<Key> >
+	std::unordered_set<Key, Hash, Pred, Alloc> wantUnorderedSet(const std::string& path, const std::string& delim = "./")
+	{
+		JsonPtr node = getNode(path, delim);
+		if (node)
+			return node->wantUnorderedSet<Key, Hash, Pred, Alloc>();
+		
+		throw FPNN_ERROR_MSG(FpnnJosnNodeNotExistError, "Target node doesn't exist.");
+	}
+	
+	template <class T, class Compare = std::less<std::string>, class Alloc = std::allocator<std::pair<const std::string, T> > >
+	std::map<std::string, T, Compare, Alloc> wantDict(const std::string& path, const std::string& delim = "./")
+	{
+		JsonPtr node = getNode(path, delim);
+		if (node)
+			return node->wantDict<T, Compare, Alloc>();
+		
+		throw FPNN_ERROR_MSG(FpnnJosnNodeNotExistError, "Target node doesn't exist.");
+	}
+
+	template <class T, class Hash = std::hash<std::string>, class Pred = std::equal_to<std::string>, class Alloc = std::allocator<std::pair<const std::string, T> > >
+	std::unordered_map<std::string, T, Hash, Pred, Alloc> wantUnorderedDict(const std::string& path, const std::string& delim = "./")
+	{
+		JsonPtr node = getNode(path, delim);
+		if (node)
+			return node->wantUnorderedDict<T, Hash, Pred, Alloc>();
+		
+		throw FPNN_ERROR_MSG(FpnnJosnNodeNotExistError, "Target node doesn't exist.");
+	}

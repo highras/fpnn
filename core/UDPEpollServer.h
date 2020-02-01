@@ -76,6 +76,7 @@ namespace fpnn
 		bool returnServerStoppingAnswer(ConnectionInfoPtr connInfo, FPQuestPtr quest);
 		void clearRemnantCallbacks();
 		void clean();
+		void exitCheck();
 		bool sendQuestWithBasicAnswerCallback(ConnectionInfoPtr connInfo, FPQuestPtr quest, BasicAnswerCallback* callback, int timeout);
 
 	private:
@@ -95,7 +96,7 @@ namespace fpnn
 			initServerVaribles();
 		}
 	public:
-		virtual ~UDPEpollServer() {}
+		virtual ~UDPEpollServer() { exitCheck(); }
 
 		static UDPServerPtr create()
 		{

@@ -7,6 +7,7 @@
 #include "base64.h"
 #include "sha1.h"
 #include "gzpipe.h"
+#include "hex.h"
 
 using namespace fpnn;
 
@@ -51,6 +52,24 @@ bool FPMessage::isQuest(const char* header){
 	}
 	else 
 		throw FPNN_ERROR_CODE_FMT(FpnnProtoError, FPNN_EC_PROTO_METHOD_TYPE, "Unknow mtype:%d", hdr->mtype);
+}
+
+std::string FPMessage::Hex(){
+	char* hexstr = (char*)malloc(_payload.size() * 2 + 1); 
+	if(!hexstr) return "";
+	Hexlify(hexstr, _payload.c_str(), _payload.size());
+	std::string result = std::string(hexstr);
+	free(hexstr);
+	return result;
+}
+
+std::string FPMessage::Hex(const std::string& str){
+	char* hexstr = (char*)malloc(str.size() * 2 + 1); 
+	if(!hexstr) return "";
+	Hexlify(hexstr, str.c_str(), str.size());
+	std::string result = std::string(hexstr);
+	free(hexstr);
+	return result;
 }
 
 std::string FPMessage::json(){
@@ -107,6 +126,7 @@ void FPQuest::_create(const Header& hdr, uint32_t seq, const std::string& method
 }
 
 void FPQuest::_create(const char* data, size_t len){
+	size_t olen = len;
 	if(len < sizeof(_hdr)) 
 		throw FPNN_ERROR_CODE_FMT(FpnnProtoError, FPNN_EC_PROTO_INVALID_PACKAGE, "hdr len:%d, but intput len:%d", sizeof(_hdr), len);
 	const char* p = data;
@@ -143,6 +163,9 @@ void FPQuest::_create(const char* data, size_t len){
 	len -= method_len;
 	if(len != payloadSize()) 
 		throw FPNN_ERROR_CODE_FMT(FpnnProtoError, FPNN_EC_PROTO_INVALID_PACKAGE, "len is too small:%d", len);
+	if(len <= 0){
+		LOG_ERROR("Invalid Package: %s", Hex(std::string(data, olen)).c_str());
+	}
 	std::string payload = std::string(p, len);
 
 	if(isMsgPack()){
@@ -258,14 +281,17 @@ void FPAnswer::_create(const Header& hdr, uint32_t seq, const std::string& paylo
 void FPAnswer::_create(const char* data, size_t len){
 	//if(!_quest) throw FPNN_ERROR_MSG(FpnnProtoError, "Create answer, But quest is NULL");
 	//if(!_quest->isTwoWay()) FPNN_ERROR_MSG(FpnnProtoError, "Create answer for oneway Message");
+	size_t olen = len;
 	if(len < sizeof(_hdr)) 
 		throw FPNN_ERROR_CODE_FMT(FpnnProtoError, FPNN_EC_PROTO_INVALID_PACKAGE, "Len is too small:%d", len);
 	const char* p = data;
 	memcpy(&_hdr, p, sizeof(_hdr));
 	p += sizeof(_hdr);
 	len -= sizeof(_hdr);
-	if(len <= 0) 
+	if(len <= 0){
+		LOG_ERROR("Invalid Package: %s", Hex(std::string(data, olen)).c_str());
 		throw FPNN_ERROR_CODE_FMT(FpnnProtoError, FPNN_EC_PROTO_INVALID_PACKAGE, "Len is too small:%d", len);
+	}
 	_status = ss();
 	if(!isSupportPack()) 
 		throw FPNN_ERROR_CODE_MSG(FpnnProtoError, FPNN_EC_PROTO_NOT_SUPPORTED, "Create answer from raw, But Not Json OR Msgpack");

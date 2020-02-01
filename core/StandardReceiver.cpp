@@ -1,7 +1,11 @@
+#include "hex.h"
 #include "FPLog.h"
 #include "Config.h"
 #include "Decoder.h"
 #include "Receiver.h"
+#include "AutoRelease.h"
+#include "FormattedPrint.h"
+#include "NetworkUtility.h"
 
 using namespace fpnn;
 
@@ -59,19 +63,19 @@ bool StandardReceiver::sslRecv(int fd, int requireRead, int& totalReadBytes)
 			int errorCode = SSL_get_error(_sslContext->_ssl, readBytes);
 			if (errorCode == SSL_ERROR_WANT_WRITE)
 			{
-				LOG_INFO("SSL/TSL re-negotiation occurred. SSL_read WANT_WRITE. socket: %d", fd);
+				LOG_INFO("SSL/TSL re-negotiation occurred. SSL_read WANT_WRITE. socket: %d, address: %s", fd, NetworkUtil::getPeerName(fd).c_str());
 				_sslContext->_negotiate = SSLNegotiate::Read_Want_Write;
 				return true;
 			}
 			else if (errorCode == SSL_ERROR_WANT_READ)
 			{
-				//LOG_WARN("SSL/TSL re-negotiation occurred. SSL_read WANT_READ. socket: %d", fd);
+				//LOG_WARN("SSL/TSL re-negotiation occurred. SSL_read WANT_READ. socket: %d, address: %s", fd, NetworkUtil::getPeerName(fd).c_str());
 				//_sslContext->_negotiate = SSLNegotiate::Read_Want_Read;
 				return true;
 			}
 			else if (errorCode == SSL_ERROR_ZERO_RETURN)
 			{
-				//LOG_INFO("socket %d ssl is closed.", fd);
+				//LOG_INFO("socket %d ssl is closed, address: %s", fd, NetworkUtil::getPeerName(fd).c_str());
 				//-- TLS/SSL connection is colsed. But the underlying transport maybe hasn't been closed.
 				//-- Please Refer the SSL_get_error() doc on https://www.openssl.org.
 				return true;
@@ -87,19 +91,19 @@ bool StandardReceiver::sslRecv(int fd, int requireRead, int& totalReadBytes)
 					return false;
 				}
 
-				LOG_ERROR("SSL read syscall error. socket %d. errno: %d", fd, errno);
+				LOG_ERROR("SSL read syscall error. socket %d, address: %s, errno: %d", fd, NetworkUtil::getPeerName(fd).c_str(), errno);
 				OpenSSLModule::logLastErrors();
 				return false;
 			}
 			else if (errorCode == SSL_ERROR_SSL)
 			{
-				LOG_ERROR("SSL read error in openSSL library. SSL error code: SSL_ERROR_SSL. socket %d.", fd);
+				LOG_ERROR("SSL read error in openSSL library. SSL error code: SSL_ERROR_SSL. socket %d, address: %s", fd, NetworkUtil::getPeerName(fd).c_str());
 				OpenSSLModule::logLastErrors();
 				return false;
 			}
 			else
 			{
-				LOG_ERROR("SSL read error. socket %d, SSL error code %d, errno: %d", fd, errorCode, errno);
+				LOG_ERROR("SSL read error. socket %d, address: %s, SSL error code %d, errno: %d", fd, NetworkUtil::getPeerName(fd).c_str(), errorCode, errno);
 				return false;
 			}
 		}
@@ -118,7 +122,7 @@ bool StandardReceiver::recv(int fd, int length)
 		_total += length;
 		if (_total > Config::_max_recv_package_length)
 		{
-			LOG_ERROR("Recv huge TCP data from socket: %d. Connection will be closed by framework.", fd);
+			LOG_ERROR("Recv huge(%ld) TCP data from socket: %d, address: %s. Connection will be closed by framework.", _total, fd, NetworkUtil::getPeerName(fd).c_str());
 			return false;
 		}
 	}
@@ -185,7 +189,7 @@ bool StandardReceiver::recvTextData(int fd)
 
 				if (_curr > Config::_max_recv_package_length)
 				{
-					LOG_ERROR("Recv huge HTTP data from socket: %d. Connection will be closed by framework.", fd);
+					LOG_ERROR("Recv huge HTTP data from socket: %d, address: %s. Connection will be closed by framework.", fd, NetworkUtil::getPeerName(fd).c_str());
 					return false;
 				}
 				return true;
@@ -203,7 +207,7 @@ bool StandardReceiver::recvTextData(int fd)
 		_curr += readBytes;
 		if (_curr > Config::_max_recv_package_length)
 		{
-			LOG_ERROR("Recv huge HTTP data from socket: %d. Connection will be closed by framework.", fd);
+			LOG_ERROR("Recv huge HTTP data from socket: %d, address: %s. Connection will be closed by framework.", fd, NetworkUtil::getPeerName(fd).c_str());
 			return false;
 		}
 	}
@@ -217,7 +221,7 @@ bool StandardReceiver::sslRecvTextData(int fd)
 	_curr += totalReadBytes;
 	if (_curr > Config::_max_recv_package_length)
 	{
-		LOG_ERROR("Recv huge HTTPS data from socket: %d. Connection will be closed by framework.", fd);
+		LOG_ERROR("Recv huge HTTPS data from socket: %d, address: %s. Connection will be closed by framework.", fd, NetworkUtil::getPeerName(fd).c_str());
 		return false;
 	}
 	return successful;
@@ -230,6 +234,30 @@ bool StandardReceiver::recvTcpPackage(int fd, int length, bool& needNextEvent)
 
 	needNextEvent = (_curr < _total);
 	return true;
+}
+
+static void logHttpBufferError(ChainBuffer* cb, int size, int fd, const char* peerName)
+{
+	const int maxLoggedSize = 256;
+	int loggedSize = (size <= maxLoggedSize) ? size : maxLoggedSize;
+
+	void* buffer = malloc(loggedSize + 1);
+	AutoFreeGuard bufferGuard(buffer);
+
+	cb->writeTo(buffer, loggedSize, 0);
+	((char*)buffer)[loggedSize] = 0;
+
+	std::string visibleBinaryString = visibleBinaryBuffer(buffer, loggedSize, " ");
+
+	char* hexBuffer = (char*)malloc(loggedSize * 2 + 1);
+	AutoFreeGuard hexBufferGuard(hexBuffer);
+
+	Hexlify(hexBuffer, buffer, loggedSize);
+
+	LOG_ERROR("Http buffer recording (visible). org size: %d, rec size: %d. socket: %d, address: %s. Buffer: %s",
+		size, loggedSize, fd, peerName, visibleBinaryString.c_str());
+	LOG_ERROR("Http buffer recording (hex). org size: %d, rec size: %d. socket: %d, address: %s. Buffer: %s",
+		size, loggedSize, fd, peerName, hexBuffer);
 }
 
 bool StandardReceiver::recvHttpPackage(int fd, bool& needNextEvent)
@@ -256,12 +284,23 @@ bool StandardReceiver::recvHttpPackage(int fd, bool& needNextEvent)
 			}
 			catch (const FpnnError& ex)
 			{
-				LOG_ERROR("HttpParser::parseHeader() function error:(%d)%s. socket: %d", ex.code(), ex.what(), fd);
+				std::string peerName = NetworkUtil::getPeerName(fd);
+
+				if (_httpParser._headerLength == 14 && _buffer->memcmp("GET / HTTP/1.1", 14))
+				{
+					LOG_WARN("Receive HTTP scan, error:(%d)%s. socket: %d, address: %s", ex.code(), ex.what(), fd, peerName.c_str());
+					return false;
+				}
+
+				LOG_ERROR("HttpParser::parseHeader() function error:(%d)%s. socket: %d, address: %s", ex.code(), ex.what(), fd, peerName.c_str());
+				logHttpBufferError(_buffer, _httpParser._headerLength, fd, peerName.c_str());
 				return false;
 			}
 			catch (...)
 			{
-				LOG_ERROR("Unknown ERROR, HttpParser::parseHeader() function error. socket: %d", fd);
+				std::string peerName = NetworkUtil::getPeerName(fd);
+				LOG_ERROR("Unknown ERROR, HttpParser::parseHeader() function error. socket: %d, address: %s", fd, peerName.c_str());
+				logHttpBufferError(_buffer, _httpParser._headerLength, fd, peerName.c_str());
 				return false;
 			}
 		}
@@ -316,7 +355,7 @@ bool StandardReceiver::recvPackage(int fd, bool& needNextEvent)
 			return recvHttpPackage(fd, needNextEvent);
 		}
 		else{
-			LOG_WARN("This Server DO NOT support HTTP, fd:%d", fd);
+			LOG_ERROR("This Server DO NOT support HTTP, socket: %d, address: %s", fd, NetworkUtil::getPeerName(fd).c_str());
 		}
 	}
 

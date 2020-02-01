@@ -3,6 +3,7 @@
 #include "Config.h"
 #include "Decoder.h"
 #include "Receiver.h"
+#include "NetworkUtility.h"
 
 using namespace fpnn;
 
@@ -71,7 +72,7 @@ bool EncryptedPackageReceiver::recvPackage(int fd, bool& needNextEvent)
 		uint32_t len = le32toh(_packageLen);
 		if (len > (uint32_t)Config::_max_recv_package_length)
 		{
-			LOG_ERROR("Recv huge TCP data from socket: %d. Package length: %u. Connection will be closed by framework.", fd, len);
+			LOG_ERROR("Recv huge TCP data from socket: %d, address: %s. Package length: %u. Connection will be closed by framework.", fd, NetworkUtil::getPeerName(fd).c_str(), len);
 			return false;
 		}
 

@@ -1,5 +1,7 @@
 # FPNN Server Basic Tutorial
 
+[TOC]
+
 ## 1. 服务代码框架
 
 假设将要开发的服务名为 **Demo**，因此，假设服务程序名为 **DemoServer**，服务的核心类名称为 **DemoQuestProcessor**。

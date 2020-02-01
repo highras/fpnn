@@ -4,6 +4,7 @@
 #include "TaskThreadPool.h"
 #include "msec.h"
 #include "Setting.h"
+#include "NetworkUtility.h"
 
 using namespace std;
 using namespace fpnn;
@@ -47,13 +48,13 @@ public:
 	virtual void serverStopped() {}
 
 	//
-	virtual void connected(const ConnectionInfo& info) { cout<<"server connected.socket ID:"<<info.socket<<endl; }
+	virtual void connected(const ConnectionInfo& info) { cout<<"server connected.socket ID:"<<info.socket<<" address:"<<NetworkUtil::getPeerName(info.socket)<<endl; }
 	virtual void connectionWillClose(const ConnectionInfo& info, bool closeByError)
 	{
 		if (!closeByError)
-			cout<<"server close event processed.socket ID:"<<info.socket<<endl;
+			cout<<"server close event processed.socket ID:"<<info.socket<<" address:"<<NetworkUtil::getPeerName(info.socket)<<endl;
 		else
-			cout<<"server error event processed.socket ID:"<<info.socket<<endl;
+			cout<<"server error event processed.socket ID:"<<info.socket<<" address:"<<NetworkUtil::getPeerName(info.socket)<<endl;
 	}
 	virtual FPAnswerPtr unknownMethod(const std::string& method_name, const FPReaderPtr args, const FPQuestPtr quest, const ConnectionInfo& ci)
 	{

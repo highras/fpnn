@@ -45,6 +45,10 @@ void Client::connected(BasicConnection* connection)
 		catch (const FpnnError& ex){
 			LOG_ERROR("connected() error:(%d)%s. %s", ex.code(), ex.what(), connection->_connectionInfo->str().c_str());
 		}
+		catch (const std::exception& ex)
+		{
+			LOG_ERROR("connected() error: %s. %s", ex.what(), connection->_connectionInfo->str().c_str());
+		}
 		catch (...)
 		{
 			LOG_ERROR("Unknown error when calling connected() function. %s", connection->_connectionInfo->str().c_str());
@@ -131,6 +135,15 @@ void Client::processQuest(FPQuestPtr quest, ConnectionInfoPtr connectionInfo)
 				answer = FpnnErrorAnswer(quest, ex.code(), std::string(ex.what()) + ", " + connectionInfo->str());
 		}
 	}
+	catch (const std::exception& ex)
+	{
+		LOG_ERROR("processQuest ERROR: %s, connection:%s", ex.what(), connectionInfo->str().c_str());
+		if (quest->isTwoWay())
+		{
+			if (_questProcessor->getQuestAnsweredStatus() == false)
+				answer = FpnnErrorAnswer(quest, FPNN_EC_CORE_UNKNOWN_ERROR, std::string(ex.what()) + ", " + connectionInfo->str());
+		}
+	}
 	catch (...){
 		LOG_ERROR("Unknown error when calling processQuest() function. %s", connectionInfo->str().c_str());
 		if (quest->isTwoWay())
@@ -169,6 +182,11 @@ void Client::processQuest(FPQuestPtr quest, ConnectionInfoPtr connectionInfo)
 		}
 		catch (const FpnnError& ex){
 			FPAnswerPtr errAnswer = FpnnErrorAnswer(quest, ex.code(), std::string(ex.what()) + ", " + connectionInfo->str());
+			raw = errAnswer->raw();
+		}
+		catch (const std::exception& ex)
+		{
+			FPAnswerPtr errAnswer = FpnnErrorAnswer(quest, FPNN_EC_CORE_UNKNOWN_ERROR, std::string(ex.what()) + ", " + connectionInfo->str());
 			raw = errAnswer->raw();
 		}
 		catch (...)
@@ -270,7 +288,7 @@ FPAnswerPtr Client::sendQuest(FPQuestPtr quest, int timeout)
 		std::unique_lock<std::mutex> lck(_mutex);
 		connInfo = _connectionInfo;
 	}
-	Config::ClientQuestLog(quest, connInfo->ip.c_str(), connInfo->port);
+	Config::ClientQuestLog(quest, connInfo->ip, connInfo->port);
 
 	if (timeout == 0)
 		return ClientEngine::nakedInstance()->sendQuest(connInfo->socket, connInfo->token, &_mutex, quest, _timeoutQuest);
@@ -294,7 +312,7 @@ bool Client::sendQuest(FPQuestPtr quest, AnswerCallback* callback, int timeout)
 		std::unique_lock<std::mutex> lck(_mutex);
 		connInfo = _connectionInfo;
 	}
-	Config::ClientQuestLog(quest, connInfo->ip.c_str(), connInfo->port);
+	Config::ClientQuestLog(quest, connInfo->ip, connInfo->port);
 
 	if (timeout == 0)
 		return ClientEngine::nakedInstance()->sendQuest(connInfo->socket, connInfo->token, quest, callback, _timeoutQuest);
@@ -317,7 +335,7 @@ bool Client::sendQuest(FPQuestPtr quest, std::function<void (FPAnswerPtr answer,
 		std::unique_lock<std::mutex> lck(_mutex);
 		connInfo = _connectionInfo;
 	}
-	Config::ClientQuestLog(quest, connInfo->ip.c_str(), connInfo->port);
+	Config::ClientQuestLog(quest, connInfo->ip, connInfo->port);
 
 	if (timeout == 0)
 		return ClientEngine::nakedInstance()->sendQuest(connInfo->socket, connInfo->token, quest, std::move(task), _timeoutQuest);

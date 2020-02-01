@@ -68,7 +68,6 @@ public:
 
 	inline int code() { return (int)_reader.wantInt("code"); }
 	inline std::string ex() { return _reader.wantString("ex"); }
-	inline std::string raiser() { return _reader.wantString("raiser"); }
 
 	//---------------[ for write options ]-----------------//
 	inline int affectedRows() { return (int)_reader.wantInt("affectedRows"); }

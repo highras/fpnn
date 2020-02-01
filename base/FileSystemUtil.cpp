@@ -64,6 +64,16 @@ bool FileSystemUtil::saveFileContent(const std::string& file, const std::string&
 	return false;
 }
 
+bool FileSystemUtil::appendFileContent(const std::string& file, const std::string& content){
+	std::ofstream out(file, std::ofstream::binary | std::ofstream::app);
+	if(out.is_open()){
+		out.write(content.data(), content.size());
+		out.close();
+		return true;
+	}
+	return false;
+}
+
 bool FileSystemUtil::readFileAttrs(const std::string& file, FileSystemUtil::FileAttrs& attrs){
 	struct stat buf;
 	int result = stat(file.c_str(), &buf);
@@ -139,6 +149,10 @@ std::string FileSystemUtil::getSelfExectuedFilePath()
 	return "";
 }
 
+bool FileSystemUtil::createDirectory(const std::string& path){
+	return createDirectory(path.c_str());
+}
+
 bool FileSystemUtil::createDirectory(const char* path)
 {
 	if (access(path, F_OK /*| W_OK*/) != 0)		//-- Create the folder which don't exist.
@@ -147,6 +161,10 @@ bool FileSystemUtil::createDirectory(const char* path)
 			return false;
 	}
 	return true;
+}
+
+bool FileSystemUtil::createDirectories(const std::string& path){
+	return createDirectories(path.c_str());
 }
 
 bool FileSystemUtil::createDirectories(const char* path)
@@ -180,6 +198,10 @@ bool FileSystemUtil::createDirectories(const char* path)
 
 	*dst = '\0';
 	return createDirectory(buffer);
+}
+
+std::vector<std::string> FileSystemUtil::getFilesInDirectory(const std::string& directoryPath, bool excludeSubDirectories){
+	return getFilesInDirectory(directoryPath.c_str(), excludeSubDirectories);
 }
 
 std::vector<std::string> FileSystemUtil::getFilesInDirectory(const char* directoryPath, bool excludeSubDirectories)
@@ -232,6 +254,10 @@ std::vector<std::string> FileSystemUtil::getFilesInDirectory(const char* directo
 
 	closedir(dir);
 	return files;
+}
+
+std::vector<std::string> FileSystemUtil::getFilesInDirectories(const std::string directoryPath){
+	return getFilesInDirectories(directoryPath.c_str());
 }
 
 std::vector<std::string> FileSystemUtil::getFilesInDirectories(const char* directoryPath)
@@ -294,6 +320,10 @@ std::vector<std::string> FileSystemUtil::getFilesInDirectories(const char* direc
 		closedir(dir);
 	}
 	return files;
+}
+
+std::vector<std::string> FileSystemUtil::findFilesInDirectories(const std::string& directoryPath, const std::string& name){
+	return findFilesInDirectories(directoryPath.c_str(), name.c_str());
 }
 
 std::vector<std::string> FileSystemUtil::findFilesInDirectories(const char* directoryPath, const char* name)
@@ -361,6 +391,10 @@ std::vector<std::string> FileSystemUtil::findFilesInDirectories(const char* dire
 	return files;
 }
 
+bool FileSystemUtil::deleteFilesInDirectories(const std::string& directoryPath){
+	return deleteFilesInDirectories(directoryPath.c_str());
+}
+
 bool FileSystemUtil::deleteFilesInDirectories(const char* directoryPath)
 {
 	if(directoryPath == NULL) return false;
@@ -413,6 +447,10 @@ bool FileSystemUtil::deleteFilesInDirectories(const char* directoryPath)
 	closedir(dir);
 	rmdir(directoryPath);
 	return true;
+}
+
+bool FileSystemUtil::deleteFilesInDirectory(const std::string& directoryPath){
+	return deleteFilesInDirectory(directoryPath.c_str());
 }
 
 bool FileSystemUtil::deleteFilesInDirectory(const char* directoryPath)

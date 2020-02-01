@@ -102,11 +102,13 @@ namespace fpnn{
 			const std::string& payload() const					{ return _payload; }
 			//get payload json string
 			std::string json();
+			std::string Hex();
 			void printHttpInfo();
 
 			int64_t ctime() const								{ return _ctime; }
 			void    setCTime(int64_t ctime)						{ _ctime = ctime; }
 		public:
+			static std::string Hex(const std::string& str);
 			static uint32_t HeaderRemain()					{ return sizeof(Header) - sizeof(fpnn_magic);}
 			static uint32_t BodyLen(const char* header);
 			static bool isQuest(const char* header);
@@ -183,6 +185,10 @@ namespace fpnn{
 					return _emptyString;
 				return http_header("Sec-WebSocket-Key");
 			}
+            StringMap http_uri_all() { return http_infos_all("u_"); }
+            StringMap http_cookie_all() { return http_infos_all("c_"); }
+            StringMap http_header_all() { return http_infos_all("h_"); }
+
 		private:
 			const std::string& http_infos(const std::string& k){
 				if(!_httpInfos) 
@@ -191,6 +197,16 @@ namespace fpnn{
 				if(it == _httpInfos->end()) return _emptyString;
 				return it->second;
 			}
+
+            StringMap http_infos_all(const std::string& prefix){
+                StringMap infos;
+                for (auto& kv: *_httpInfos) {
+                    int32_t prefixLen = prefix.length();
+                    if (kv.first.substr(0, prefixLen) == prefix)
+                        infos[kv.first.substr(prefixLen)] = kv.second;
+                }
+                return infos;
+            }
 
 		protected:
 			static uint32_t nextSeqNum(){

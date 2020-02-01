@@ -68,7 +68,10 @@ namespace fpnn
 			for (auto& endpoint: _endpoints)
 			{
 				if (endpoint == _selfEndpoint)
+				{
+					_clients.erase(endpoint);
 					continue;
+				}
 				
 				auto iter = _clients.find(endpoint);
 				if (iter == _clients.end())
@@ -86,6 +89,15 @@ namespace fpnn
 		void exceptSelf(const std::string& endpoint)
 		{
 			_selfEndpoint = endpoint;
+		}
+
+		virtual bool empty()
+		{
+			std::unique_lock<std::mutex> lck(_mutex);
+			if (_endpoints.size() == 1)
+				return _endpoints[0] == _selfEndpoint;
+			else 
+				return _endpoints.empty();
 		}
 
 		TCPClientPtr getClient(const std::string& endpoint, bool connect)

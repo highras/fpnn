@@ -54,7 +54,11 @@ FPAnswerPtr UDPServerMasterProcessor::tune(const FPReaderPtr args, const FPQuest
 	}
 	catch (const FpnnError& ex){
 		LOG_ERROR("Error in tune:(%d)%s", ex.code(), ex.what());
-	}   
+	}
+	catch (const std::exception& ex)
+	{
+		LOG_ERROR("Error in tune: %s", ex.what());
+	}
 	catch (...)
 	{   
 		LOG_ERROR("Unknown Error when quest user tune");
@@ -104,6 +108,15 @@ void UDPServerMasterProcessor::dealQuest(UDPRequestPackage * requestPackage)
 					answer = FpnnErrorAnswer(quest, ex.code(), std::string(ex.what()) + ", " + requestPackage->_connectionInfo->str());
 			}
 		}
+		catch (const std::exception& ex)
+		{
+			LOG_ERROR("processQuest() Exception: %s. %s", ex.what(), requestPackage->_connectionInfo->str().c_str());
+			if (quest->isTwoWay())
+			{
+				if (_questProcessor->getQuestAnsweredStatus() == false)
+					answer = FpnnErrorAnswer(quest, FPNN_EC_CORE_UNKNOWN_ERROR, std::string(ex.what()) + ", " + requestPackage->_connectionInfo->str());
+			}
+		}
 		catch (...)
 		{
 			LOG_ERROR("Unknow error when calling processQuest() function. %s", requestPackage->_connectionInfo->str().c_str());
@@ -148,6 +161,11 @@ void UDPServerMasterProcessor::dealQuest(UDPRequestPackage * requestPackage)
 			answer = FpnnErrorAnswer(quest, ex.code(), std::string(ex.what()) + ", " + requestPackage->_connectionInfo->str());
 			raw = answer->raw();
 		}
+		catch (const std::exception& ex)
+		{
+			answer = FpnnErrorAnswer(quest, FPNN_EC_CORE_UNKNOWN_ERROR, std::string(ex.what()) + ", " + requestPackage->_connectionInfo->str());
+			raw = answer->raw();
+		}
 		catch (...)
 		{
 			answer = FpnnErrorAnswer(quest, FPNN_EC_CORE_UNKNOWN_ERROR, std::string("exception while do answer raw, ") + requestPackage->_connectionInfo->str());
@@ -171,6 +189,10 @@ void UDPServerMasterProcessor::run(UDPRequestPackage * requestPackage)
 	}
 	catch (const FpnnError& ex){
 		LOG_ERROR("Fatal error occurred when deal quest:(%d)%s. Connection will be closed by server. %s", ex.code(), ex.what(), requestPackage->_connectionInfo->str().c_str());
+	}
+	catch (const std::exception& ex)
+	{
+		LOG_ERROR("Fatal error occurred when deal quest: %s. Connection will be closed by server. %s", ex.what(), requestPackage->_connectionInfo->str().c_str());
 	}
 	catch (...)
 	{

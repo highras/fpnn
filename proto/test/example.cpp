@@ -508,6 +508,7 @@ int main(int argc, char** argv){
 		catch(const std::exception& ex){
 			cout<<"***********EXCEPTION::"<<ex.what()<<endl;
 		}
+		cout<<"******HEX:"<<oneway->Hex()<<endl;
 
 
 		QReader(oneway);

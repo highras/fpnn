@@ -25,6 +25,13 @@ using namespace fpnn;
 //azure
 //curl -H Metadata:true "http://169.254.169.254/metadata/instance?api-version=2018-02-01"
 
+//tencent
+//curl http://metadata.tencentyun.com/latest/meta-data/
+
+//alibaba
+//curl http://100.100.100.200/latest/meta-data/
+//-- 等待添加
+
 std::string ServerInfo::_serverHostName;
 std::string ServerInfo::_serverRegionName;
 std::string ServerInfo::_serverZoneName;
@@ -36,6 +43,7 @@ std::string ServerInfo::_serverPubliceIP6;
 static std::string AWS_BASE_HOST = "http://169.254.169.254/latest/meta-data";
 static std::string GCP_BASE_HOST = "http://metadata/computeMetadata/v1/instance/";
 static std::string AZURE_BASE_HOST = "http://169.254.169.254/metadata/instance?api-version=2018-02-01";
+static std::string TENCENT_BASE_HOST = "http://metadata.tencentyun.com/latest/meta-data";
 static std::string HOST_PLATFORM = "FP.server.host.platform";
 
 const std::string& ServerInfo::getServerHostName(){
@@ -54,6 +62,9 @@ const std::string& ServerInfo::getServerHostName(){
 #elif HOST_PLATFORM_AZURE
 		if(getAZUREInfo(AZURE_BASE_HOST))
 			return _serverHostName;
+#elif HOST_PLATFORM_TENCENT
+		std::string url = TENCENT_BASE_HOST+"/instance-name";
+		_serverHostName = getTencentInfo(url);
 #else
 		std::cout<<"Unknow platform"<<std::endl;
 		exit(-10);
@@ -86,6 +97,9 @@ const std::string& ServerInfo::getServerZoneName(){
 #elif HOST_PLATFORM_AZURE
 		if(getAZUREInfo(AZURE_BASE_HOST))
 			return _serverZoneName;
+#elif HOST_PLATFORM_TENCENT
+		std::string url = TENCENT_BASE_HOST+"/placement/zone";
+		_serverZoneName = getTencentInfo(url);
 #else
 		std::cout<<"Unknow platform"<<std::endl;
 		exit(-10);
@@ -111,6 +125,9 @@ const std::string& ServerInfo::getServerRegionName(){
 #elif HOST_PLATFORM_AZURE
 		if(getAZUREInfo(AZURE_BASE_HOST))
 			return _serverRegionName;
+#elif HOST_PLATFORM_TENCENT
+		std::string url = TENCENT_BASE_HOST+"/placement/region";
+		_serverRegionName = getTencentInfo(url);
 #else
 		std::cout<<"Unknow platform"<<std::endl;
 		exit(-10);
@@ -136,6 +153,9 @@ const std::string& ServerInfo::getServerLocalIP4(){
 #elif HOST_PLATFORM_AZURE
 		if(getAZUREInfo(AZURE_BASE_HOST))
 			return _serverLocalIP4;
+#elif HOST_PLATFORM_TENCENT
+		std::string url = TENCENT_BASE_HOST+"/local-ipv4";
+		_serverLocalIP4 = getTencentInfo(url);
 #else
 		_serverLocalIP4 = NetworkUtil::getLocalIP4();
 		if (_serverLocalIP4.length())
@@ -167,6 +187,9 @@ const std::string& ServerInfo::getServerPublicIP4(){
 #elif HOST_PLATFORM_AZURE
 		if(getAZUREInfo(AZURE_BASE_HOST))
 			return _serverPubliceIP4;
+#elif HOST_PLATFORM_TENCENT
+		std::string url = TENCENT_BASE_HOST+"/public-ipv4";
+		_serverPubliceIP4 = getTencentInfo(url);
 #else
 		_serverPubliceIP4 = NetworkUtil::getPublicIP4();
 		if (_serverPubliceIP4.length())
@@ -207,6 +230,10 @@ std::string ServerInfo::getAWSInfo(const std::string& url){
 	std::vector<std::string> header;
 	HttpClient::Get(url, header, resp);
 	return resp;
+}
+
+std::string ServerInfo::getTencentInfo(const std::string& url){
+	return getAWSInfo(url);
 }
 
 std::string ServerInfo::getGCPInfo(const std::string& url){

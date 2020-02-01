@@ -181,17 +181,17 @@ namespace fpnn
 		virtual bool isSent() = 0;
 
 		//-- Extends
-		virtual void cacheTraceInfo(const std::string&, const std::string& raiser = "") = 0;
-		virtual void cacheTraceInfo(const char *, const char* raiser = "") = 0;
+		virtual void cacheTraceInfo(const std::string&) = 0;
+		virtual void cacheTraceInfo(const char *) = 0;
 
-		virtual bool sendErrorAnswer(int code = 0, const std::string& ex = "", const std::string& raiser = "")
+		virtual bool sendErrorAnswer(int code = 0, const std::string& ex = "")
 		{
-			FPAnswerPtr answer = FpnnErrorAnswer(getQuest(), code, ex + ", " + raiser);
+			FPAnswerPtr answer = FpnnErrorAnswer(getQuest(), code, ex);
 			return sendAnswer(answer);
 		}
-		virtual bool sendErrorAnswer(int code = 0, const char* ex = "", const char* raiser = "")
+		virtual bool sendErrorAnswer(int code = 0, const char* ex = "")
 		{
-			FPAnswerPtr answer = FpnnErrorAnswer(getQuest(), code, std::string(ex) + ", " + std::string(raiser));
+			FPAnswerPtr answer = FpnnErrorAnswer(getQuest(), code, ex);
 			return sendAnswer(answer);
 		}
 		virtual bool sendEmptyAnswer()
@@ -236,6 +236,8 @@ namespace fpnn
 		virtual void setConcurrentSender(IConcurrentSender* concurrentSender) { if (!_concurrentSender) _concurrentSender = concurrentSender; }
 		virtual void setConcurrentSender(IConcurrentUDPSender* concurrentUDPSender) { if (!_concurrentUDPSender) _concurrentUDPSender = concurrentUDPSender; }
 		virtual FPAnswerPtr processQuest(const FPReaderPtr args, const FPQuestPtr quest, const ConnectionInfo& connectionInfo) = 0;
+		virtual const char* getCompiledDate() = 0;
+		virtual const char* getCompiledTime() = 0;
 
 		/*===============================================================================
 		  Call by Developer.
@@ -320,6 +322,8 @@ namespace fpnn
 		std::unordered_map<std::string, MethodInfo> _methodMap;\
 
 	#define QuestProcessorClassBasicPublicFuncs	\
+		virtual const char* getCompiledDate() { return __DATE__; } \
+		virtual const char* getCompiledTime() { return __TIME__; } \
 		inline void registerMethod(const std::string& method_name, MethodFunc func, uint32_t attributes = 0)	{ \
 			_methodMap[method_name] = {func, attributes}; \
 			Statistics::initMethod(method_name); \
