@@ -4,7 +4,6 @@
 
 + **客户端**：一个API解决所有操作
 + **服务器**：一个类继承解决所有RPC，同步异步，编码解码问题。
-+ **FPNN**：Fast Programmable Nexus Network
 
 ## 一、开发背景
 
@@ -143,6 +142,10 @@ RPC框架也一样。
 	注意事项请参见 [FPNN 注意事项](doc/zh-cn/fpnn-notices.md)
 
 	问题排查请参见 [FPNN 问题排查](doc/zh-cn/fpnn-troubleshooting.md)
+
+1. 最佳实践
+
+	1. [FPNN 服务治理与服务网格](doc/zh-cn/fpnn-SOA-governance-service-mesh.md)
 
 ## 五、全部文档索引
 
