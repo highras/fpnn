@@ -45,7 +45,6 @@ FPNN 技术生态对服务治理的结构非常清晰，FPNN 的服务治理需�
 	+ 服务的工程模版与IDE集成
 
 * **服务网格**
-* [云上曲率][HighRAS]实时消息服务的**服务治理实践**
 
 ## **服务治理 (SOA Governance)**
 
@@ -245,34 +244,5 @@ FPNN 框架是一个分布式微服务框架，在设计之初便将简单易用
 具备良好设计的分布式网络无需服务网格多一次数据辗转，但如需使用，请使用 FPNN 技术生态中的 **UniversalGate**。以上功能，全部具备，**无需额外处理**。
 
 
-## **[云上曲率][HighRAS]实时消息服务的服务治理实践**
-
-最后，我们以 **[云上曲率][HighRAS]**的**实时消息服务**作为一个实例，简单介绍一下 FPNN 服务治理在其中的运用。
-
-以下是**云上曲率**的**实时消息服务**产品结构图：
-
-![云上曲率实时消息服务(RTM)结构图](../pics/SOA-Governance/RTM.architecture.png)
-
-在结构图中，可以发现，有 FPNN 技术生态的 FPZK、DBProxy、UniversalGate、Dispatcher 四个服务出现。
-
-下图是**云上曲率**的**实时消息服务**运维结构图：
-
-![云上曲率实时消息服务(RTM)运维结构图](../pics/SOA-Governance/RTM.architecture.full.png)
-
-运维结构图中，出现了产品图中省略的 DCA、FPMonitor、FPManage Center、DATS 四个服务。
-
-云上曲率的实时消息服务，采用 FPZK 作为集群管理服务，所有服务和子集群均向 FPZK 注册。然后使用 Dispatcher 服务为客户端网关提供负载均衡服务，每次返回负载权重最轻的一台 rtmGated 供客户端接入。
-
-然后采用 UniversalGate 作为内部网关，对客户用管理系统屏蔽所有实时消息服务集群内拓扑细节，并提供访问控制和代理服务。
-
-之后采用 DBProxy 对内屏蔽所有数据库拓扑和分库分表细节，并提供数据库访问代理服务。
-
-在实时消息服务运维系统中，采用 DCA（Data Collection & Analysis Service）采集实时消息服务所有数据，使用 FPMonitor 分析和报警。
-
-然后使用 FPManage Center 全局管理和控制、动态调节各个服务的参数、接口状态。
-
-最后，实时消息服务采用 DATS（Distributed Automated Testing Suite）对整个系统进行自动化的分布式压力测试，和全球送达速率测试。
-
-
-[HighRAS]: http://rasolution.ifunplus.cn/        "云上曲率"
+[HighRAS]: https://www.ilivedata.com/        "云上曲率"
 
