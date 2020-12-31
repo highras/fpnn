@@ -68,7 +68,7 @@ bool showMachineStatus(TCPClientPtr client, const std::string& monitorHost, doub
 		int srcIdx = findIndex("source", fields);
 		int connIdx = findIndex("connCount", fields);
 
-		bool loadStatus = 0;
+		int loadStatus = 0;
 		bool monitor = false;
 
 		for (auto& row: rows)

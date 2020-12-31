@@ -12,6 +12,7 @@ namespace fpnn
 	{
 	protected:
 		int64_t _rev;
+		int64_t _clusterAlteredMsec;
 		FPZKClientPtr _fpzkClient;
 		std::string _serviceName;
 
@@ -20,21 +21,25 @@ namespace fpnn
 			FPZKClient::ServiceInfosPtr sip = _fpzkClient->getServiceInfos(_serviceName);
 			if (sip == nullptr)
 			{
-				LOG_ERROR("[%s] Service %s is empty! rev:%lld", proxyTypeForLog, _serviceName.c_str(), _rev);
+				LOG_ERROR("[%s] Service %s is empty! last rev:%lld, last altered msec:%lld",
+					proxyTypeForLog, _serviceName.c_str(), _rev, _clusterAlteredMsec);
+
 				sip = std::make_shared<FPZKClient::ServiceInfos>();
 			}
 
-			if (_rev != sip->revision || !_rev || _endpoints.empty())
+			if (_clusterAlteredMsec != sip->clusterAlteredMsec || _rev != sip->revision || _endpoints.empty())
 			{
 				_endpoints.clear();
 				for (auto& nodePair: sip->nodeMap)
 					_endpoints.push_back(nodePair.first);
 				
-				LOG_INFO("[%s Changed] Rev(old/new):%lld/%lld serviceName:%s, server list:%s", proxyTypeForLog,
-					_rev, sip->revision, _serviceName.c_str(), StringUtil::join(_endpoints, ", ").c_str());
+				LOG_INFO("[%s Changed] ServiceName: %s, rev(old/new):%lld/%lld, alter msec(old/new):%lld/%lld, server list:%s",
+					proxyTypeForLog, _serviceName.c_str(), _rev, sip->revision,
+					_clusterAlteredMsec, sip->clusterAlteredMsec, StringUtil::join(_endpoints, ", ").c_str());
 
 				checkClientMap();
 				_rev = sip->revision;
+				_clusterAlteredMsec = sip->clusterAlteredMsec;
 				afterUpdate();
 			}
 		}
@@ -42,7 +47,7 @@ namespace fpnn
 	public:
 		//-- If questTimeoutSeconds less then zero, mean using global settings.
 		TCPFPZKProxyCore(FPZKClientPtr fpzkClient, const std::string& serviceName, const std::string& cluster = "", int64_t questTimeoutSeconds = -1):
-			TCPProxyCore(questTimeoutSeconds), _rev(0), _fpzkClient(fpzkClient), _serviceName(serviceName)
+			TCPProxyCore(questTimeoutSeconds), _rev(0), _clusterAlteredMsec(0), _fpzkClient(fpzkClient), _serviceName(serviceName)
 		{
 			if (!cluster.empty())
 				_serviceName.append("@").append(cluster);

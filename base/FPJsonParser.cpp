@@ -13,6 +13,7 @@ class JsonParser
 	MethodFunc _callMap[256];
 
 	StringUtil::CharsChecker _numberChars;
+	std::ostringstream _outStringStream;
 
 	std::stack<JsonPtr> _nodeStack;
 
@@ -139,7 +140,176 @@ class JsonParser
 		return nullptr;
 	}
 
+	void UTF16ToUTF8(uint16_t utf16Char)
+	{
+		const uint8_t utf82 = 0xc0;	//-- 1100 0000
+		const uint8_t utf83 = 0xe0;	//-- 1110 0000
+		const uint8_t low6BitsMask = 0x3F;	//-- 0011 1111
+
+		if (utf16Char <= 0x7F)
+		{
+			_outStringStream<<(char)utf16Char;
+		}
+		else if (utf16Char <= 0x7FF)
+		{
+			char a = utf82 | (utf16Char >> 6);
+			char b = 0x80 | (utf16Char & low6BitsMask);
+
+			_outStringStream << a << b;
+		}
+		else
+		{
+			char a = utf83 | (utf16Char >> 12);
+			char b = 0x80 | ((utf16Char >> 6) & low6BitsMask);
+			char c = 0x80 | (utf16Char & low6BitsMask);
+
+			_outStringStream << a << b << c;
+		}
+	}
+
+	void UTF16ToUTF8(uint16_t W1, uint16_t W2)
+	{
+		const uint8_t low6BitsMask = 0x3F;	//-- 0011 1111
+
+		uint32_t utf16SurrogatePair = (((W1 - 0xD800) << 10) | (W2 - 0xDC00)) + 0x10000;
+
+		char a = 0xF0 | (utf16SurrogatePair >> 18);
+		char b = 0x80 | ((utf16SurrogatePair >> 12) & low6BitsMask);
+		char c = 0x80 | ((utf16SurrogatePair >> 6) & low6BitsMask);
+		char d = 0x80 | (utf16SurrogatePair & low6BitsMask);
+		
+		_outStringStream << a << b << c << d;
+	}
+
+	uint16_t parseUTF16Char()
+	{
+		uint16_t utf16Char = 0;
+		for (int i = 0; i < 4; i++)
+		{
+			char c = *(_pos + i);
+
+			if (c <= '9' && c >= '0')
+				c -= '0';
+			else if (c <= 'f' && c>= 'a')
+			{
+				c -= 'a';
+				c += 10;
+			}
+			else if (c <= 'F' && c>= 'A')
+			{
+				c -= 'A';
+				c += 10;
+			}
+			else
+				throw FPNN_ERROR_MSG(FpnnJosnInvalidContentError, "Json parser: content error, uncompleted string.");
+
+			utf16Char <<= 4;
+			utf16Char += (uint16_t)c;
+		}
+
+		return utf16Char;
+	}
+
+	void processSlash()
+	{
+		_pos++;
+
+		if (*_pos == 0)
+			throw FPNN_ERROR_MSG(FpnnJosnInvalidContentError, "Json parser: content error, uncompleted string.");
+
+		switch (*_pos)
+		{
+			// case '"':		//-- Action same as default;
+			// case '\\':		//-- Action same as default;
+			// case '/':		//-- Action same as default;
+
+			case 'b': _outStringStream<<'\b'; break;
+			case 'f': _outStringStream<<'\f'; break;
+			case 'n': _outStringStream<<'\n'; break;
+			case 'r': _outStringStream<<'\r'; break;
+			case 't': _outStringStream<<'\t'; break;
+			case 'u':
+			{
+				_pos++;
+				uint16_t W1 = parseUTF16Char();
+				_pos += 4;
+
+				if (W1 < 0xD800 || W1 > 0xDFFF)
+				{
+					UTF16ToUTF8(W1);
+					return;
+				}
+
+				if (W1 >= 0xD800 && W1 <= 0xDBFF)
+				{
+					if(*_pos++ != '\\')
+					{
+						throw FPNN_ERROR_MSG(FpnnJosnInvalidContentError, "Json parser: content error, trail surrogates for utf-16 surrogate pair missing.");
+					}
+					else if(*_pos++ != 'u')
+					{
+						throw FPNN_ERROR_MSG(FpnnJosnInvalidContentError, "Json parser: content error, trail surrogates for utf-16 surrogate pair missing.");
+					}
+					uint16_t W2 = parseUTF16Char();
+					if (W2 < 0xDC00 || W2 > 0xDFFF)
+					{
+						throw FPNN_ERROR_MSG(FpnnJosnInvalidContentError, "Json parser: content error, trail surrogates for utf-16 surrogate pair in wrong range.");
+					}
+					UTF16ToUTF8(W1, W2);
+					_pos += 4;
+					return;
+				}
+				else
+					throw FPNN_ERROR_MSG(FpnnJosnInvalidContentError, "Json parser: content error, lead surrogates for utf-16 surrogate pair missing.");
+			}
+			
+			default:
+				_outStringStream<<(char)(*_pos);
+				break;
+		}
+
+		_pos++;
+	}
+
 	std::string fetchString()
+	{
+		_pos++;
+		char *_start = _pos;
+
+		while (true)
+		{
+			if (*_pos == 0)
+				throw FPNN_ERROR_MSG(FpnnJosnInvalidContentError, "Json parser: content error, uncompleted string.");
+
+			else if (*_pos == '\\')
+			{
+				_outStringStream.write(_start, _pos - _start);
+				processSlash();
+				_start = _pos;
+			}
+			else if (*_pos == '"')
+			{
+				if (_outStringStream.tellp() == 0)
+				{
+					std::string str(_start, _pos - _start);
+					_pos++;
+					return str;
+				}
+				else
+				{
+					_outStringStream.write(_start, _pos - _start);
+					std::string str = _outStringStream.str();
+					_outStringStream.str("");
+					_pos++;
+					return str;
+				}
+			}
+			else
+				_pos++;
+		}
+	}
+
+	/*std::string fetchString()
 	{
 		_pos++;
 		char *_start = _pos;
@@ -163,7 +333,7 @@ class JsonParser
 
 			_pos++;
 		}
-	}
+	}*/
 
 	JsonPtr processString()
 	{
@@ -361,7 +531,7 @@ JsonPtr JsonParser::parse(const char* json)
 	return root;
 }
 
-JsonPtr Json::parse(const char* data) throw(FpnnJosnInvalidContentError)
+JsonPtr Json::parse(const char* data)
 {
 	JsonParser parser;
 	return parser.parse(data);

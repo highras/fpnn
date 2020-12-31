@@ -119,6 +119,13 @@ namespace fpnn
 		}
 
 		virtual ~TCPBasicConnection() { _sslContext.close(); }
+
+		void resetMutex(std::mutex* mutex)
+		{
+			_recvBuffer.setMutex(mutex);
+			_sendBuffer.setMutex(mutex);
+			_connectionInfo->_mutex = mutex;
+		}
 	};
 }
 

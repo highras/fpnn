@@ -21,7 +21,7 @@ std::string FpnnError::format(const char *fmt, ...){
     return s;
 }
 
-const char* FpnnError::what() const throw(){
+const char* FpnnError::what() const noexcept {
 	std::stringstream ss;
 	ss << '(' << _code << ')';
 	if (_fun && _fun[0])

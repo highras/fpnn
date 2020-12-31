@@ -216,7 +216,7 @@ ConnectionInfoPtr TCPClient::perpareConnection(int socket, std::string& publicKe
 	{
 		std::unique_lock<std::mutex> lck(_mutex);
 		newConnectionInfo.reset(new ConnectionInfo(socket, _connectionInfo->port, _connectionInfo->ip, _isIPv4, false));
-		connection = new TCPClientConnection(shared_from_this(), &_mutex, _ioChunkSize, newConnectionInfo);
+		connection = new TCPClientConnection(shared_from_this(), _ioChunkSize, newConnectionInfo);
 	}
 
 	if (_sslEnabled)
@@ -275,7 +275,7 @@ bool TCPClient::perpareConnectIPv4Address()
 
 	TCPClientConnection* connection = NULL;
 	ConnectionInfoPtr newConnectionInfo(new ConnectionInfo(socketfd, _connectionInfo->port, _connectionInfo->ip, _isIPv4, false));
-	connection = new TCPClientConnection(shared_from_this(), &_mutex, _ioChunkSize, newConnectionInfo);
+	connection = new TCPClientConnection(shared_from_this(), _ioChunkSize, newConnectionInfo);
 	
 	bool joined = ClientEngine::nakedInstance()->joinEpoll(connection);
 	if (!joined)

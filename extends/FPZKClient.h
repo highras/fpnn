@@ -258,7 +258,8 @@ private:
 	void prepareSelfServiceInfo();
 	void adjustSelfPortInfo();
 	void resubscribe();
-	void updateChangedAndMonitoredServices(const std::map<std::string, int64_t>& rvMap);
+	void updateChangedAndMonitoredServices(const std::set<std::string>& invalidServices, const std::map<std::string, int64_t>& rvMap);
+	void updateChangedAndMonitoredServices(const std::set<std::string>& invalidServices, const std::vector<std::string>& services, const std::vector<int64_t>& revisions, const std::vector<int64_t>& clusterAlteredTimes);
 	void fetchInterestServices(const std::set<std::string>& serviceNames);
 	void updateServicesMapCache(FPReader* reader);
 	void unregisterSelf();

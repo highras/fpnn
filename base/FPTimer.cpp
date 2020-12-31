@@ -6,6 +6,9 @@
 #include "NetworkUtility.h"
 #include "FPTimer.h"
 
+//-- For unused the returned values of write() in Timer::wakeUpEpollWithLocker()/Timer::wakeUpEpollWithoutLocker().
+#pragma GCC diagnostic ignored "-Wunused-result"
+
 using namespace fpnn;
 
 static const int Timer_defaultWaitMsec = 2000;

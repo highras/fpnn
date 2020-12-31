@@ -19,6 +19,9 @@
 #include "ChainBuffer.h"
 #include "ClientEngine.h"
 
+//-- G++ 9: for unused the returned values of write() in MultipleURLEngine::Executor::pushTask()/pushTasks()/stop().
+#pragma GCC diagnostic ignored "-Wunused-result"
+
 namespace fpnn {
 class MultipleURLEngine
 {

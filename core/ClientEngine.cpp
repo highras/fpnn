@@ -16,6 +16,9 @@
 #include "msec.h"
 #include "Config.h"
 
+//-- For unused the returned values of pipe() & write() in ClientEngine::stop().
+#pragma GCC diagnostic ignored "-Wunused-result"
+
 using namespace fpnn;
 
 std::mutex ClientEngine::_mutex;

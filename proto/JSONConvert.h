@@ -1,5 +1,11 @@
 #ifndef JSONConvert_h_
 #define JSONConvert_h_
+
+#if (__GNUC__ >= 8)
+//-- For msgpack & RapidJSON: -Wall will triggered the -Wclass-memaccess with G++ 8 and later.
+#pragma GCC diagnostic ignored "-Wclass-memaccess"
+#endif
+
 #include <sstream>
 #include <iostream>
 #include <string>

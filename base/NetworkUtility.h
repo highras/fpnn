@@ -1,6 +1,7 @@
 #ifndef FPNN_Network_Utility_H
 #define FPNN_Network_Utility_H
 
+#include <netinet/in.h>
 #include <string>
 #include <vector>
 #include <map>
@@ -53,6 +54,10 @@ namespace NetworkUtil
 	std::string getPublicIP4();
 	std::string getPeerName(int fd);
 	std::string getSockName(int fd);
+
+	bool isPrivateIP(struct sockaddr_in* addr);
+	bool isPrivateIP(struct sockaddr_in6* addr);
+	bool isPrivateIPv6(const std::string& ipv6);
 }
 
 }

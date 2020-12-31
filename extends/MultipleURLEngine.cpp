@@ -4,6 +4,14 @@
 #include "StringUtil.h"
 #include "NetworkUtility.h"
 #include "MultipleURLEngine.h"
+
+//-- G++ 8: for ignored unused-value warning triggered by CRYPTO_THREADID_set_callback()
+#pragma GCC diagnostic ignored "-Wunused-value"
+
+//-- G++ 8 & 9: for ignored unused-function warning triggered by OpenSSL required
+//--            CRYPTO_THREADID_set_callback(OpenSSL_thread_Id_Func) & CRYPTO_set_locking_callback(OpenSSL_locking_callback)
+#pragma GCC diagnostic ignored "-Wunused-function"
+
 using namespace fpnn;
 //====================================================//
 //-        OpenSSL settings for multi-threads        -//
@@ -606,6 +614,7 @@ void MultipleURLEngine::Executor::checkTimeoutedQueuedSyncTask()
 				sync->resultFilled();
 
 				it = _queue.erase(it);
+				_queueSize--;
 				continue;
 			}
 			else

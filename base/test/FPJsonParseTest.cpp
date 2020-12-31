@@ -28,6 +28,8 @@ void parseTest(const char *filenme, const char *path)
 		cout<<json<<endl<<endl;
 		cout<<"get value by path "<<path<<endl;
 		cout<<(*json)[path]<<endl;
+		cout<<json->getNode(path)->str()<<endl;
+		cout<<json->wantString(path)<<endl;
 	}
 	catch (const FpnnError &e)
 	{

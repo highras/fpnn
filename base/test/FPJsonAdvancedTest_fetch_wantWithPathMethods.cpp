@@ -22,10 +22,11 @@ void test_tuple(JsonPtr json, bool compatibleMode)
 
 	std::tuple<std::string, int, double, uint64_t, std::string, int, std::string> more;
 	std::tuple<std::string, uint32_t, float, int> less;
+	std::tuple<std::string, uint32_t, std::string, int, int> error;
 
 	cout<<"---- more elements ----------"<<endl;
 	try {
-		(*json)["aa"].wantTuple(more, compatibleMode);
+		json->wantTuple("aa", more, compatibleMode);
 
 		cout<<"Element 1: "<<std::get<0>(more)<<endl;
 		cout<<"Element 2: "<<std::get<1>(more)<<endl;
@@ -43,12 +44,28 @@ void test_tuple(JsonPtr json, bool compatibleMode)
 
 	cout<<"---- less elements ----------"<<endl;
 	try {
-		(*json)["aa"].wantTuple(less, compatibleMode);
+		json->wantTuple("aa", less, compatibleMode);
 
 		cout<<"Element 1: "<<std::get<0>(less)<<endl;
 		cout<<"Element 2: "<<std::get<1>(less)<<endl;
 		cout<<"Element 3: "<<std::get<2>(less)<<endl;
 		cout<<"Element 4: "<<std::get<3>(less)<<endl;
+
+	}
+	catch (const FpnnJsonNodeTypeMissMatchError &e)
+	{
+		cout<<"[Expectant error]: Type miss match."<<endl;
+	}
+
+	cout<<"---- error elements ----------"<<endl;
+	try {
+		json->wantTuple("aa", error, compatibleMode);
+
+		cout<<"Element 1: "<<std::get<0>(error)<<endl;
+		cout<<"Element 2: "<<std::get<1>(error)<<endl;
+		cout<<"Element 3: "<<std::get<2>(error)<<endl;
+		cout<<"Element 4: "<<std::get<3>(error)<<endl;
+		cout<<"Element 5: "<<std::get<4>(error)<<endl;
 
 	}
 	catch (const FpnnJsonNodeTypeMissMatchError &e)
@@ -67,7 +84,7 @@ void test_tuple()
 		cout<<"get json:"<<endl;
 		cout<<json<<endl<<endl;
 
-		(*json)["aa"].wantTuple(matchTuple);
+		json->wantTuple("aa", matchTuple);
 		cout<<"Element 1: "<<std::get<0>(matchTuple)<<endl;
 		cout<<"Element 2: "<<std::get<1>(matchTuple)<<endl;
 		cout<<"Element 3: "<<std::get<2>(matchTuple)<<endl;
@@ -89,7 +106,7 @@ void test_array(JsonPtr json, const char* key, const char* desc, bool compatible
 {
 	cout<<endl<<desc<<endl;
 
-	std::array<K, N> elemArray = (*json)[key].wantArray<K, N>(compatibleMode);
+	std::array<K, N> elemArray = json->wantArray<K, N>(key, compatibleMode);
 	for (auto& element: elemArray)
 		cout<<"Element: "<<element<<endl;
 }
@@ -162,7 +179,7 @@ void test_queue(JsonPtr json, const char* key, const char* desc)
 {
 	cout<<endl<<desc<<endl;
 
-	std::queue<K> elemQueue = (*json)[key].wantQueue<K>();
+	std::queue<K> elemQueue = json->wantQueue<K>(key);
 	while (elemQueue.size())
 	{
 		cout<<"Element: "<<elemQueue.front()<<endl;
@@ -194,7 +211,7 @@ void test_deque(JsonPtr json, const char* key, const char* desc)
 {
 	cout<<endl<<desc<<endl;
 
-	std::deque<K> elemQueue = (*json)[key].wantDeque<K>();
+	std::deque<K> elemQueue = json->wantDeque<K>(key);
 	while (elemQueue.size())
 	{
 		cout<<"Element: "<<elemQueue.front()<<endl;
@@ -226,7 +243,7 @@ void test_list(JsonPtr json, const char* key, const char* desc)
 {
 	cout<<endl<<desc<<endl;
 
-	std::list<K> elemList = (*json)[key].wantList<K>();
+	std::list<K> elemList = json->wantList<K>(key);
 	for (auto& element: elemList)
 		cout<<"Element: "<<element<<endl;
 }
@@ -255,7 +272,7 @@ void test_vector(JsonPtr json, const char* key, const char* desc)
 {
 	cout<<endl<<desc<<endl;
 
-	std::vector<K> elemVector = (*json)[key].wantVector<K>();
+	std::vector<K> elemVector = json->wantVector<K>(key);
 	for (auto& element: elemVector)
 		cout<<"Element: "<<element<<endl;
 }
@@ -284,7 +301,7 @@ void test_set(JsonPtr json, const char* key, const char* desc)
 {
 	cout<<endl<<desc<<endl;
 
-	std::set<K> elemSet = (*json)[key].wantSet<K>();
+	std::set<K> elemSet = json->wantSet<K>(key);
 	for (auto& element: elemSet)
 		cout<<"Element: "<<element<<endl;
 }
@@ -313,7 +330,7 @@ void test_unordered_set(JsonPtr json, const char* key, const char* desc)
 {
 	cout<<endl<<desc<<endl;
 
-	std::unordered_set<K> elemSet = (*json)[key].wantUnorderedSet<K>();
+	std::unordered_set<K> elemSet = json->wantUnorderedSet<K>(key);
 	for (auto& element: elemSet)
 		cout<<"Element: "<<element<<endl;
 }
@@ -342,7 +359,7 @@ void test_dict(JsonPtr json, const char* key, const char* desc)
 {
 	cout<<endl<<desc<<endl;
 
-	std::map<std::string, K> elemMap = (*json)[key].wantDict<K>();
+	std::map<std::string, K> elemMap = json->wantDict<K>(key);
 	for (auto& pp: elemMap)
 		cout<<"Element: "<<pp.first<<":"<<pp.second<<endl;
 }
@@ -371,7 +388,7 @@ void test_unordered_dict(JsonPtr json, const char* key, const char* desc)
 {
 	cout<<endl<<desc<<endl;
 
-	std::unordered_map<std::string, K> elemMap = (*json)[key].wantUnorderedDict<K>();
+	std::unordered_map<std::string, K> elemMap = json->wantUnorderedDict<K>(key);
 	for (auto& pp: elemMap)
 		cout<<"Element: "<<pp.first<<":"<<pp.second<<endl;
 }

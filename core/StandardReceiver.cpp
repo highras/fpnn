@@ -254,9 +254,9 @@ static void logHttpBufferError(ChainBuffer* cb, int size, int fd, const char* pe
 
 	Hexlify(hexBuffer, buffer, loggedSize);
 
-	LOG_ERROR("Http buffer recording (visible). org size: %d, rec size: %d. socket: %d, address: %s. Buffer: %s",
+	LOG_WARN("Http buffer recording (visible). org size: %d, rec size: %d. socket: %d, address: %s. Buffer: %s",
 		size, loggedSize, fd, peerName, visibleBinaryString.c_str());
-	LOG_ERROR("Http buffer recording (hex). org size: %d, rec size: %d. socket: %d, address: %s. Buffer: %s",
+	LOG_WARN("Http buffer recording (hex). org size: %d, rec size: %d. socket: %d, address: %s. Buffer: %s",
 		size, loggedSize, fd, peerName, hexBuffer);
 }
 

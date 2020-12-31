@@ -11,6 +11,9 @@
 #include "NetworkUtility.h"
 #include "UDPEpollServer.h"
 
+//-- For unused the returned values of pipe() & write() in UDPEpollServer::stop().
+#pragma GCC diagnostic ignored "-Wunused-result"
+
 using namespace fpnn;
 
 UDPServerPtr UDPEpollServer::_server = nullptr;

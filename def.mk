@@ -6,6 +6,7 @@ DEFAULTPLATFORM=-DHOST_PLATFORM_AWS
 #DEFAULTPLATFORM=-DHOST_PLATFORM_GCP
 #DEFAULTPLATFORM=-DHOST_PLATFORM_AZURE
 #DEFAULTPLATFORM=-DHOST_PLATFORM_TENCENT
+#DEFAULTPLATFORM=-DHOST_PLATFORM_ALIYUN
 
 CFLAGS += $(DEFAULTPLATFORM)
 
@@ -13,7 +14,7 @@ CXXFLAGS += -std=c++11 $(DEFAULTPLATFORM)
 
 CPPFLAGS += -g -Wall -rdynamic -Werror -fPIC $(OPTIMIZE) 
 
-LIBS += $(OPTIMIZE) -lstdc++ -lcurl -lfpnn -lfpproto -lextends -lfpbase -lpthread -lz -lssl -lcrypto $(LINKARGS)
+LIBS += $(OPTIMIZE) -lstdc++ -lfpnn -lfpproto -lextends -lfpbase -lpthread -lz -lssl -lcrypto -lcurl $(LINKARGS)
 #LIBS += $(OPTIMIZE) -static-libstdc++ -lcurl -lfpnn -lfpproto -lextends -lfpbase -lpthread -lz -lssl -lcrypto $(LINKARGS)
 
 #for apps

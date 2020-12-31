@@ -1,6 +1,10 @@
 #ifndef uuid_h_
 #define uuid_h_
 
+#ifndef _DEFAULT_SOURCE
+#define _DEFAULT_SOURCE	1	//-- for compiling warning in /usr/include/features.h.
+#endif
+
 #include <stdint.h>
 #include <stdlib.h>
 

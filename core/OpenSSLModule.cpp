@@ -7,6 +7,13 @@
 #include "IQuestProcessor.h"
 #include "OpenSSLModule.h"
 
+//-- G++ 8: for ignored unused-value warning triggered by CRYPTO_THREADID_set_callback()
+#pragma GCC diagnostic ignored "-Wunused-value"
+
+//-- G++ 8 & 9: for ignored unused-function warning triggered by OpenSSL required
+//--            CRYPTO_set_locking_callback(openSSLLockerCallback) & CRYPTO_THREADID_set_callback(fetchOpenSSLThreadID)
+#pragma GCC diagnostic ignored "-Wunused-function"
+
 using namespace fpnn;
 
 //------------------[ Local Definition & variables ]---------------------------//

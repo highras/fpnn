@@ -338,7 +338,7 @@ void SendBuffer::addWebSocketWrap()
 			uint64_t payloadSize = dataSize;
 			payloadSize = htobe64(payloadSize);
 
-			headerBuffer[1] = 126;
+			headerBuffer[1] = 127;
 			wrappedData.append((char*)headerBuffer, 2);
 			wrappedData.append((char*)&payloadSize, 8);
 		}

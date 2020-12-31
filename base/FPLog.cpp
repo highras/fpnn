@@ -233,7 +233,9 @@ bool FPSockLog::_initSocket() {
     }
     memset(&_server_addr, 0, sizeof(_server_addr));
     _server_addr.sun_family = AF_UNIX;
-    snprintf(_server_addr.sun_path, UNIX_PATH_MAX, _socketFile.c_str());
+    //snprintf(_server_addr.sun_path, UNIX_PATH_MAX, _socketFile.c_str());
+    strncpy(_server_addr.sun_path, _socketFile.c_str(), UNIX_PATH_MAX);
+    _server_addr.sun_path[UNIX_PATH_MAX - 1] = 0;
     if(connect(_socket_fd, (struct sockaddr*)&_server_addr, sizeof(_server_addr)) < 0) {
         fprintf(stderr, "FPLog connect error: %s (errno: %d)\n", strerror(errno), errno);
         return false;

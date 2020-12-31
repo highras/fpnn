@@ -67,7 +67,7 @@ void stressLauncher(int taskId, int threadCount, int clientCount, double perClie
 	actor->addAction(taskId, stressTask);
 }
 
-void ExecutiveActor::action(int taskId, const std::string& method, const FPReaderPtr payload) throw(FpnnError)
+void ExecutiveActor::action(int taskId, const std::string& method, const FPReaderPtr payload)
 {
 	if (method == "beginStress")
 	{

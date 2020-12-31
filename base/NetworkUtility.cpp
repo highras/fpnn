@@ -191,7 +191,7 @@ bool fpnn::getIPs(std::map<enum IPTypes, std::set<std::string>>& ipDict)
 				type = IPv4_Local;
 			else if (ip[0] == 192 && ip[1] == 168)
 				type = IPv4_Local;
-			else if (ip[0] == 127)
+			else if (ip[0] == 127 && ip[1] == 0 && ip[2] == 0 && ip[3] == 1)
 				type = IPv4_Loopback;
 
 			ipDict[type].insert(ipStr);
@@ -225,6 +225,55 @@ bool fpnn::getIPs(std::map<enum IPTypes, std::set<std::string>>& ipDict)
 
 	freeifaddrs(ifaddr);
 	return true;
+}
+
+bool fpnn::NetworkUtil::isPrivateIP(struct sockaddr_in* addr)
+{
+	uint8_t *ip = (uint8_t *)&(addr->sin_addr.s_addr);
+	if (ip[0] == 10)
+		return true;
+	
+	if (ip[0] == 172 && (ip[1] > 15 && ip[1] < 32))
+		return true;
+	
+	if (ip[0] == 192 && ip[1] == 168)
+		return true;
+	
+	if (ip[0] == 127 && ip[1] == 0 && ip[2] == 0 && ip[3] == 1)
+		return true;
+
+	return false;
+}
+bool fpnn::NetworkUtil::isPrivateIP(struct sockaddr_in6* addr)
+{
+	if (addr->sin6_addr.s6_addr[0] == 0xfe)
+	{
+		if (addr->sin6_addr.s6_addr[1] == 0x80)
+			return true;
+		else if (addr->sin6_addr.s6_addr[1] == 0xc0)
+			return true;
+	}
+	else
+	{
+		//-- Loopback
+		for (int i = 0; i < 15; i++)
+			if (addr->sin6_addr.s6_addr[i] != 0)
+				return false;
+
+		if (addr->sin6_addr.s6_addr[15] == 1)
+			return true;
+	}
+
+	return false;
+}
+bool fpnn::NetworkUtil::isPrivateIPv6(const std::string& ipv6)
+{
+	struct sockaddr_in6 addr;
+
+	if (inet_pton(AF_INET6, ipv6.c_str(), &addr.sin6_addr) != 1)
+		return false;
+
+	return isPrivateIP(&addr);
 }
 
 std::string fpnn::NetworkUtil::getFirstIPAddress(enum IPTypes type)

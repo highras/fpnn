@@ -31,6 +31,11 @@ namespace fpnn
 				delete _receiver;
 		}
 
+		inline void setMutex(std::mutex* mutex)
+		{
+			_mutex = mutex;
+		}
+
 		inline bool recvPackage(int fd, bool& needNextEvent)
 		{
 			return _receiver->recvPackage(fd, needNextEvent);
@@ -112,6 +117,8 @@ namespace fpnn
 			if (_encryptor)
 				delete _encryptor;
 		}
+
+		inline void setMutex(std::mutex* mutex) { _mutex = mutex; }
 
 		/** returned INT: id 0, success, else, is errno. */
 		int send(int fd, bool& needWaitSendEvent, bool& actualSent, std::string* data = NULL);

@@ -25,6 +25,9 @@
 #include "OpenSSLModule.h"
 #include "NetworkUtility.h"
 
+//-- For unused the returned values of pipe() & write() in TCPEpollServer::stop().
+#pragma GCC diagnostic ignored "-Wunused-result"
+
 using namespace fpnn;
 
 std::mutex TCPEpollServer::_sendQueueMutex[FPNN_SEND_QUEUE_MUTEX_COUNT];
@@ -858,7 +861,7 @@ void TCPEpollServer::dealAnswer(int socket, FPAnswerPtr answer)
 	BasicAnswerCallback* callback = _connectionMap.takeCallback(socket, answer->seqNumLE());
 	if (!callback)
 	{
-		LOG_WARN("Received error answer seq is %u at socket %d, address: %s", answer->seqNumLE(), socket, NetworkUtil::getPeerName(socket).c_str());
+		LOG_WARN("Received error answer seq is %u at socket %d, address: %s, %s", answer->seqNumLE(), socket, NetworkUtil::getPeerName(socket).c_str(), answer->json().c_str());
 		return;
 	}
 	if (callback->syncedCallback())		//-- check first, then fill result.

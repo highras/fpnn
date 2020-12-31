@@ -8,6 +8,8 @@ using namespace fpnn;
 //======================================//
 //-          Assistant Class           -//
 //======================================//
+static const char* gc_JsonStringEscaper_HexCharsArray = "0123456789abcdef";
+
 class JsonStringEscaper
 {
 	typedef void (JsonStringEscaper::* MethodFunc)(std::ostream& os, const char * start, int len, int & idx);
@@ -15,7 +17,8 @@ class JsonStringEscaper
 
 	void hexadecimal(std::ostream& os, const char * start, int len, int & idx)
 	{
-		os << "\\u" << std::hex << std::setw(4) << std::setfill('0') << (unsigned char)start[idx];
+		unsigned char c = (unsigned char)start[idx];
+		os << "\\u00" << *(gc_JsonStringEscaper_HexCharsArray + (c >> 4)) << *(gc_JsonStringEscaper_HexCharsArray + (c & 0xf));
 	}
 	void quotationMarks(std::ostream& os, const char * start, int len, int & idx)
 	{
@@ -925,13 +928,13 @@ bool Json::remove(const std::string& path, const std::string& delim)
 //======================================//
 //-         Member checking            -//
 //======================================//
-bool Json::isNull(const std::string& path, const std::string& delim) throw()
+bool Json::isNull(const std::string& path, const std::string& delim) noexcept
 {
 	JsonPtr node = getNode(path, delim);
 	return (node && node->isNull());
 }
 
-enum Json::ElementType Json::type(const std::string& path, const std::string& delim) throw(FpnnJosnNodeNotExistError)
+enum Json::ElementType Json::type(const std::string& path, const std::string& delim)
 {
 	JsonPtr node = getNode(path, delim);
 	if (node)
@@ -1016,7 +1019,7 @@ const std::map<std::string, JsonPtr> * const Json::getDict() const
 //======================================//
 //-        Baisc want Function         -//
 //======================================//
-bool Json::wantBool() const throw(FpnnJsonNodeTypeMissMatchError)
+bool Json::wantBool() const
 {
 	if (_type == JSON_Boolean)
 		return (bool)_data;
@@ -1024,7 +1027,7 @@ bool Json::wantBool() const throw(FpnnJsonNodeTypeMissMatchError)
 	throw FPNN_ERROR_MSG(FpnnJsonNodeTypeMissMatchError, "Node type miss match.");
 }
 
-intmax_t Json::wantInt() const throw(FpnnJsonNodeTypeMissMatchError)
+intmax_t Json::wantInt() const
 {
 	if (_type == JSON_Integer)
 		return *((intmax_t*)_data);
@@ -1039,7 +1042,7 @@ intmax_t Json::wantInt() const throw(FpnnJsonNodeTypeMissMatchError)
 	throw FPNN_ERROR_MSG(FpnnJsonNodeTypeMissMatchError, "Node type miss match.");
 }
 
-uintmax_t Json::wantUInt() const throw(FpnnJsonNodeTypeMissMatchError)
+uintmax_t Json::wantUInt() const
 {
 	if (_type == JSON_UInteger)
 		return *((uintmax_t*)_data);
@@ -1054,7 +1057,7 @@ uintmax_t Json::wantUInt() const throw(FpnnJsonNodeTypeMissMatchError)
 	throw FPNN_ERROR_MSG(FpnnJsonNodeTypeMissMatchError, "Node type miss match.");
 }
 
-double Json::wantReal() const throw(FpnnJsonNodeTypeMissMatchError)
+double Json::wantReal() const
 {
 	if (_type == JSON_Real)
 		return *((double*)_data);
@@ -1062,7 +1065,7 @@ double Json::wantReal() const throw(FpnnJsonNodeTypeMissMatchError)
 	throw FPNN_ERROR_MSG(FpnnJsonNodeTypeMissMatchError, "Node type miss match.");
 }
 
-std::string Json::wantString() const throw(FpnnJsonNodeTypeMissMatchError)
+std::string Json::wantString() const
 {
 	if (_type == JSON_String)
 		return *((std::string*)_data);
@@ -1071,7 +1074,7 @@ std::string Json::wantString() const throw(FpnnJsonNodeTypeMissMatchError)
 }
 
 
-std::vector<bool> Json::wantBoolVector() const throw(FpnnJsonNodeTypeMissMatchError)
+std::vector<bool> Json::wantBoolVector() const
 {
 	if (_type != JSON_Array)
 		throw FPNN_ERROR_MSG(FpnnJsonNodeTypeMissMatchError, "Node type miss match.");
@@ -1086,7 +1089,7 @@ std::vector<bool> Json::wantBoolVector() const throw(FpnnJsonNodeTypeMissMatchEr
 	return res;
 }
 
-std::vector<double> Json::wantRealVector() const throw(FpnnJsonNodeTypeMissMatchError)
+std::vector<double> Json::wantRealVector() const
 {
 	if (_type != JSON_Array)
 		throw FPNN_ERROR_MSG(FpnnJsonNodeTypeMissMatchError, "Node type miss match.");
@@ -1101,7 +1104,7 @@ std::vector<double> Json::wantRealVector() const throw(FpnnJsonNodeTypeMissMatch
 	return res;
 }
 
-std::vector<intmax_t> Json::wantIntVector() const throw(FpnnJsonNodeTypeMissMatchError)
+std::vector<intmax_t> Json::wantIntVector() const
 {
 	if (_type != JSON_Array)
 		throw FPNN_ERROR_MSG(FpnnJsonNodeTypeMissMatchError, "Node type miss match.");
@@ -1116,7 +1119,7 @@ std::vector<intmax_t> Json::wantIntVector() const throw(FpnnJsonNodeTypeMissMatc
 	return res;
 }
 
-std::vector<std::string> Json::wantStringVector() const throw(FpnnJsonNodeTypeMissMatchError)
+std::vector<std::string> Json::wantStringVector() const
 {
 	if (_type != JSON_Array)
 		throw FPNN_ERROR_MSG(FpnnJsonNodeTypeMissMatchError, "Node type miss match.");
@@ -1131,7 +1134,7 @@ std::vector<std::string> Json::wantStringVector() const throw(FpnnJsonNodeTypeMi
 	return res;
 }
 
-std::map<std::string, bool> Json::wantBoolDict() const throw(FpnnJsonNodeTypeMissMatchError)
+std::map<std::string, bool> Json::wantBoolDict() const
 {
 	if (_type != JSON_Object)
 		throw FPNN_ERROR_MSG(FpnnJsonNodeTypeMissMatchError, "Node type miss match.");
@@ -1145,7 +1148,7 @@ std::map<std::string, bool> Json::wantBoolDict() const throw(FpnnJsonNodeTypeMis
 	return res;
 }
 
-std::map<std::string, double> Json::wantRealDict() const throw(FpnnJsonNodeTypeMissMatchError)
+std::map<std::string, double> Json::wantRealDict() const
 {
 	if (_type != JSON_Object)
 		throw FPNN_ERROR_MSG(FpnnJsonNodeTypeMissMatchError, "Node type miss match.");
@@ -1159,7 +1162,7 @@ std::map<std::string, double> Json::wantRealDict() const throw(FpnnJsonNodeTypeM
 	return res;
 }
 
-std::map<std::string, intmax_t> Json::wantIntDict() const throw(FpnnJsonNodeTypeMissMatchError)
+std::map<std::string, intmax_t> Json::wantIntDict() const
 {
 	if (_type != JSON_Object)
 		throw FPNN_ERROR_MSG(FpnnJsonNodeTypeMissMatchError, "Node type miss match.");
@@ -1173,7 +1176,7 @@ std::map<std::string, intmax_t> Json::wantIntDict() const throw(FpnnJsonNodeType
 	return res;
 }
 
-std::map<std::string, std::string> Json::wantStringDict() const throw(FpnnJsonNodeTypeMissMatchError)
+std::map<std::string, std::string> Json::wantStringDict() const
 {
 	if (_type != JSON_Object)
 		throw FPNN_ERROR_MSG(FpnnJsonNodeTypeMissMatchError, "Node type miss match.");
@@ -1261,7 +1264,7 @@ const std::map<std::string, JsonPtr> * const Json::getDict(const std::string& pa
 //======================================//
 //-      Pathlized want Function       -//
 //======================================//
-bool Json::wantBool(const std::string& path, const std::string& delim) throw(FpnnLogicError)
+bool Json::wantBool(const std::string& path, const std::string& delim)
 {
 	JsonPtr node = getNode(path, delim);
 	if (node)
@@ -1270,7 +1273,7 @@ bool Json::wantBool(const std::string& path, const std::string& delim) throw(Fpn
 	throw FPNN_ERROR_MSG(FpnnJosnNodeNotExistError, "Target node doesn't exist.");
 }
 
-intmax_t Json::wantInt(const std::string& path, const std::string& delim) throw(FpnnLogicError)
+intmax_t Json::wantInt(const std::string& path, const std::string& delim)
 {
 	JsonPtr node = getNode(path, delim);
 	if (node)
@@ -1279,7 +1282,7 @@ intmax_t Json::wantInt(const std::string& path, const std::string& delim) throw(
 	throw FPNN_ERROR_MSG(FpnnJosnNodeNotExistError, "Target node doesn't exist.");
 }
 
-uintmax_t Json::wantUInt(const std::string& path, const std::string& delim) throw(FpnnLogicError)
+uintmax_t Json::wantUInt(const std::string& path, const std::string& delim)
 {
 	JsonPtr node = getNode(path, delim);
 	if (node)
@@ -1288,7 +1291,7 @@ uintmax_t Json::wantUInt(const std::string& path, const std::string& delim) thro
 	throw FPNN_ERROR_MSG(FpnnJosnNodeNotExistError, "Target node doesn't exist.");
 }
 
-double Json::wantReal(const std::string& path, const std::string& delim) throw(FpnnLogicError)
+double Json::wantReal(const std::string& path, const std::string& delim)
 {
 	JsonPtr node = getNode(path, delim);
 	if (node)
@@ -1297,7 +1300,7 @@ double Json::wantReal(const std::string& path, const std::string& delim) throw(F
 	throw FPNN_ERROR_MSG(FpnnJosnNodeNotExistError, "Target node doesn't exist.");
 }
 
-std::string Json::wantString(const std::string& path, const std::string& delim) throw(FpnnLogicError)
+std::string Json::wantString(const std::string& path, const std::string& delim)
 {
 	JsonPtr node = getNode(path, delim);
 	if (node)
@@ -1306,19 +1309,19 @@ std::string Json::wantString(const std::string& path, const std::string& delim) 
 	throw FPNN_ERROR_MSG(FpnnJosnNodeNotExistError, "Target node doesn't exist.");
 }
 
-Json& Json::operator [] (const char * path) throw(FpnnJsonNodeTypeMissMatchError)
+Json& Json::operator [] (const char * path)
 {
 	JsonPtr node = createNode(path, "./", true);
 	return *(node.get());
 }
 
-Json& Json::operator [] (const std::string& path) throw(FpnnJsonNodeTypeMissMatchError)
+Json& Json::operator [] (const std::string& path)
 {
 	JsonPtr node = createNode(path, "./", true);
 	return *(node.get());
 }
 
-Json& Json::operator [] (int index) throw(FpnnJsonNodeTypeMissMatchError)
+Json& Json::operator [] (int index)
 {
 	if (_type == JSON_Uninit)
 		setArray();
@@ -1349,7 +1352,7 @@ Json& Json::operator [] (int index) throw(FpnnJsonNodeTypeMissMatchError)
 	return *(node.get());
 }
 
-std::vector<bool> Json::wantBoolVector(const std::string& path, const std::string& delim) throw(FpnnLogicError)
+std::vector<bool> Json::wantBoolVector(const std::string& path, const std::string& delim)
 {
 	JsonPtr node = getNode(path, delim);
 	if (node)
@@ -1358,7 +1361,7 @@ std::vector<bool> Json::wantBoolVector(const std::string& path, const std::strin
 	throw FPNN_ERROR_MSG(FpnnJosnNodeNotExistError, "Target node doesn't exist.");
 }
 
-std::vector<double> Json::wantRealVector(const std::string& path, const std::string& delim) throw(FpnnLogicError)
+std::vector<double> Json::wantRealVector(const std::string& path, const std::string& delim)
 {
 	JsonPtr node = getNode(path, delim);
 	if (node)
@@ -1367,7 +1370,7 @@ std::vector<double> Json::wantRealVector(const std::string& path, const std::str
 	throw FPNN_ERROR_MSG(FpnnJosnNodeNotExistError, "Target node doesn't exist.");
 }
 
-std::vector<intmax_t> Json::wantIntVector(const std::string& path, const std::string& delim) throw(FpnnLogicError)
+std::vector<intmax_t> Json::wantIntVector(const std::string& path, const std::string& delim)
 {
 	JsonPtr node = getNode(path, delim);
 	if (node)
@@ -1376,7 +1379,7 @@ std::vector<intmax_t> Json::wantIntVector(const std::string& path, const std::st
 	throw FPNN_ERROR_MSG(FpnnJosnNodeNotExistError, "Target node doesn't exist.");
 }
 
-std::vector<std::string> Json::wantStringVector(const std::string& path, const std::string& delim) throw(FpnnLogicError)
+std::vector<std::string> Json::wantStringVector(const std::string& path, const std::string& delim)
 {
 	JsonPtr node = getNode(path, delim);
 	if (node)
@@ -1386,7 +1389,7 @@ std::vector<std::string> Json::wantStringVector(const std::string& path, const s
 }
 
 
-std::map<std::string, bool> Json::wantBoolDict(const std::string& path, const std::string& delim) throw(FpnnLogicError)
+std::map<std::string, bool> Json::wantBoolDict(const std::string& path, const std::string& delim)
 {
 	JsonPtr node = getNode(path, delim);
 	if (node)
@@ -1395,7 +1398,7 @@ std::map<std::string, bool> Json::wantBoolDict(const std::string& path, const st
 	throw FPNN_ERROR_MSG(FpnnJosnNodeNotExistError, "Target node doesn't exist.");
 }
 
-std::map<std::string, double> Json::wantRealDict(const std::string& path, const std::string& delim) throw(FpnnLogicError)
+std::map<std::string, double> Json::wantRealDict(const std::string& path, const std::string& delim)
 {
 	JsonPtr node = getNode(path, delim);
 	if (node)
@@ -1404,7 +1407,7 @@ std::map<std::string, double> Json::wantRealDict(const std::string& path, const 
 	throw FPNN_ERROR_MSG(FpnnJosnNodeNotExistError, "Target node doesn't exist.");
 }
 
-std::map<std::string, intmax_t> Json::wantIntDict(const std::string& path, const std::string& delim) throw(FpnnLogicError)
+std::map<std::string, intmax_t> Json::wantIntDict(const std::string& path, const std::string& delim)
 {
 	JsonPtr node = getNode(path, delim);
 	if (node)
@@ -1413,7 +1416,7 @@ std::map<std::string, intmax_t> Json::wantIntDict(const std::string& path, const
 	throw FPNN_ERROR_MSG(FpnnJosnNodeNotExistError, "Target node doesn't exist.");
 }
 
-std::map<std::string, std::string> Json::wantStringDict(const std::string& path, const std::string& delim) throw(FpnnLogicError)
+std::map<std::string, std::string> Json::wantStringDict(const std::string& path, const std::string& delim)
 {
 	JsonPtr node = getNode(path, delim);
 	if (node)

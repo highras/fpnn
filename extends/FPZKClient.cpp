@@ -519,26 +519,40 @@ bool FPZKClient::syncSelfStatus(float perCPUUsage)
 		return false;
 	}
 
-	std::map<std::string, int64_t> rvMap = ar.get("revisionMap", std::map<std::string, int64_t>());
-	
-	for (auto& revpair: rvMap)
-		queriedServices.erase(revpair.first);
-
-	for (auto& service: queriedServices)
+	std::vector<std::string> services = ar.get("services", std::vector<std::string>());
+	if (services.size() > 0)
 	{
-		_servicesMap.erase(service);
-		LOG_INFO("Services %s cluster is empty in FPZK clinet cache!",  service.c_str());
+		//-- FPZKServer 3.0.2 and after
+		for (auto& service: services)
+			queriedServices.erase(service);
+
+		std::vector<int64_t> revisions = ar.get("revisions", std::vector<int64_t>());
+		std::vector<int64_t> clusterAlteredTimes = ar.get("clusterAlteredTimes", std::vector<int64_t>());
+
+		updateChangedAndMonitoredServices(queriedServices, services, revisions, clusterAlteredTimes);
+	}
+	else
+	{
+		//-- FPZKServer 3.0.1 and before
+		std::map<std::string, int64_t> rvMap = ar.get("revisionMap", std::map<std::string, int64_t>());
+		
+		for (auto& revpair: rvMap)
+			queriedServices.erase(revpair.first);
+
+		updateChangedAndMonitoredServices(queriedServices, rvMap);
 	}
 
-	updateChangedAndMonitoredServices(rvMap);
 	return true;
 }
 
-void FPZKClient::updateChangedAndMonitoredServices(const std::map<std::string, int64_t>& rvMap)
+void FPZKClient::updateChangedAndMonitoredServices(const std::set<std::string>& invalidServices, const std::map<std::string, int64_t>& rvMap)
 {
 	std::set<std::string> needUpdateServices;
 	{
 		std::lock_guard<std::mutex> lck(_mutex);
+
+		for (auto& service: invalidServices)
+			_servicesMap.erase(service);
 
 		if (_monitorDetail == false)
 		{
@@ -558,6 +572,50 @@ void FPZKClient::updateChangedAndMonitoredServices(const std::map<std::string, i
 		}
 		else
 			needUpdateServices = _interestServices;
+	}
+
+	for (auto& service: invalidServices)
+	{
+		LOG_INFO("Services %s cluster is empty in FPZK clinet cache!",  service.c_str());
+	}
+
+	if(!needUpdateServices.empty())
+		fetchInterestServices(needUpdateServices);
+}
+
+void FPZKClient::updateChangedAndMonitoredServices(const std::set<std::string>& invalidServices,
+	const std::vector<std::string>& services, const std::vector<int64_t>& revisions, const std::vector<int64_t>& clusterAlteredTimes)
+{
+	std::set<std::string> needUpdateServices;
+	{
+		std::lock_guard<std::mutex> lck(_mutex);
+
+		for (auto& service: invalidServices)
+			_servicesMap.erase(service);
+
+		if (_monitorDetail == false)
+		{
+			for (size_t i = 0; i < services.size(); i++)
+			{
+				auto it = _servicesMap.find(services[i]);
+				if (it != _servicesMap.end())
+				{
+					if (it->second->clusterAlteredMsec != clusterAlteredTimes[i] || it->second->revision != revisions[i])
+						needUpdateServices.insert(services[i]);
+				}
+				else
+					needUpdateServices.insert(services[i]);
+			}
+
+			needUpdateServices.insert(_detailServices.begin(), _detailServices.end());
+		}
+		else
+			needUpdateServices = _interestServices;
+	}
+
+	for (auto& service: invalidServices)
+	{
+		LOG_INFO("Services %s cluster is empty in FPZK clinet cache!",  service.c_str());
 	}
 
 	if(!needUpdateServices.empty())

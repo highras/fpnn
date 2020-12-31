@@ -44,9 +44,9 @@ std::string TimeUtil::getTimeStr(int64_t t, char sep){
 	struct tm timeInfo;
 	struct tm *tmT = localtime_r(&t, &timeInfo);
 	if (tmT){
-		snprintf(buff, sizeof(buff), "%04d%c%02d%c%02d%c%02d%c%02d%c%02d",
-				tmT->tm_year+1900, sep, tmT->tm_mon+1, sep, tmT->tm_mday, sep,
-				tmT->tm_hour,sep, tmT->tm_min, sep, tmT->tm_sec);
+		snprintf(buff, sizeof(buff), "%04hd%c%02hhd%c%02hhd%c%02hhd%c%02hhd%c%02hhd",
+				(short)(tmT->tm_year+1900), sep, (int8_t)(tmT->tm_mon+1), sep, (int8_t)(tmT->tm_mday), sep,
+				(int8_t)(tmT->tm_hour), sep, (int8_t)(tmT->tm_min), sep, (int8_t)(tmT->tm_sec));
 	}
 	return std::string(buff);
 }
@@ -62,9 +62,7 @@ std::string TimeUtil::getDateTime(int64_t t){
 	struct tm timeInfo;
 	struct tm *tmT = localtime_r(&t, &timeInfo);
 	if (tmT)
-		snprintf(buff, sizeof(buff), "%04d-%02d-%02d %02d:%02d:%02d",
-				tmT->tm_year+1900, tmT->tm_mon+1, tmT->tm_mday,
-				tmT->tm_hour, tmT->tm_min, tmT->tm_sec);
+		strftime(buff, sizeof(buff), "%Y-%m-%d %T", tmT);
 	return std::string(buff);
 }
 

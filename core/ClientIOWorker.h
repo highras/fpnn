@@ -15,6 +15,7 @@ namespace fpnn
 	class TCPClientConnection: public TCPBasicConnection
 	{
 	private:
+		std::mutex _mutex;
 		std::weak_ptr<TCPClient> _client;
 
 	public:
@@ -22,10 +23,11 @@ namespace fpnn
 		virtual enum ConnectionType connectionType() { return BasicConnection::TCPClientConnectionType; }
 		TCPClientPtr client() { return _client.lock(); }
 
-		TCPClientConnection(TCPClientPtr client, std::mutex* mutex, int ioChunkSize, ConnectionInfoPtr connectionInfo):
-			TCPBasicConnection(mutex, ioChunkSize, connectionInfo), _client(client)
+		TCPClientConnection(TCPClientPtr client, int ioChunkSize, ConnectionInfoPtr connectionInfo):
+			TCPBasicConnection(NULL, ioChunkSize, connectionInfo), _client(client)
 		{
 			_connectionInfo->token = (uint64_t)this;	//-- if using Virtual Derive, must do this. Else, this is just redo the action in base class.
+			resetMutex(&_mutex);
 		}
 
 		~TCPClientConnection() {}

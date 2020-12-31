@@ -47,7 +47,7 @@ public:
 	bool actorStopped();
 	std::string actorName();
 	void setRegion(const std::string& region) { _region = region; }
-	void action(int taskId, const std::string& method, const FPReaderPtr payload) throw(FpnnError);
+	void action(int taskId, const std::string& method, const FPReaderPtr payload);
 	static std::string customParamsUsage();
 
 public:

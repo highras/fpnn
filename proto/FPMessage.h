@@ -1,5 +1,11 @@
 #ifndef FPMessage_h_
 #define FPMessage_h_
+
+#if (__GNUC__ >= 8)
+//-- For msgpack & RapidJSON: -Wall will triggered the -Wclass-memaccess with G++ 8 and later.
+#pragma GCC diagnostic ignored "-Wclass-memaccess"
+#endif
+
 #include <memory>
 #include <atomic>
 #include <msgpack.hpp>

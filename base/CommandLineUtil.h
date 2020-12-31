@@ -15,6 +15,7 @@ namespace fpnn
 /*
 	Sign can only following '-' or '--'.
 	If sign has a value, it CANNOT beignning with '-' or '--'.
+	DO NOT support a flag (sign without value) front of rest params list. 
 */
 class CommandLineParser
 {
