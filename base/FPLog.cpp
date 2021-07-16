@@ -234,8 +234,8 @@ bool FPSockLog::_initSocket() {
     memset(&_server_addr, 0, sizeof(_server_addr));
     _server_addr.sun_family = AF_UNIX;
     //snprintf(_server_addr.sun_path, UNIX_PATH_MAX, _socketFile.c_str());
-    strncpy(_server_addr.sun_path, _socketFile.c_str(), UNIX_PATH_MAX);
-    _server_addr.sun_path[UNIX_PATH_MAX - 1] = 0;
+    strncpy(_server_addr.sun_path, _socketFile.c_str(), sizeof(_server_addr.sun_path));
+    _server_addr.sun_path[sizeof(_server_addr.sun_path) - 1] = 0;
     if(connect(_socket_fd, (struct sockaddr*)&_server_addr, sizeof(_server_addr)) < 0) {
         fprintf(stderr, "FPLog connect error: %s (errno: %d)\n", strerror(errno), errno);
         return false;
@@ -324,10 +324,11 @@ void FPLog::log(FPLogLevel curLevel, const char* fileName, int32_t line, const c
         delete log;
         return;
     }
-    int32_t s = snprintf(log->_body, FPLOG_BUF_SIZE, "[%s]~[%s]~[%d(%ld)]~[%s@%s@%s@%s:%d]~[%s]: ", 
+    int32_t s = snprintf(log->_body, FPLOG_BUF_SIZE, "[%s]~[%s]~[%d(%d)]~[%s@%s@%s@%s:%d]~[%s]: ", 
         TimeUtil::getDateTimeMS().c_str(),
         dbgLevelStr[curLevel],
-        pid,syscall(SYS_gettid),
+        //pid,long(syscall(SYS_gettid)),
+        pid,getttid(),
         _localIP4.c_str(), _serverName.c_str(), funcName, fileName, line, tag);
     s = std::min(FPLOG_BUF_SIZE, s);
     if (s > 0) {
@@ -354,10 +355,11 @@ void FPLog::logRoute(const std::string& route, const char* fileName, int32_t lin
         delete log;
         return;
     }
-    int32_t s = snprintf(log->_body, FPLOG_BUF_SIZE, "[%s]~[%s]~[%d(%ld)]~[%s@%s@%s@%s:%d]~[%s]: ", 
+    int32_t s = snprintf(log->_body, FPLOG_BUF_SIZE, "[%s]~[%s]~[%d(%d)]~[%s@%s@%s@%s:%d]~[%s]: ", 
         TimeUtil::getDateTimeMS().c_str(),
         "INFO",
-        pid,syscall(SYS_gettid),
+        //pid,long(syscall(SYS_gettid)),
+        pid,getttid(),
         _localIP4.c_str(), _serverName.c_str(), funcName, fileName, line, tag);
     s = std::min(FPLOG_BUF_SIZE, s);
     if (s > 0) {
@@ -397,7 +399,7 @@ void FPLog::logTag(const std::string& tag, const std::string& body) {
 using namespace std;
 
 int main(int argc, char **argv) {
-
+    
     //ofstream file;
     //file.open("test.log");
     //FPLog::init(file, "fpnn.test", "DEBUG");
@@ -406,7 +408,7 @@ int main(int argc, char **argv) {
     //FPLog::init("std::cerr", "fpnn.test", "DEBUG");
     //FPLog::init("std::cout", "fpnn.test", "DEBUG");
     //FPLog::init("tcp://127.0.0.1:9999", "fpnn.test", "DEBUG");
-    FPLog::init("unix:///mnt/home/jianjun.zhao/code/infra-log-server/logAgent/fplog.sock", "rtmGated", "DEBUG", "test_server_name");
+    FPLog::init("unix:///tmp/fplog.sock", "rtmGated", "DEBUG", "test_server_name");
 
     //FPLog::setLevel("DEBUG");
 

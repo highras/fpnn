@@ -1081,8 +1081,8 @@ bool MultipleURLEngine::pushTasks(std::vector<BaiscResultCallbackPtr> &tasks)
 	return true;
 }
 
-bool MultipleURLEngine::visit(const std::string& url, Result &result,
-	int timeoutSeconds, const std::string& postBody)
+bool MultipleURLEngine::visit(const std::string& url, Result &result, int timeoutSeconds,
+	bool saveResponseData, const std::string& postBody, const std::vector<std::string>& header)
 {
 	CURL *easy = curl_easy_init();
 	if (!easy)
@@ -1094,7 +1094,7 @@ bool MultipleURLEngine::visit(const std::string& url, Result &result,
 		return false;
 	}
 
-	if (!visit(easy, result, timeoutSeconds, true, postBody))
+	if (!visit(easy, result, timeoutSeconds, saveResponseData, postBody, header))
 	{
 		curl_easy_cleanup(easy);
 		return false;
@@ -1104,10 +1104,10 @@ bool MultipleURLEngine::visit(const std::string& url, Result &result,
 }
 
 bool MultipleURLEngine::visit(CURL *curl, Result &result, int timeoutSeconds, bool saveResponseData,
-		const std::string& postBody)
+		const std::string& postBody, const std::vector<std::string>& header)
 {
 	std::shared_ptr<SyncedResultCallback> callback = std::make_shared<SyncedResultCallback>(&result);	
-	if (real_visit(curl, callback, timeoutSeconds, saveResponseData, postBody))
+	if (real_visit(curl, callback, timeoutSeconds, saveResponseData, header, postBody))
 	{
 		callback->waitResult();
 		return true;
@@ -1116,8 +1116,8 @@ bool MultipleURLEngine::visit(CURL *curl, Result &result, int timeoutSeconds, bo
 		return false;
 }
 
-bool MultipleURLEngine::visit(const std::string& url, ResultCallbackPtr callback,
-	int timeoutSeconds, const std::string& postBody)
+bool MultipleURLEngine::visit(const std::string& url, ResultCallbackPtr callback, int timeoutSeconds,
+	bool saveResponseData, const std::string& postBody, const std::vector<std::string>& header)
 {
 	CURL *easy = curl_easy_init();
 	if (!easy)
@@ -1129,7 +1129,7 @@ bool MultipleURLEngine::visit(const std::string& url, ResultCallbackPtr callback
 		return false;
 	}
 
-	if (!visit(easy, callback, timeoutSeconds, true, postBody))
+	if (!visit(easy, callback, timeoutSeconds, saveResponseData, postBody, header))
 	{
 		callback->_handle = NULL;
 		curl_easy_cleanup(easy);
@@ -1139,8 +1139,8 @@ bool MultipleURLEngine::visit(const std::string& url, ResultCallbackPtr callback
 	return true;
 }
 
-bool MultipleURLEngine::visit(const std::string& url,
-	std::function<void (Result &result)> callback, int timeoutSeconds, const std::string& postBody)
+bool MultipleURLEngine::visit(const std::string& url, std::function<void (Result &result)> callback,
+	int timeoutSeconds, bool saveResponseData, const std::string& postBody, const std::vector<std::string>& header)
 {
 	CURL *easy = curl_easy_init();
 	if (!easy)
@@ -1153,7 +1153,7 @@ bool MultipleURLEngine::visit(const std::string& url,
 	}
 
 	std::shared_ptr<FunctionResultCallback>  fcb(new FunctionResultCallback(std::move(callback)));
-	if (!real_visit(easy, fcb, timeoutSeconds, true, postBody))
+	if (!real_visit(easy, fcb, timeoutSeconds, saveResponseData, header, postBody))
 	{
 		fcb->_handle = NULL;
 		curl_easy_cleanup(easy);
@@ -1163,8 +1163,8 @@ bool MultipleURLEngine::visit(const std::string& url,
 	return true;
 }
 
-bool MultipleURLEngine::addToBatch(const std::string& url, ResultCallbackPtr callback,
-	int timeoutSeconds, const std::string& postBody)
+bool MultipleURLEngine::addToBatch(const std::string& url, ResultCallbackPtr callback, int timeoutSeconds,
+	bool saveResponseData, const std::string& postBody, const std::vector<std::string>& header)
 {
 	CURL *easy = curl_easy_init();
 	if (!easy)
@@ -1176,7 +1176,7 @@ bool MultipleURLEngine::addToBatch(const std::string& url, ResultCallbackPtr cal
 		return false;
 	}
 
-	if (!real_addToBatch(easy, callback, timeoutSeconds, true, postBody))
+	if (!real_addToBatch(easy, callback, timeoutSeconds, saveResponseData, header, postBody))
 	{
 		callback->_handle = NULL;
 		curl_easy_cleanup(easy);
@@ -1186,8 +1186,8 @@ bool MultipleURLEngine::addToBatch(const std::string& url, ResultCallbackPtr cal
 	return true;
 }
 
-bool MultipleURLEngine::addToBatch(const std::string& url,
-	std::function<void (Result &result)> callback, int timeoutSeconds, const std::string& postBody)
+bool MultipleURLEngine::addToBatch(const std::string& url, std::function<void (Result &result)> callback,
+	int timeoutSeconds, bool saveResponseData, const std::string& postBody, const std::vector<std::string>& header)
 {
 	CURL *easy = curl_easy_init();
 	if (!easy)
@@ -1200,7 +1200,7 @@ bool MultipleURLEngine::addToBatch(const std::string& url,
 	}
 
 	std::shared_ptr<FunctionResultCallback>  fcb(new FunctionResultCallback(std::move(callback)));
-	if (!real_addToBatch(easy, fcb, timeoutSeconds, true, postBody))
+	if (!real_addToBatch(easy, fcb, timeoutSeconds, saveResponseData, header, postBody))
 	{
 		fcb->_handle = NULL;
 		curl_easy_cleanup(easy);
@@ -1211,10 +1211,20 @@ bool MultipleURLEngine::addToBatch(const std::string& url,
 }
 
 bool MultipleURLEngine::prepareEasyHandle(CURL *curl, BaiscResultCallbackPtr callback, int timeoutSeconds,
-		bool saveResponseData, const std::string& postBody)
+		bool saveResponseData, const std::vector<std::string>& headers, const std::string& postBody)
 {
 	if (timeoutSeconds >= 0)
 		curl_easy_setopt(curl, CURLOPT_TIMEOUT, timeoutSeconds);
+
+	if (headers.size() > 0)
+	{
+		for (auto& header: headers)
+		{
+			callback->_headerChunk = curl_slist_append(callback->_headerChunk, header.c_str());
+		}
+
+		curl_easy_setopt(curl, CURLOPT_HTTPHEADER, callback->_headerChunk);
+	}
 
 	if (saveResponseData)
 	{
@@ -1245,18 +1255,18 @@ bool MultipleURLEngine::prepareEasyHandle(CURL *curl, BaiscResultCallbackPtr cal
 }
 
 bool MultipleURLEngine::real_visit(CURL *curl, BaiscResultCallbackPtr callback, int timeoutSeconds,
-		bool saveResponseData, const std::string& postBody)
+		bool saveResponseData, const std::vector<std::string>& headers, const std::string& postBody)
 {
-	if (!prepareEasyHandle(curl, callback, timeoutSeconds, saveResponseData, postBody))
+	if (!prepareEasyHandle(curl, callback, timeoutSeconds, saveResponseData, headers, postBody))
 		return false;
 	
 	return pushTask(callback);
 }
 
 bool MultipleURLEngine::real_addToBatch(CURL *curl, BaiscResultCallbackPtr callback, int timeoutSeconds,
-		bool saveResponseData, const std::string& postBody)
+		bool saveResponseData, const std::vector<std::string>& headers, const std::string& postBody)
 {
-	if (!prepareEasyHandle(curl, callback, timeoutSeconds, saveResponseData, postBody))
+	if (!prepareEasyHandle(curl, callback, timeoutSeconds, saveResponseData, headers, postBody))
 		return false;
 
 	if (_localTaskCache == nullptr)

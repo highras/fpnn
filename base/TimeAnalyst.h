@@ -43,8 +43,8 @@ private:
 	int addSegment(const std::string& desc, bool isMark);
 	int addFragment(const std::string& desc);
 
-	friend class SegmentTimeMonitor;
-	friend class FragmentTimeMonitor;
+	friend struct SegmentTimeMonitor;
+	friend struct FragmentTimeMonitor;
 
 public:
 	SegmentTimeAnalyst(const std::string& desc): _index(0), _desc(desc)

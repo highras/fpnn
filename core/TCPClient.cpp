@@ -16,8 +16,12 @@
 using namespace fpnn;
 
 TCPClient::TCPClient(const std::string& host, int port, bool autoReconnect):
-	Client(host, port, autoReconnect), _AESKeyLen(16), _packageEncryptionMode(true), _sslEnabled(false), _ioChunkSize(256)
-{}
+	Client(host, port, autoReconnect), _AESKeyLen(16), _packageEncryptionMode(true),
+	_sslEnabled(false), _ioChunkSize(256), _keepAliveParams(NULL)
+{
+	if (Config::Client::KeepAlive::defaultEnable)
+		keepAlive();
+}
 
 bool TCPClient::enableEncryptorByDerData(const std::string &derData, bool packageMode, bool reinforce)
 {
@@ -67,6 +71,35 @@ bool TCPClient::enableSSL(bool enable)
 	}
 	else
 		return false;
+}
+
+void TCPClient::keepAlive()
+{
+	std::unique_lock<std::mutex> lck(_mutex);
+
+	if (!_keepAliveParams)
+	{
+		_keepAliveParams = new TCPClientKeepAliveParams;
+
+		_keepAliveParams->pingTimeout = 0;
+		_keepAliveParams->pingInterval = Config::Client::KeepAlive::pingInterval;
+		_keepAliveParams->maxPingRetryCount = Config::Client::KeepAlive::maxPingRetryCount;
+	}
+}
+void TCPClient::setKeepAlivePingTimeout(int seconds)
+{
+	keepAlive();
+	_keepAliveParams->pingTimeout = seconds * 1000;
+}
+void TCPClient::setKeepAliveInterval(int seconds)
+{
+	keepAlive();
+	_keepAliveParams->pingInterval = seconds * 1000;
+}
+void TCPClient::setKeepAliveMaxPingRetryCount(int count)
+{
+	keepAlive();
+	_keepAliveParams->maxPingRetryCount = count;
 }
 
 class QuestTask: public ITaskThreadPool::ITask
@@ -170,6 +203,16 @@ void TCPClient::dealQuest(FPQuestPtr quest, ConnectionInfoPtr connectionInfo)		/
 	}
 }
 
+void TCPClient::configKeepAliveParams(const TCPClientKeepAliveParams* params)
+{
+	std::unique_lock<std::mutex> lck(_mutex);
+
+	if (!_keepAliveParams)
+		_keepAliveParams = new TCPClientKeepAliveParams;
+
+	_keepAliveParams->config(params);	
+}
+
 bool TCPClient::configEncryptedConnection(TCPClientConnection* connection, std::string& publicKey)
 {
 	if (_eccCurve.empty())
@@ -217,6 +260,18 @@ ConnectionInfoPtr TCPClient::perpareConnection(int socket, std::string& publicKe
 		std::unique_lock<std::mutex> lck(_mutex);
 		newConnectionInfo.reset(new ConnectionInfo(socket, _connectionInfo->port, _connectionInfo->ip, _isIPv4, false));
 		connection = new TCPClientConnection(shared_from_this(), _ioChunkSize, newConnectionInfo);
+
+		if (_keepAliveParams)
+		{
+			if (_keepAliveParams->pingTimeout)
+				connection->configKeepAlive(_keepAliveParams);
+			else
+			{
+				_keepAliveParams->pingTimeout = _timeoutQuest ? _timeoutQuest : ClientEngine::getQuestTimeout() * 1000;
+				connection->configKeepAlive(_keepAliveParams);
+				_keepAliveParams->pingTimeout = 0;
+			}
+		}
 	}
 
 	if (_sslEnabled)

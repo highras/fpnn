@@ -47,6 +47,10 @@ static std::string HOST_PLATFORM = "FP.server.host.platform";
 
 const std::string& ServerInfo::getServerHostName(){
 	while(_serverHostName.empty()){
+		_serverHostName = Setting::getString("FP.server.domain");
+		if (!_serverHostName.empty())
+			return _serverHostName;
+		
 		std::string key = "FP.server.hostname";
 		if(Setting::setted(key)){
 			_serverHostName = Setting::getString(key);

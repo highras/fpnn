@@ -57,6 +57,7 @@ namespace NetworkUtil
 
 	bool isPrivateIP(struct sockaddr_in* addr);
 	bool isPrivateIP(struct sockaddr_in6* addr);
+	bool isPrivateIPv4(const std::string& ipv4);
 	bool isPrivateIPv6(const std::string& ipv6);
 }
 

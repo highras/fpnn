@@ -147,7 +147,7 @@ namespace fpnn
 			exitCheck();
 			
 			if (_ioPool)
-				_ioPool->setServerIOWorker(nullptr);
+				_ioPool->setServerIOWorker((std::shared_ptr<TCPServerIOWorker>)nullptr);
 		}
 
 		static TCPServerPtr create(){

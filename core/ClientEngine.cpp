@@ -256,6 +256,7 @@ void ClientEngine::sendCloseEvent()
 		struct epoll_event	ev;
 		ev.data.fd = socket;
 		ev.events = EPOLLHUP | EPOLLRDHUP;
+
 		processEvent(ev);
 	}
 }
@@ -373,6 +374,22 @@ void ClientEngine::processEvent(struct epoll_event & event)
 				client->willClose(conn);
 				return;
 			}
+			else
+			{
+				IQuestProcessorPtr processor = conn->questProcessor();
+				if (processor)
+				{
+					std::shared_ptr<ClientCloseTask> task(new ClientCloseTask(processor, conn, false));
+					_answerCallbackPool.wakeUp(task);
+					_reclaimer->reclaim(task);
+				}
+				else
+				{
+					ConnectionReclaimTaskPtr task(new ConnectionReclaimTask(conn));
+					_reclaimer->reclaim(task);
+				}
+				return;
+			}
 		}
 
 		LOG_ERROR("This codes (Engine::close) is impossible touched. This is just a safety inspection. If this ERROR triggered, please tell swxlion to add old CloseErrorTask class back, and fix it.");
@@ -411,6 +428,22 @@ void ClientEngine::processEvent(struct epoll_event & event)
 				client->errorAndWillBeClosed(conn);
 				return;
 			}
+			else
+			{
+				IQuestProcessorPtr processor = conn->questProcessor();
+				if (processor)
+				{
+					std::shared_ptr<ClientCloseTask> task(new ClientCloseTask(processor, conn, true));
+					_answerCallbackPool.wakeUp(task);
+					_reclaimer->reclaim(task);
+				}
+				else
+				{
+					ConnectionReclaimTaskPtr task(new ConnectionReclaimTask(conn));
+					_reclaimer->reclaim(task);
+				}
+				return;
+			}
 		}
 
 		LOG_ERROR("This codes (Engine::error) is impossible touched. This is just a safety inspection. If this ERROR triggered, please tell swxlion to add old CloseErrorTask class back, and fix it.");
@@ -432,6 +465,18 @@ void ClientEngine::sendData(int socket, uint64_t token, std::string* data)
 	{
 		delete data;
 		LOG_WARN("Data not send at socket %d, address: %s. socket maybe closed.", socket, NetworkUtil::getPeerName(socket).c_str());
+	}
+}
+
+void ClientEngine::sendUDPData(int socket, uint64_t token, std::string* data, int64_t expiredMS, bool discardable)
+{
+	if (expiredMS == 0)
+		expiredMS = slack_real_msec() + _timeoutQuest;
+
+	if (!_connectionMap.sendUDPData(socket, token, data, expiredMS, discardable))
+	{
+		delete data;
+		LOG_WARN("UDP Data not send at socket %d, address: %s. socket maybe closed.", socket, NetworkUtil::getPeerName(socket).c_str());
 	}
 }
 
@@ -485,7 +530,10 @@ bool ClientEngine::waitForEvents(uint32_t baseEvent, const BasicConnection* conn
 
 	if (epoll_ctl(_epoll_fd, EPOLL_CTL_MOD, connection->socket(), &ev) != 0)
 	{
-		LOG_ERROR("Client engine wait socket event failed. Socket: %d, address: %s, errno: %d", connection->socket(),NetworkUtil::getPeerName(connection->socket()).c_str(), errno);
+		if (errno == ENOENT)
+			return false;
+		
+		LOG_INFO("Client engine wait socket event failed. Socket: %d, address: %s, errno: %d", connection->socket(),NetworkUtil::getPeerName(connection->socket()).c_str(), errno);
 		return false;
 	}
 	else
@@ -502,18 +550,86 @@ void ClientEngine::exitEpoll(const BasicConnection* connection)
 	epoll_ctl(_epoll_fd, EPOLL_CTL_DEL, connection->socket(), &ev);
 }
 
+void ClientEngine::closeUDPConnection(UDPClientConnection* connection)
+{
+	exitEpoll(connection);
+
+	UDPClientPtr client = connection->client();
+	if (client)
+	{
+		client->clearConnectionQuestCallbacks(connection, FPNN_EC_CORE_CONNECTION_CLOSED);
+		client->willClose(connection);
+	}
+	else
+	{
+		clearConnectionQuestCallbacks(connection, FPNN_EC_CORE_CONNECTION_CLOSED);
+		
+		IQuestProcessorPtr processor = connection->questProcessor();
+		if (processor)
+		{
+			std::shared_ptr<ClientCloseTask> task(new ClientCloseTask(processor, connection, false));
+			wakeUpAnswerCallbackThreadPool(task);
+			ConnectionReclaimer::nakedInstance()->reclaim(task);
+		}
+		else
+		{
+			ConnectionReclaimTaskPtr task(new ConnectionReclaimTask(connection));
+			ConnectionReclaimer::nakedInstance()->reclaim(task);
+		}
+	}
+}
+
 void ClientEngine::timeoutCheckThread()
 {
 	while (_running)
 	{
-		int cyc = 100;
-		while (_running && cyc--)
-			usleep(10000);
+		//-- Step 1: UDP period sending check
 
-//void ClientEngine::checkTimeout()
-//{
-//	if (_running)
-//	{
+		int cyc = 100;
+		int udpSendingCheckSyc = 5;
+		while (_running && cyc--)
+		{
+			udpSendingCheckSyc -= 1;
+			if (udpSendingCheckSyc == 0)
+			{
+				udpSendingCheckSyc = 5;
+				std::unordered_set<UDPClientConnection*> invalidOrExpiredConnections;
+				_connectionMap.periodUDPSendingCheck(invalidOrExpiredConnections);
+
+				for (UDPClientConnection* conn: invalidOrExpiredConnections)
+					closeUDPConnection(conn);
+			}
+
+			usleep(10000);
+		}
+
+
+		//-- Step 2: TCP client keep alive
+
+		std::list<TCPClientConnection*> invalidConnections;
+
+		_connectionMap.TCPClientKeepAlive(invalidConnections);
+		for (auto conn: invalidConnections)
+		{
+			exitEpoll(conn);
+			clearConnectionQuestCallbacks(conn, FPNN_EC_CORE_INVALID_CONNECTION);
+
+			TCPClientPtr client = conn->client();
+			if (client)
+			{
+				client->errorAndWillBeClosed(conn);
+			}
+			else
+			{
+				LOG_ERROR("This codes (Engine::error) is impossible touched. This is just a safety inspection. If this ERROR triggered, please tell swxlion to add old CloseErrorTask class back, and fix it.");
+				ConnectionReclaimTaskPtr task(new ConnectionReclaimTask(conn));
+				//CloseErrorTaskPtr task(new CloseErrorTask(orgConn, true));
+				//_answerCallbackPool.wakeUp(task);
+				_reclaimer->reclaim(task);
+			}
+		}
+
+		//-- Step 3: clean timeouted callbacks
 
 		int64_t current = slack_real_msec();
 		std::list<std::map<uint32_t, BasicAnswerCallback*> > timeouted;

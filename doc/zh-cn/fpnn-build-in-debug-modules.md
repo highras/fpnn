@@ -1,44 +1,45 @@
 # FPNN 内置调试模块介绍
 
-## * 时间分析类
+## 时间分析类
 
-1. **TimeAnaylist**
+1. **SegmentTimeAnalyst**
 
-位于 <fpnn-folder>/base/TimeAnalyst.h 文件中。
+	侵入式的多线程安全的时间消耗分析记录器。
 
-* class TimeCostAlarm
+	不仅记录任意操作总的时间消耗，还可以跟踪记录每一个流程**分段**的时间消耗，以及每一个循环的次数，总时间消耗和每个循环**片段**平均时间消耗。  
+	当 SegmentTimeAnalyst 实例析构时，以上时间消耗数据均会以 `"Time cost"` 为 tag，用 [UXLOG](APIs/base/FPLog.md#UXLOG) 进行输出。
 
-	单流程耗时分析。  
-	析构时自动向日志输出从创建到析构经历的时间。单位：毫秒。
-
-* class SegmentTimeAnalyst
-
-	流程阶段耗时分析。  
-	可以记录一个流程各个子阶段的时间消耗，以及流程总时间消耗。  
-	析构时自动向日志输出流程总时间消耗，和流程各阶段的时间消耗。单位：毫秒。
+	详细文档请参见：[SegmentTimeAnalyst](APIs/base/TimeAnalyst.md#SegmentTimeAnalyst)。
 
 
+1. **TimeCostAlarm**
 
-## * 格式化输出类
+	超时告警对象。
 
-1. **PrintMemory**
+	当实例创建时，开始记录时间消耗。当实例析构时，将检测时间消耗是否超过构造时设定的时长。如果实际执行时长大于设定的时长，将使用 [LOG_WARN](APIs/base/FPLog.md#LOG_WARN) 在日志中输出实际执行时长。
 
-	打印内存数据
-
-		#include "PrintMemory.h"
-		using namespace fpnn;
-
-		void printMemory(const void* memory, size_t size);
+	详细文档请参见：[TimeCostAlarm](APIs/base/TimeAnalyst.md#TimeCostAlarm)。
 
 
+## 格式化输出类
+
+1. **printMemory**
+
+	以16进制和文本对照的形式，打印指定的内存数据到标准输出。
+
+	详细文档请参见：[printMemory](APIs/base/PrintMemory.md)。
+
+
+1. **visibleBinaryBuffer**
+
+	输出指定内存块的可视化内容。
+
+	详细文档请参见：[visibleBinaryBuffer](APIs/base/FormattedPrint.md#visibleBinaryBuffer)。
 
 
 1. **printTable**
 
-	以类似于 MySQL client 的方式，输出表格
+	格式化表格，以类似于 MySQL client 那样的格式，输出表格内容。
 
-		#include "FormattedPrint.h"
-		using namespace fpnn;
-
-		void printTable(const std::vector<std::string>& fields, const std::vector<std::vector<std::string>>& rows);
+	详细文档请参见：[printTable](APIs/base/FormattedPrint.md#printTable)。
 

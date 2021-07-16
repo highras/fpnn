@@ -1,7 +1,7 @@
 #include "PartitionedConnectionMap.h"
 
 namespace fpnn
-{		
+{
 	BasicAnswerCallback* ConnectionMap::takeCallback(int socket, uint32_t seqNum)
 	{
 		std::unique_lock<std::mutex> lck(_mutex);
@@ -67,9 +67,54 @@ namespace fpnn
 			_connections.remove_node(n);
 	}
 
-	
+	void ConnectionMap::TCPClientKeepAlive(TCPClientSharedKeepAlivePingDatas& sharedPing, std::list<TCPClientConnection*>& invalidConnections)
+	{
+		typedef HashMap<int, BasicConnection*>::node_type HashNode;
 
-	bool PartitionedConnectionMap::sendQuestWithBasicAnswerCallback(int socket, uint64_t token, FPQuestPtr quest, BasicAnswerCallback* callback, int timeout)
+		std::list<TCPClientKeepAliveTimeoutInfo> keepAliveList;
+
+		//-- Step 1: pick invalid connections & requiring ping connections
+		{
+			bool isLost;
+			int timeout;
+			HashNode* node = NULL;
+			std::list<HashNode*> invalidNodes;
+
+			std::unique_lock<std::mutex> lck(_mutex);
+
+			while ((node = _connections.next_node(node)))
+			{
+				BasicConnection* connection = node->data;
+				if (connection->connectionType() == BasicConnection::TCPClientConnectionType)
+				{
+					TCPClientConnection* tcpClientConn = (TCPClientConnection*)connection;
+					timeout = tcpClientConn->isRequireKeepAlive(isLost);
+					if (isLost)
+					{
+						invalidConnections.push_back(tcpClientConn);
+						invalidNodes.push_back(node);
+					}
+					else if (timeout > 0)
+					{
+						connection->_refCount++;
+						keepAliveList.push_back(TCPClientKeepAliveTimeoutInfo{ tcpClientConn, timeout });
+					}
+				}
+			}
+
+			for (auto n: invalidNodes)
+				_connections.remove_node(n);
+		}
+
+		//--  Step 2: send ping
+		if (keepAliveList.size() > 0)
+		{
+			sharedPing.build();
+			sendTCPClientKeepAlivePingQuest(sharedPing, keepAliveList);
+		}
+	}
+
+	bool PartitionedConnectionMap::sendQuestWithBasicAnswerCallback(int socket, uint64_t token, FPQuestPtr quest, BasicAnswerCallback* callback, int timeout, bool discardableUDPQuest)
 	{
 		if (!quest)
 			return false;
@@ -103,23 +148,23 @@ namespace fpnn
 			callback->updateExpiredTime(slack_real_msec() + timeout);
 
 		int idx = socket % _count;
-		bool status = _array[idx]->sendQuest(socket, token, raw, seqNum, callback);
+		bool status = _array[idx]->sendQuest(socket, token, raw, seqNum, callback, timeout, discardableUDPQuest);
 		if (!status)
 			delete raw;
 
 		return status;
 	}
 
-	FPAnswerPtr PartitionedConnectionMap::sendQuest(int socket, uint64_t token, std::mutex* mutex, FPQuestPtr quest, int timeout)
+	FPAnswerPtr PartitionedConnectionMap::sendQuest(int socket, uint64_t token, std::mutex* mutex, FPQuestPtr quest, int timeout, bool discardableUDPQuest)
 	{
 		if (!quest->isTwoWay())
 		{
-			sendQuestWithBasicAnswerCallback(socket, token, quest, NULL, 0);
+			sendQuestWithBasicAnswerCallback(socket, token, quest, NULL, 0, discardableUDPQuest);
 			return NULL;
 		}
 
 		std::shared_ptr<SyncedAnswerCallback> s(new SyncedAnswerCallback(mutex, quest));
-		if (!sendQuestWithBasicAnswerCallback(socket, token, quest, s.get(), timeout))
+		if (!sendQuestWithBasicAnswerCallback(socket, token, quest, s.get(), timeout, discardableUDPQuest))
 		{
 			return FpnnErrorAnswer(quest, FPNN_EC_CORE_SEND_ERROR, "unknown sending error.");
 		}

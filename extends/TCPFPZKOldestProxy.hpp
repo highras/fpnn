@@ -35,6 +35,7 @@ namespace fpnn
 			TCPFPZKProxyCore(fpzkClient, serviceName, cluster, questTimeoutSeconds)//, _originalServiceName(serviceName), _originalCluster(cluster)
 		{
 		}
+		virtual ~TCPFPZKOldestProxy() {}
 
 		std::string getOldestEndpoint()
 		{

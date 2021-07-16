@@ -43,7 +43,7 @@ bool FileSystemUtil::fetchFileContentInLines(const std::string& filename, std::v
 	return false;
 }
 
-bool FileSystemUtil::readFileContent(const std::string& file, std::string& content){
+/*bool FileSystemUtil::readFileContent(const std::string& file, std::string& content){
 	std::ifstream in(file, std::ios::in);
 	if (in.is_open()){
 		std::istreambuf_iterator<char> beg(in), end;
@@ -52,6 +52,22 @@ bool FileSystemUtil::readFileContent(const std::string& file, std::string& conte
 		return true;
 	}
 	return false;
+}*/
+
+bool FileSystemUtil::readFileContent(const std::string& file, std::string& content){
+    std::ifstream is (file, std::ifstream::binary);
+    if (is) {
+        is.seekg (0, is.end);
+        int length = is.tellg();
+        is.seekg (0, is.beg);
+        char * buffer = new char [length];
+        is.read (buffer,length);
+        is.close();
+        content = std::string(buffer, length);
+        delete[] buffer;
+        return true;
+    }   
+    return false;
 }
 
 bool FileSystemUtil::saveFileContent(const std::string& file, const std::string& content){

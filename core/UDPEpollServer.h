@@ -10,7 +10,9 @@
 #include "ServerInterface.h"
 #include "RecordIPList.h"
 #include "UDPIOBuffer.h"
-#include "UDPSessions.h"
+#include "GlobalIOPool.h"
+#include "UDPServerIOWorker.h"
+#include "ConnectionReclaimer.h"
 #include "UDPServerMasterProcessor.h"
 #include "ConcurrentSenderInterface.h"
 
@@ -21,6 +23,19 @@ namespace fpnn
 	class UDPEpollServer;
 	typedef std::shared_ptr<UDPEpollServer> UDPServerPtr;
 
+	class UDPConnectionCache
+	{
+		std::unordered_map<std::string, UDPServerConnection*> _cache;
+
+	public:
+		~UDPConnectionCache() { reset(); }
+
+		void insert(UDPServerReceiver& receiver, UDPServerConnection* conn);
+		UDPServerConnection* check(UDPServerReceiver& receiver);
+		inline std::unordered_map<std::string, UDPServerConnection*>& getCache() { return _cache; }
+		inline void reset() { _cache.clear(); }
+	};
+
 	class UDPEpollServer: virtual public ServerInterface, virtual public IConcurrentUDPSender
 	{
 	private:
@@ -28,6 +43,9 @@ namespace fpnn
 		std::string _ip;
 		uint16_t _port6;
 		std::string _ipv6;
+
+		struct sockaddr_in  _serverAddr;
+		struct sockaddr_in6 _serverAddr6;
 
 		int _socket;
 		int _socket6;
@@ -44,15 +62,19 @@ namespace fpnn
 		size_t _maxWorkerPoolQueueLength;
 		int64_t _timeoutQuest; //only valid when as a client
 
-		UDPSendBuffer _sendBuffer;
-		UDPSendBuffer _sendBuffer6;
-		PartitionedCallbackMap _callbackMap;
+		UDPServerReceiver _receiver;
+		UDPConnectionCache _connectionCache;
+		UDPServerConnectionMap _connectionMap;
+		std::shared_ptr<UDPServerIOWorker> _ioWorker;
 		std::shared_ptr<UDPServerMasterProcessor> _serverMasterProcessor;
+
+		GlobalIOPoolPtr _ioPool;
 		std::shared_ptr<ParamTemplateThreadPoolArray<UDPRequestPackage *>> _workerPool;
 		std::shared_ptr<TaskThreadPoolArray> _answerCallbackPool;
 
 		std::atomic<bool> _enableIPWhiteList;
 		IPWhiteList _ipWhiteList;
+		ConnectionReclaimerPtr _reclaimer;
 
 		static UDPServerPtr _server;
 
@@ -67,17 +89,23 @@ namespace fpnn
 		bool initIPv4();
 		bool initIPv6();
 		bool initEpoll();
+		void exitEpoll(int socket);
+		const char* createSocket(int socketDomain, const struct sockaddr *addr, socklen_t addrlen, int& newSocket);
 		void initFailClean(const char* fail_info);
-		void updateSocketStatus(int socket, bool needWaitSendEvent);
-		void processSendEvent(int socket);
-		void processEvent(struct epoll_event & event, UDPRecvBuffer &recvBuffer);
-		void deliverAnswer(ConnectionInfoPtr connInfo, FPAnswerPtr answer);
-		void deliverQuest(ConnectionInfoPtr connInfo, FPQuestPtr quest);
-		bool returnServerStoppingAnswer(ConnectionInfoPtr connInfo, FPQuestPtr quest);
-		void clearRemnantCallbacks();
+		void createConnections();
+		void createConnections6();
+		bool checkSourceAddress();
+		void newConnection(int newSocket, bool isIPv4);
+		void scheduleNewConnections();
+		void processEvent(struct epoll_event & event);
+		void returnServerStoppingAnswer(UDPServerConnection* conn, FPQuestPtr quest);
+		void reclaimeConnection(UDPServerConnection* conn);
+		void clearConnectionQuestCallbacks(UDPServerConnection* conn, int errorCode);
+		void clearRemnantConnections();
 		void clean();
 		void exitCheck();
-		bool sendQuestWithBasicAnswerCallback(ConnectionInfoPtr connInfo, FPQuestPtr quest, BasicAnswerCallback* callback, int timeout);
+		void internalTerminateConnection(UDPServerConnection* conn, int socket, UDPSessionEventType type, int errorCode);
+		bool sendQuestWithBasicAnswerCallback(int socket, uint64_t token, FPQuestPtr quest, BasicAnswerCallback* callback, int timeout, bool discardable);
 
 	private:
 		UDPEpollServer(): _port(0), _port6(0), _socket(0), _socket6(0), _epoll_fd(0), _max_events(16),
@@ -94,9 +122,31 @@ namespace fpnn
 			Config::initSystemVaribles();
 
 			initServerVaribles();
+
+			_reclaimer = ConnectionReclaimer::instance();
 		}
+
 	public:
-		virtual ~UDPEpollServer() { exitCheck(); }
+		/*===============================================================================
+		  Call by framwwork.
+		=============================================================================== */
+		void connectionConnectedEventCompleted(UDPServerConnection* conn);
+		void terminateConnection(int socket, UDPSessionEventType type, int errorCode);
+		bool deliverSessionEvent(UDPServerConnection* conn, UDPSessionEventType type);
+		void deliverAnswer(UDPServerConnection* conn, FPAnswerPtr answer);
+		void deliverQuest(UDPServerConnection* conn, FPQuestPtr quest);
+		bool joinEpoll(int socket);
+		bool waitForAllEvents(int socket);
+		bool waitForRecvEvent(int socket);
+
+	public:
+		virtual ~UDPEpollServer()
+		{
+			exitCheck();
+			
+			if (_ioPool)
+				_ioPool->setServerIOWorker((std::shared_ptr<UDPServerIOWorker>)nullptr);
+		}
 
 		static UDPServerPtr create()
 		{
@@ -166,6 +216,15 @@ namespace fpnn
 			return _timeoutQuest / 1000;
 		}
 
+		inline int currentConnections()
+		{
+			return _connectionMap.connectionCount();
+		}
+		inline int validARQConnections()
+		{
+			return _serverMasterProcessor->validARQConnectionCount();
+		}
+
 		inline void configWorkerThreadPool(int32_t initCount, int32_t perAppendCount, int32_t perfectCount, int32_t maxCount, size_t maxQueueSize)
 		{
 			_workerPool.reset(new ParamTemplateThreadPoolArray<UDPRequestPackage *>(getCPUCount(), _serverMasterProcessor));
@@ -212,26 +271,25 @@ namespace fpnn
 			_ipWhiteList.removeIP(ip);
 		}
 
-		virtual void sendData(ConnectionInfoPtr connInfo, std::string* data);
-		//virtual void sendAnswer(ConnectionInfoPtr connInfo, FPAnswerPtr answer);
+		virtual void sendData(int socket, uint64_t token, std::string* data, int64_t expiredMS, bool discardable);
 
 		/**
 			All SendQuest():
 				If return false, caller must free quest & callback.
 				If return true, don't free quest & callback.
 		*/
-		virtual FPAnswerPtr sendQuest(ConnectionInfoPtr connInfo, FPQuestPtr quest, int timeout = 0);
-		virtual bool sendQuest(ConnectionInfoPtr connInfo, FPQuestPtr quest, AnswerCallback* callback, int timeout = 0)
+		virtual FPAnswerPtr sendQuest(int socket, uint64_t token, FPQuestPtr quest, int timeout = 0, bool discardable = true);
+		virtual bool sendQuest(int socket, uint64_t token, FPQuestPtr quest, AnswerCallback* callback, int timeout = 0, bool discardable = true)
 		{
 			if (timeout == 0) timeout = _timeoutQuest;
-			return sendQuestWithBasicAnswerCallback(connInfo, quest, callback, timeout);
+			return sendQuestWithBasicAnswerCallback(socket, token, quest, callback, timeout, discardable);
 		}
-		virtual bool sendQuest(ConnectionInfoPtr connInfo, FPQuestPtr quest, std::function<void (FPAnswerPtr answer, int errorCode)> task, int timeout = 0)
+		virtual bool sendQuest(int socket, uint64_t token, FPQuestPtr quest, std::function<void (FPAnswerPtr answer, int errorCode)> task, int timeout = 0, bool discardable = true)
 		{
 			if (timeout == 0) timeout = _timeoutQuest;
 
 			BasicAnswerCallback* t = new FunctionAnswerCallback(std::move(task));
-			if (sendQuestWithBasicAnswerCallback(connInfo, quest, t, timeout))
+			if (sendQuestWithBasicAnswerCallback(socket, token, quest, t, timeout, discardable))
 				return true;
 			else
 			{
@@ -240,6 +298,8 @@ namespace fpnn
 			}
 		}
 		
+		void closeConnection(int socket, bool force = false);
+		void periodSendingCheck();
 		void checkTimeout();
 	};
 }

@@ -180,7 +180,7 @@ public:
 		bool duplexInOneWay = args->getBool("duplex in one way", false);
 
 		FPQuestPtr quest2 = QWriter(duplexMethod.c_str(), duplexInOneWay, FPMessage::FP_PACK_MSGPACK);
-		FPAnswerPtr answer = sendQuest(ci, quest2);
+		FPAnswerPtr answer = sendQuest(quest2);
 		
 		if (!duplexInOneWay)	
 			cout<<"recv client answer: "<<(answer->json())<<endl;
@@ -223,7 +223,7 @@ public:
 		if (duplex)
 		{
 			FPQuestPtr quest2 = QWriter("one way duplex quest", true, FPMessage::FP_PACK_MSGPACK);
-			sendQuest(ci, quest2);
+			sendQuest(quest2);
 		}
 		TCPEpollServer::instance()->closeConnectionAfterSent(ci);
 		return nullptr;

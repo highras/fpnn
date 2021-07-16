@@ -1,0 +1,169 @@
+## TaskThreadPoolArray
+
+### 介绍
+
+任务线程池阵列。
+
+本线程池阵列为 [TaskThreadPool](TaskThreadPool.md) 的阵列封装，因此核心接口与 [TaskThreadPool](TaskThreadPool.md) 一致。
+
+### 命名空间
+
+	namespace fpnn;
+
+#### 关键定义
+
+	class TaskThreadPoolArray: public ITaskThreadPool
+	{
+	public:
+		TaskThreadPoolArray(int count);
+		TaskThreadPoolArray();
+		virtual ~TaskThreadPoolArray();
+
+		void config(int count);
+		virtual bool init(int32_t initCount, int32_t perAppendCount, int32_t perfectCount, int32_t maxCount, size_t maxQueueLength = 0, size_t tempThreadLatencySeconds = 60);
+
+		bool wakeUp(int hint, TaskThreadPool::ITaskPtr task);
+		virtual bool wakeUp(TaskThreadPool::ITaskPtr task);
+		bool wakeUp(int hint, std::function<void ()> task);
+		virtual bool wakeUp(std::function<void ()> task);
+
+		virtual void release();
+
+		virtual void status(int32_t &normalThreadCount, int32_t &temporaryThreadCount, int32_t &busyThreadCount, int32_t &taskQueueSize, int32_t& min, int32_t& max, int32_t& maxQueue);
+		virtual std::string infos();
+
+		virtual bool inited();
+		virtual bool exiting();
+	};
+
+### 构造函数
+
+	TaskThreadPoolArray(int count);
+	TaskThreadPoolArray();
+
+**参数说明**
+
+* **`int count`**
+
+	阵列数量。即，所含线程池数量。默认为 0。
+
+### 成员函数
+
+#### config
+
+	void config(int count);
+
+配置阵列所含线程池数量。
+
+#### init
+
+	virtual bool init(int32_t initCount, int32_t perAppendCount, int32_t perfectCount, int32_t maxCount, size_t maxQueueLength = 0, size_t tempThreadLatencySeconds = 60);
+
+初始化线程池阵列。
+
+**注意**
+
++ 初始化线程池阵列前，必须完成线程池阵列配置。
++ 接口参数为线程池阵列总参数，初始化线程池阵列内每一个线程池时，会做等分。
+
+**参数说明**
+
+* **`int32_t initCount`**
+
+	初始的线程数量。
+
+* **`int32_t perAppendCount`**
+
+	追加线程时，单次的追加线程数量。
+
+* **`int32_t perfectCount`**
+
+	线程池**常驻**线程的最大数量。
+
+* **`int32_t maxCount`**
+
+	线程池线程最大数量。如果为 `0`，则表示不限制。
+
+* **`size_t maxQueueLength`**
+
+	线程池任务队列最大数量限制。如果为 `0`，则表示不限制。
+
+* **`size_t tempThreadLatencySeconds`**
+
+	超过 `perfectCount` 数量限制的临时线程退出前，等待新任务的等待时间。
+
+#### wakeUp
+
+	bool wakeUp(int hint, TaskThreadPool::ITaskPtr task);
+	virtual bool wakeUp(TaskThreadPool::ITaskPtr task);
+	bool wakeUp(int hint, std::function<void ()> task);
+	virtual bool wakeUp(std::function<void ()> task);
+
+向线程池中添加任务，并唤醒线程池，执行任务。  
+如果线程池排队任务数量超过 `maxQueueLength` 限制，将添加失败。
+
+**注意**
+
+`int hint` 参数为线程池选择参数。按阵列数量取模后，便是所选择线程池索引编号。  
+对于不含该参数的接口，实际执行任务的线程池将按线程池索引轮换。
+
+#### release
+
+	void release();
+
+释放线程池。  
+释放后的线程池，可重新初始化。
+
+#### status
+
+	void status(int32_t &normalThreadCount, int32_t &temporaryThreadCount, int32_t &busyThreadCount, int32_t &taskQueueSize, int32_t& min, int32_t& max, int32_t& maxQueue);
+
+获取线程池状态。
+
+**参数说明**
+
+* **`normalThreadCount`**
+
+	当前常驻线程数量。
+
+* **`temporaryThreadCount`**
+
+	当前临时线程数量。
+
+* **`busyThreadCount`**
+
+	当前正在执行任务的线程数量。
+
+* **`taskQueueSize`**
+
+	当前待处理的任务数量（不含执行中的）。
+
+* **`min`**
+
+	初始化线程池时的初始化线程数。
+
+* **`max`**
+
+	最大线程数限制。
+
+* **`maxQueue`**
+
+	最大任务队列限制。
+
+#### infos
+
+	std::string infos();
+
+以 JSON 格式，返回线程池状态。
+
+#### inited
+
+	inline bool inited();
+
+判断线程池是否初始化。
+
+#### exiting
+
+	inline bool exiting();
+
+判断线程池是否正在释放/退出。

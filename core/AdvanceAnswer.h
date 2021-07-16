@@ -7,6 +7,8 @@
 #include "ConcurrentSenderInterface.h"
 #include "FPWriter.h"
 #include "Config.h"
+#include "ClientEngine.h"
+#include "UDPEpollServer.h"
 
 namespace fpnn
 {
@@ -59,10 +61,19 @@ namespace fpnn
 			try
 			{
 				std::string* raw = answer->raw();
-				if (_concurrentSender)
+				if (_connectionInfo->isTCP())
 					_concurrentSender->sendData(_connectionInfo->socket, _connectionInfo->token, raw);
+				else if (_connectionInfo->isServerConnection())
+				{
+					int64_t expiredMS = UDPEpollServer::instance()->getQuestTimeout() * 1000 + slack_real_msec();
+					_concurrentUDPSender->sendData(_connectionInfo->socket, _connectionInfo->token, raw, expiredMS, _quest->isOneWay());
+				}
 				else
-					_concurrentUDPSender->sendData(_connectionInfo, raw);
+				{
+					int64_t expiredMS = ClientEngine::instance()->getQuestTimeout() * 1000 + slack_real_msec();
+					ClientEngine::instance()->sendUDPData(_connectionInfo->socket, _connectionInfo->token, raw, expiredMS, _quest->isOneWay());
+				}
+
 				_sent = true;
 				return true;
 			}

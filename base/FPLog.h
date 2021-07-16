@@ -23,12 +23,25 @@
 #include <stdarg.h>
 #include <mutex>
 #include <sys/un.h>
+#include <pthread.h>
+#include <sys/syscall.h>
 
 namespace fpnn {
 
 #define FPLOG_BUF_SIZE 4096
 #define FPLOG_DEFAULT_MAX_QUEUE_SIZE	500000
 #define FPLOG_QUEUE_LIMIT_LOG_INTERVAL  60
+
+inline pid_t getttid()
+{
+#ifdef __APPLE__
+uint64_t tid64;
+pthread_threadid_np(NULL, &tid64);
+return (pid_t)tid64;
+#else
+return syscall(SYS_gettid);
+#endif
+}
 
 typedef enum {FP_LEVEL_FATAL=0, FP_LEVEL_ERROR=1, FP_LEVEL_WARN=2, FP_LEVEL_INFO=3, FP_LEVEL_DEBUG=4} FPLogLevel;
 extern FPLogLevel fpLogLevel;
@@ -56,7 +69,7 @@ public:
     FPLogBase(size_t maxQueueSize = FPLOG_DEFAULT_MAX_QUEUE_SIZE): _willExit(false), _maxQueueSize(maxQueueSize) {
         _flushThread = std::thread(&FPLogBase::consume, this);
     };
-    ~FPLogBase() {
+    virtual ~FPLogBase() {
 		release();
     };
 
@@ -152,7 +165,6 @@ private:
     struct sockaddr_in _server_addr;
 };
 
-#define UNIX_PATH_MAX 108
 class FPSockLog : public FPPipeLogBase {
 public:
     FPSockLog(const std::string& route, const std::string& socketFile, size_t maxQueueSize = FPLOG_DEFAULT_MAX_QUEUE_SIZE): 

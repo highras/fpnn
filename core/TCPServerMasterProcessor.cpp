@@ -102,7 +102,12 @@ void TCPServerMasterProcessor::dealQuest(RequestPackage * requestPackage)
 			if (requestPackage->_connectionInfo->isPrivateIP())
 				answer = (this->*(node->data))(args, quest, *(requestPackage->_connectionInfo));
 			else
-				answer = FpnnErrorAnswer(quest, FPNN_EC_CORE_FORBIDDEN, std::string("Can not call internal method from external, ") + requestPackage->_connectionInfo->str());
+			{
+				if (quest->isTwoWay())
+					answer = FpnnErrorAnswer(quest, FPNN_EC_CORE_FORBIDDEN, std::string("Can not call internal method from external, ") + requestPackage->_connectionInfo->str());
+				else
+					answer = NULL;
+			}
 		}
 	}
 
@@ -113,7 +118,15 @@ void TCPServerMasterProcessor::dealQuest(RequestPackage * requestPackage)
 			answer = _questProcessor->processQuest(args, quest, *(requestPackage->_connectionInfo));
 		}
 		catch (const FpnnError& ex){
-			LOG_ERROR("processQuest() Exception:(%d)%s. %s", ex.code(), ex.what(), requestPackage->_connectionInfo->str().c_str());
+			if (ex.code() == FPNN_EC_PROTO_TYPE_CONVERT || ex.code() == FPNN_EC_PROTO_KEY_NOT_FOUND)
+			{
+				LOG_WARN("processQuest() Exception:(%d)%s. %s", ex.code(), ex.what(), requestPackage->_connectionInfo->str().c_str());
+			}
+			else
+			{
+				LOG_ERROR("processQuest() Exception:(%d)%s. %s", ex.code(), ex.what(), requestPackage->_connectionInfo->str().c_str());
+			}
+
 			if (quest->isTwoWay())
 			{
 				if (_questProcessor->getQuestAnsweredStatus() == false)

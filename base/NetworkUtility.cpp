@@ -266,6 +266,15 @@ bool fpnn::NetworkUtil::isPrivateIP(struct sockaddr_in6* addr)
 
 	return false;
 }
+bool fpnn::NetworkUtil::isPrivateIPv4(const std::string& ipv4)
+{
+	struct sockaddr_in addr;
+
+	if (inet_pton(AF_INET, ipv4.c_str(), &addr.sin_addr) != 1)
+		return false;
+
+	return isPrivateIP(&addr);
+}
 bool fpnn::NetworkUtil::isPrivateIPv6(const std::string& ipv6)
 {
 	struct sockaddr_in6 addr;

@@ -15,6 +15,7 @@ namespace fpnn
 			TCPFPZKProxyCore(fpzkClient, serviceName, cluster, questTimeoutSeconds)
 		{
 		}
+		virtual ~TCPFPZKRandomProxy() {}
 
 		TCPClientPtr getClient(bool connect)
 		{

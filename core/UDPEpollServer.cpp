@@ -104,11 +104,12 @@ bool UDPEpollServer::prepare()
 		return false;
 	}
 
+	//_connectionMap.init(128);
+	int cpuCount = getCPUCount();
 	_serverMasterProcessor->setServer(this);
 
 	if (_workerPool == nullptr)
 	{
-		int cpuCount = getCPUCount();
 		int workThreadMin = Setting::getInt(std::vector<std::string>{
 			"FPNN.server.udp.work.thread.min.size", "FPNN.server.work.thread.min.size"}, cpuCount);
 		int workThreadMax = Setting::getInt(std::vector<std::string>{
@@ -116,6 +117,37 @@ bool UDPEpollServer::prepare()
 
 		adjustThreadPoolParams(workThreadMin, workThreadMax, 2, 256);
 		configWorkerThreadPool(workThreadMin, 1, workThreadMin, workThreadMax, _maxWorkerPoolQueueLength);
+	}
+
+	if (!_ioWorker)
+	{
+		_ioWorker.reset(new UDPServerIOWorker);
+		//_ioWorker->setWorkerPool(_workerPool);
+		_ioWorker->setServer(this);
+	}
+	if (_ioPool == nullptr)
+	{
+		_ioPool = GlobalIOPool::instance();
+		_ioPool->setServerIOWorker(_ioWorker);
+
+		{
+			/** 
+				Just ensure io Pool is inited. If is inited, it will not reconfig or reinit.
+			*/
+
+			int ioThreadMin = Setting::getInt("FPNN.global.io.thread.min.size", cpuCount);
+			int ioThreadMax = Setting::getInt("FPNN.global.io.thread.max.size", cpuCount);
+
+			adjustThreadPoolParams(ioThreadMin, ioThreadMax, 2, 256);
+			_ioPool->init(ioThreadMin, 1, ioThreadMin, ioThreadMax);
+		}
+
+		/**
+			Ensure helodLogger is newset.
+			Because ClientEngine maybe startup before server created. If in that case, the ioPool is inited by ClientEngine,
+			then, the FPlog is reinited in constructor of server. So, the held logger need to be refreshed.
+		*/
+		_ioPool->updateHeldLogger();
 	}
 
 	{
@@ -145,8 +177,6 @@ bool UDPEpollServer::prepare()
 	//if (!_ipv6.empty())
 	//	_ipv6 = HostLookup::get(_ipv6);
 
-	_callbackMap.init(128);
-
 	return true;
 }
 
@@ -167,20 +197,51 @@ bool UDPEpollServer::init()
 	return true;
 }
 
+const char* UDPEpollServer::createSocket(int socketDomain, const struct sockaddr *addr, socklen_t addrlen, int& newSocket)
+{
+	newSocket = socket(socketDomain, SOCK_DGRAM, 0);
+	if (newSocket == -1)
+	{
+		newSocket = 0;
+		return "Create UDP socket failed.";
+	}
+
+	int reuse_flag = 1;
+	if (-1 == setsockopt(newSocket, SOL_SOCKET, SO_REUSEADDR, (void*)&(reuse_flag), sizeof(reuse_flag)))
+	{
+		return "Set UDP socket SO_REUSEADDR failed.";
+	}
+
+	if (-1 == setsockopt(newSocket, SOL_SOCKET, SO_REUSEPORT, (void*)&(reuse_flag), sizeof(reuse_flag)))
+	{
+		return "Set UDP socket SO_REUSEPORT failed.";
+	}
+
+	if (!nonblockedFd(newSocket))
+	{
+		return "Change UDP socket to non-blocked failed.";
+	}
+
+	if (-1 == bind(newSocket, addr, addrlen)) 
+	{
+		return "Bind UDP socket failed.";
+	}
+
+	return NULL;
+}
+
 bool UDPEpollServer::initIPv4()
 {
-	struct sockaddr_in serverAddr;
-
-	memset(&serverAddr, 0, sizeof(serverAddr));
-	serverAddr.sin_family = AF_INET; 
-	serverAddr.sin_port = htons(_port);
+	memset(&_serverAddr, 0, sizeof(_serverAddr));
+	_serverAddr.sin_family = AF_INET; 
+	_serverAddr.sin_port = htons(_port);
 
 	if (_ip.empty())
-		serverAddr.sin_addr.s_addr = htonl(INADDR_ANY);
+		_serverAddr.sin_addr.s_addr = htonl(INADDR_ANY);
 	else
-		serverAddr.sin_addr.s_addr = inet_addr(_ip.c_str());
+		_serverAddr.sin_addr.s_addr = inet_addr(_ip.c_str());
 	
-	if (serverAddr.sin_addr.s_addr == INADDR_NONE)
+	if (_serverAddr.sin_addr.s_addr == INADDR_NONE)
 	{
 		std::string errorMsg("Invalid UDP IPv4 address: ");
 		errorMsg.append(_ip);
@@ -188,24 +249,13 @@ bool UDPEpollServer::initIPv4()
 		return false;
 	}
 
-	_socket = socket(AF_INET, SOCK_DGRAM, 0);
-	if (_socket == -1)
+	const char* errorMessage = createSocket(AF_INET, (struct sockaddr *)(&_serverAddr), sizeof(_serverAddr), _socket);
+	if (errorMessage != NULL)
 	{
-		_socket = 0;
-		initFailClean("Create UDP IPv4 socket failed.");
-		return false;
-	}
+		std::string info("IPv4 listening socket create failed. Reason: ");
+		info += errorMessage;
 
-	int reuse_addr = 1;
-	if (-1 == setsockopt(_socket, SOL_SOCKET, SO_REUSEADDR, (void*)&(reuse_addr), sizeof(reuse_addr)))
-	{
-		initFailClean("UDP IPv4 socket resuing failed.");
-		return false;
-	}
-
-	if (!nonblockedFd(_socket))
-	{
-		initFailClean("Change UDP IPv4 socket to non-blocked failed.");
+		initFailClean(info.c_str());
 		return false;
 	}
 
@@ -219,26 +269,18 @@ bool UDPEpollServer::initIPv4()
 		return false;
 	}
 
-	if (-1 == bind(_socket, (struct sockaddr *)(&serverAddr), sizeof(serverAddr))) 
-	{
-		initFailClean("Bind UDP IPv4 listening socket failed.");
-		return false;
-	}
-
 	return true;
 }
 
 bool UDPEpollServer::initIPv6()
 {
-	struct sockaddr_in6 serverAddr;
-
-	memset(&serverAddr, 0, sizeof(serverAddr));
-	serverAddr.sin6_family = AF_INET6; 
-	serverAddr.sin6_port = htons(_port6);
+	memset(&_serverAddr6, 0, sizeof(_serverAddr6));
+	_serverAddr6.sin6_family = AF_INET6; 
+	_serverAddr6.sin6_port = htons(_port6);
 
 	if (_ipv6.empty())
-		serverAddr.sin6_addr = in6addr_any;
-	else if (inet_pton(AF_INET6, _ipv6.c_str(), &serverAddr.sin6_addr) != 1)
+		_serverAddr6.sin6_addr = in6addr_any;
+	else if (inet_pton(AF_INET6, _ipv6.c_str(), &_serverAddr6.sin6_addr) != 1)
 	{
 		std::string errorMsg("Invalid UDP IPv6 address: ");
 		errorMsg.append(_ipv6);
@@ -246,24 +288,13 @@ bool UDPEpollServer::initIPv6()
 		return false;
 	}
 
-	_socket6 = socket(AF_INET6, SOCK_DGRAM, 0);
-	if (_socket6 == -1)
+	const char* errorMessage = createSocket(AF_INET6, (struct sockaddr *)(&_serverAddr6), sizeof(_serverAddr6), _socket6);
+	if (errorMessage != NULL)
 	{
-		_socket6 = 0;
-		initFailClean("Create UDP IPv6 socket failed.");
-		return false;
-	}
+		std::string info("IPv6 listening socket create failed. Reason: ");
+		info += errorMessage;
 
-	int reuse_addr = 1;
-	if (-1 == setsockopt(_socket6, SOL_SOCKET, SO_REUSEADDR, (void*)&(reuse_addr), sizeof(reuse_addr)))
-	{
-		initFailClean("UDP IPv6 socket resuing failed.");
-		return false;
-	}
-
-	if (!nonblockedFd(_socket6))
-	{
-		initFailClean("Change UDP IPv6 socket to non-blocked failed.");
+		initFailClean(info.c_str());
 		return false;
 	}
 
@@ -274,12 +305,6 @@ bool UDPEpollServer::initIPv6()
 	if (-1 == epoll_ctl(_epoll_fd, EPOLL_CTL_ADD, _socket6, &ev))
 	{
 		initFailClean("Add UDP IPv6 listening socket to epoll failed.");
-		return false;
-	}
-
-	if (-1 == bind(_socket6, (struct sockaddr *)(&serverAddr), sizeof(serverAddr))) 
-	{
-		initFailClean("Bind UDP IPv6 listening socket failed.");
 		return false;
 	}
 
@@ -332,19 +357,6 @@ void UDPEpollServer::initFailClean(const char* fail_info)
 		LOG_FATAL(fail_info);
 }
 
-void UDPEpollServer::updateSocketStatus(int socket, bool needWaitSendEvent)
-{
-	struct epoll_event	ev;
-	ev.data.fd = socket;
-	ev.events = EPOLLIN | EPOLLERR | EPOLLHUP | EPOLLET | EPOLLRDHUP;
-
-	if (needWaitSendEvent)
-		ev.events |= EPOLLOUT;
-	
-	if (epoll_ctl(_epoll_fd, EPOLL_CTL_MOD, socket, &ev) != 0)
-		LOG_ERROR("Modify server listened UDP socket: %d, address: %s %s send event error.", socket, NetworkUtil::getPeerName(socket).c_str(), needWaitSendEvent ? "with" : "without");
-}
-
 void UDPEpollServer::exitCheck()
 {
 	if (_serverMasterProcessor->getQuestProcessor())
@@ -375,8 +387,6 @@ void UDPEpollServer::run()
 	_stopping = false;
 	_stopSignalNotified = false;
 
-	UDPRecvBuffer recvBuffer;
-
 	while (true)
 	{
 		int readyfdsCount = epoll_wait(_epoll_fd, _epollEvents, _max_events, -1);
@@ -405,83 +415,218 @@ void UDPEpollServer::run()
 		}
 
 		for (int i = 0; i < readyfdsCount; i++)
-			processEvent(_epollEvents[i], recvBuffer);
+		{
+			if (_epollEvents[i].data.fd == _socket)
+			{
+				createConnections();
+			}
+			else if (_epollEvents[i].data.fd == _socket6)
+			{
+				createConnections6();
+			}
+			else
+				processEvent(_epollEvents[i]);
+		}
+
+		scheduleNewConnections();
 	}
 }
 
-void UDPEpollServer::processEvent(struct epoll_event & event, UDPRecvBuffer &recvBuffer)
+void UDPEpollServer::createConnections()
+{
+	while (true)
+	{
+		if (_receiver.recvIPv4(_socket) == false)
+			return;
+
+		if (_receiver.udpRawData == NULL)
+			continue;
+
+		if (checkSourceAddress() == false)
+			continue;
+
+		int newSocket;
+		const char* errorMessage = createSocket(AF_INET, (struct sockaddr *)(&_serverAddr), sizeof(_serverAddr), newSocket);
+		if (errorMessage != NULL)
+		{
+			delete _receiver.udpRawData;
+
+			if (newSocket > 0)
+				close(newSocket);
+
+			LOG_ERROR("IPv4 socket create for new UDP connection (%s:%d) failed. Reason: %s",
+				_receiver.ip.c_str(), _receiver.port, errorMessage);
+
+			continue;
+		}
+
+		if (connect(newSocket, (struct sockaddr *)(_receiver.sockaddr), _receiver.requiredAddrLen) != 0)
+		{
+			close(newSocket);
+			delete _receiver.udpRawData;
+			LOG_ERROR("Connect new IPv4 socket for new UDP connection (%s:%d) failed.", _receiver.ip.c_str(), _receiver.port);
+			continue;
+		}
+
+		newConnection(newSocket, true);
+	}
+}
+
+void UDPEpollServer::createConnections6()
+{
+	while (true)
+	{
+		if (_receiver.recvIPv6(_socket6) == false)
+			return;
+
+		if (_receiver.udpRawData == NULL)
+			continue;
+
+		if (checkSourceAddress() == false)
+			continue;
+
+		int newSocket;
+		const char* errorMessage = createSocket(AF_INET6, (struct sockaddr *)(&_serverAddr6), sizeof(_serverAddr6), newSocket);
+		if (errorMessage != NULL)
+		{
+			delete _receiver.udpRawData;
+
+			if (newSocket > 0)
+				close(newSocket);
+
+			LOG_ERROR("IPv6 socket create for new UDP connection (%s:%d) failed. Reason: %s",
+				_receiver.ip.c_str(), _receiver.port, errorMessage);
+
+			continue;
+		}
+
+		if (connect(newSocket, (struct sockaddr *)(_receiver.sockaddr), _receiver.requiredAddrLen) != 0)
+		{
+			close(newSocket);
+			delete _receiver.udpRawData;
+			LOG_ERROR("Connect new IPv6 socket for new UDP connection (%s:%d) failed.", _receiver.ip.c_str(), _receiver.port);
+			continue;
+		}
+
+		newConnection(newSocket, false);
+	}
+}
+
+bool UDPEpollServer::checkSourceAddress()
+{
+	UDPServerConnection* connection = _connectionCache.check(_receiver);
+	if (connection == NULL)
+		return true;
+
+	connection->appendRawData(_receiver.udpRawData);
+	return false;
+}
+
+void UDPEpollServer::newConnection(int newSocket, bool isIPv4)
+{
+	ConnectionInfoPtr connInfo(new ConnectionInfo(newSocket, _receiver.port, _receiver.ip, isIPv4, true));
+	connInfo->changeToUDP((uint8_t*)_receiver.sockaddr);
+
+	int mtu = connInfo->isPrivateIP() ? Config::UDP::_LAN_MTU : Config::UDP::_internet_MTU;
+
+	UDPServerConnection* connection = new UDPServerConnection(connInfo, mtu);
+	connection->epollfd = _epoll_fd;
+
+	_connectionCache.insert(_receiver, connection);
+	connection->appendRawData(_receiver.udpRawData);
+	connection->_refCount++;
+}
+
+void UDPEpollServer::scheduleNewConnections()
+{
+	std::unordered_map<std::string, UDPServerConnection*>& cache = _connectionCache.getCache();
+
+	_connectionMap.insert(cache);
+	for (auto& pp: cache)
+		_ioPool->wakeUp(pp.second);
+
+	_connectionCache.reset();
+}
+
+void UDPEpollServer::processEvent(struct epoll_event & event)
 {
 	int socket = event.data.fd;
-	bool ipv4Socket = (socket == _socket);
 
+	//-- Please care the order.
 	if (event.events & EPOLLRDHUP || event.events & EPOLLHUP)
-		LOG_FATAL("UDP %s socket recv EPOLLRDHUP or EPOLLHUP event.", ipv4Socket ? "IPv4" : "IPv6");
+	{
+		terminateConnection(socket, UDPSessionEventType::Closed, FPNN_EC_CORE_CONNECTION_CLOSED);
+		return;
+	}
+	else if (event.events & EPOLLERR)
+	{
+		terminateConnection(socket, UDPSessionEventType::Closed, FPNN_EC_CORE_UNKNOWN_ERROR);
+		return;
+	}
 	
-	if (event.events & EPOLLERR)
-		LOG_FATAL("UDP %s socket recv EPOLLERR event.", ipv4Socket ? "IPv4" : "IPv6");
-
-	//-- send is first than receive.
-	if (event.events & EPOLLOUT)
-		processSendEvent(socket);
-
-	if (event.events & EPOLLIN)
-	{
-		if (ipv4Socket)
-		{
-			while (true)
-			{
-				UDPReceivedResults results;
-				if (recvBuffer.recvIPv4(socket, results) == false)
-					return;
-
-				for (auto& answer: results.answerList)
-					deliverAnswer(results.connInfo, answer);
-				
-				for (auto& quest: results.questList)
-					deliverQuest(results.connInfo, quest);
-			}
-		}
-		else
-		{
-			while (true)
-			{
-				UDPReceivedResults results;
-				if (recvBuffer.recvIPv6(socket, results) == false)
-					return;
-				
-				for (auto& answer: results.answerList)
-					deliverAnswer(results.connInfo, answer);
-				
-				for (auto& quest: results.questList)
-					deliverQuest(results.connInfo, quest);
-			}
-		}
-	}
+	UDPServerConnection* conn = (UDPServerConnection*)_connectionMap.signConnection(socket, event.events);
+	if (conn)
+		_ioPool->wakeUp(conn);
 }
 
-void UDPEpollServer::processSendEvent(int socket)
+void UDPEpollServer::connectionConnectedEventCompleted(UDPServerConnection* conn)
 {
-	bool needWaitSendEvent = false;
-	if (socket == _socket)
+	bool noTerminationCalled = conn->connectedEventCompleted();
+
+	if (!noTerminationCalled)
 	{
-		_sendBuffer.send(needWaitSendEvent);
-		updateSocketStatus(socket, needWaitSendEvent);
+		exitEpoll(conn->socket());
+
+		if (deliverSessionEvent(conn, UDPSessionEventType::Closed) == false)
+			conn->_refCount--;
+
+		//-- terminateConnection() is called, just call closed event only.
+		// terminateConnection(conn->socket(), UDPSessionEventType::Closed, FPNN_EC_CORE_CONNECTION_CLOSED);
+		return;
 	}
-	else if (socket == _socket6)
+
+	//-- TO dispatch quest
+	std::list<FPQuestPtr> cachedQuests;
+	conn->swapCachedQuests(cachedQuests);
+
+	for (auto& quest: cachedQuests)
+		deliverQuest(conn, quest);
+
+	conn->_refCount--;
+}
+
+bool UDPEpollServer::deliverSessionEvent(UDPServerConnection* conn, UDPSessionEventType type)
+{
+	UDPRequestPackage* requestPackage = new(std::nothrow) UDPRequestPackage(conn, type);
+	if (!requestPackage)
 	{
-		_sendBuffer6.send(needWaitSendEvent);
-		updateSocketStatus(socket, needWaitSendEvent);
+		LOG_ERROR("Alloc Event package for UDP session %s event failed. %s",
+			(type == UDPSessionEventType::Connected) ? "connected" : "closing", conn->_connectionInfo->str().c_str());
+		return false;
 	}
+
+	bool wakeUpResult;
+	if (type == UDPSessionEventType::Connected)
+		wakeUpResult = _workerPool->priorWakeUp(requestPackage);
 	else
-		LOG_ERROR("Unknown UDP socket %d is triggered with send event in server process.", socket);
+		wakeUpResult = _workerPool->forceWakeUp(requestPackage);
+
+	if (wakeUpResult)
+		return true;
+
+	LOG_ERROR("Worker pool wake up for UDP session %s event failed. %s",
+		(type == UDPSessionEventType::Connected) ? "connected" : "closing", conn->_connectionInfo->str().c_str());
+
+	delete requestPackage;
+	return false;
 }
 
-void UDPEpollServer::deliverAnswer(ConnectionInfoPtr connInfo, FPAnswerPtr answer)
+void UDPEpollServer::deliverAnswer(UDPServerConnection* conn, FPAnswerPtr answer)
 {
-	BasicAnswerCallback* callback = _callbackMap.takeCallback(connInfo, answer->seqNumLE());
+	BasicAnswerCallback* callback = conn->takeCallback(answer->seqNumLE());
 	if (!callback)
 	{
-		LOG_ERROR("Received error answer seq is %u at UDP %s.", answer->seqNumLE(), connInfo->str().c_str());
+		LOG_ERROR("Received error answer seq is %u at UDP endpoint %s.", answer->seqNumLE(), conn->_connectionInfo->endpoint().c_str());
 		return;
 	}
 	if (callback->syncedCallback())		//-- check first, then fill result.
@@ -491,48 +636,40 @@ void UDPEpollServer::deliverAnswer(ConnectionInfoPtr connInfo, FPAnswerPtr answe
 		return;
 	}
 
-	if (_answerCallbackPool)
 	{
 		callback->fillResult(answer, FPNN_EC_OK);
 
 		BasicAnswerCallbackPtr task(callback);
 		_answerCallbackPool->wakeUp(task);
 	}
-	else
-	{
-		delete callback;
-		LOG_ERROR("UDP server received an answer, but process answers is disabled. Answer will be dropped. %s", connInfo->str().c_str());
-	}
 }
 
-bool UDPEpollServer::returnServerStoppingAnswer(ConnectionInfoPtr connInfo, FPQuestPtr quest)
+void UDPEpollServer::returnServerStoppingAnswer(UDPServerConnection* conn, FPQuestPtr quest)
 {
 	try
 	{
 		FPAnswerPtr answer = FpnnErrorAnswer(quest, FPNN_EC_CORE_SERVER_STOPPING, Config::_sName);
 		std::string *raw = answer->raw();
-		sendData(connInfo, raw);
-		return true;
+		conn->sendData(raw, slack_real_msec() + _timeoutQuest, false);
 	}
 	catch (const FpnnError& ex)
 	{
-		LOG_ERROR("Exception when return UDP server stopping answer. %s, exception:(%d)%s", connInfo->str().c_str(), ex.code(), ex.what());
-		return false;
+		LOG_ERROR("Exception when return UDP server stopping answer. endpoint %s, exception:(%d)%s", conn->_connectionInfo->endpoint().c_str(), ex.code(), ex.what());
 	}
 	catch (...)
 	{
-		LOG_ERROR("Exception when return UDP server stopping answer. %s", connInfo->str().c_str());
-		return false;
+		LOG_ERROR("Exception when return UDP server stopping answer. endpoint %s", conn->_connectionInfo->endpoint().c_str());
 	}
-
-	return true;
 }
 
-void UDPEpollServer::deliverQuest(ConnectionInfoPtr connInfo, FPQuestPtr quest)
+void UDPEpollServer::deliverQuest(UDPServerConnection* conn, FPQuestPtr quest)
 {
 	if (_stopping)
 	{
-		returnServerStoppingAnswer(connInfo, quest);
+		if (quest->isOneWay())
+			return;
+		
+		returnServerStoppingAnswer(conn, quest);
 		return;
 	}
 
@@ -545,10 +682,10 @@ void UDPEpollServer::deliverQuest(ConnectionInfoPtr connInfo, FPQuestPtr quest)
 			prior = true;
 	}
 
-	UDPRequestPackage* requestPackage = new(std::nothrow) UDPRequestPackage(connInfo, quest);
+	UDPRequestPackage* requestPackage = new(std::nothrow) UDPRequestPackage(conn->_connectionInfo, quest);
 	if (!requestPackage)
 	{
-		LOG_ERROR("Alloc Event package for received quest (%s) of UDP server failed. %s", questMethod.c_str(), connInfo->str().c_str());
+		LOG_ERROR("Alloc Event package for received quest (%s) of UDP server failed. %s", questMethod.c_str(), conn->_connectionInfo->str().c_str());
 		return;
 	}
 
@@ -563,7 +700,7 @@ void UDPEpollServer::deliverQuest(ConnectionInfoPtr connInfo, FPQuestPtr quest)
 		if (!_workerPool->exiting())
 		{
 			LOG_ERROR("Worker pool wake up for quest (%s) failed, UDP server worker Pool length limitation is caught. %s",
-				questMethod.c_str(), connInfo->str().c_str());
+				questMethod.c_str(), conn->_connectionInfo->str().c_str());
 
 			if (quest->isTwoWay())
 			{
@@ -571,25 +708,31 @@ void UDPEpollServer::deliverQuest(ConnectionInfoPtr connInfo, FPQuestPtr quest)
 				{
 					FPAnswerPtr answer = FpnnErrorAnswer(quest, FPNN_EC_CORE_WORK_QUEUE_FULL, std::string("Server queue is full!"));
 					std::string *raw = answer->raw();
-					sendData(connInfo, raw);
+					conn->sendData(raw, slack_real_msec() + _timeoutQuest, false);
 				}
 				catch (const FpnnError& ex)
 				{
 					LOG_ERROR("Generate error answer for UDP server worker queue full failed. Quest %s, %s, exception:(%d)%s",
-						questMethod.c_str(), connInfo->str().c_str(), ex.code(), ex.what());
+						questMethod.c_str(), conn->_connectionInfo->str().c_str(), ex.code(), ex.what());
 				}
 				catch (...)
 				{
 					LOG_ERROR("Generate error answer for UDP server worker queue full failed. Quest %s, %s",
-						questMethod.c_str(), connInfo->str().c_str());
+						questMethod.c_str(), conn->_connectionInfo->str().c_str());
 				}
 			}
 		}
 		else
-			LOG_ERROR("Worker pool wake up for quest (%s) failed, UDP server is exiting. %s", questMethod.c_str(), connInfo->str().c_str());
+			LOG_WARN("Worker pool wake up for quest (%s) failed, UDP server is exiting. %s", questMethod.c_str(), conn->_connectionInfo->str().c_str());
 
 		delete requestPackage;
 	}
+}
+
+void UDPEpollServer::reclaimeConnection(UDPServerConnection* conn)
+{
+	IReleaseablePtr autoRelease(conn);
+	_reclaimer->reclaim(autoRelease);
 }
 
 void UDPEpollServer::stop()
@@ -599,6 +742,7 @@ void UDPEpollServer::stop()
 	LOG_INFO("UDP server will go to stop!");
 
 	_stopping = true;
+	_ioWorker->serverWillStop();
 
 	//call user defined function before server exit
 	_serverMasterProcessor->getQuestProcessor()->serverWillStop();
@@ -626,6 +770,8 @@ void UDPEpollServer::stop()
 
 void UDPEpollServer::clean()
 {
+	/*
+	//-- 需要在 _workerPool release 之后关闭，否则 ARQ 链接的关闭事件，无法发送。
 	if (_socket > 0)
 	{
 		close(_socket);
@@ -637,6 +783,7 @@ void UDPEpollServer::clean()
 		close(_socket6);
 		_socket6 = 0;
 	}
+	*/
 
 	while (!_stopSignalNotified)
 		usleep(20000);
@@ -646,11 +793,23 @@ void UDPEpollServer::clean()
 	_closeNotifyFds[0] = 0;
 	_closeNotifyFds[1] = 0;
 	
-	clearRemnantCallbacks();
+	clearRemnantConnections();
 
 	_workerPool->release();
-	if (_answerCallbackPool)
-		_answerCallbackPool->release();
+	_answerCallbackPool->release();
+
+	//-- 需要在 _workerPool release 之后关闭，否则 ARQ 链接的关闭事件，无法发送。
+	if (_socket > 0)
+	{
+		close(_socket);
+		_socket = 0;
+	}
+
+	if (_socket6 > 0)
+	{
+		close(_socket6);
+		_socket6 = 0;
+	}
 
 	close(_epoll_fd);
 	_epoll_fd = 0;
@@ -669,111 +828,46 @@ void UDPEpollServer::clean()
 	_serverMasterProcessor->setQuestProcessor(nullptr);
 }
 
-void UDPEpollServer::clearRemnantCallbacks()
+void UDPEpollServer::clearRemnantConnections()
 {
-	std::set<BasicAnswerCallback*> callbacks;
-	_callbackMap.clearAndFetchAllRemnantCallbacks(callbacks);
+	_connectionMap.markAllConnectionsActiveCloseSignal();
+	periodSendingCheck();
 
-	for (auto callback: callbacks)
-	{
-		if (callback->syncedCallback())		//-- check first, then fill result.
-			callback->fillResult(NULL, FPNN_EC_CORE_SERVER_STOPPING);
-		else
-		{
-			if (_answerCallbackPool)
-			{
-				callback->fillResult(NULL, FPNN_EC_CORE_SERVER_STOPPING);
+	std::list<UDPServerConnection*> connections;
+	_connectionMap.removeAllConnections(connections);
 
-				BasicAnswerCallbackPtr task(callback);
-				_answerCallbackPool->wakeUp(task);
-			}
-			else
-				delete callback;
-		}
-	}
+	for (auto conn: connections)
+		terminateConnection(conn->socket(), UDPSessionEventType::Closed, FPNN_EC_CORE_SERVER_STOPPING);
 }
 
-void UDPEpollServer::sendData(ConnectionInfoPtr connInfo, std::string* data)
+void UDPEpollServer::sendData(int socket, uint64_t token, std::string* data, int64_t expiredMS, bool discardable)
 {
-	bool needWaitSendEvent = false, actualSent = false;
-	if (connInfo->socket == _socket)
-	{
-		_sendBuffer.send(connInfo, needWaitSendEvent, actualSent, data);
-		updateSocketStatus(_socket, needWaitSendEvent);
-	}
-	else if (connInfo->socket == _socket6)
-	{
-		_sendBuffer6.send(connInfo, needWaitSendEvent, actualSent, data);
-		updateSocketStatus(_socket6, needWaitSendEvent);
-	}
-	else
+	if (expiredMS == 0)
+		expiredMS = slack_real_msec() + _timeoutQuest;
+
+	if (!_connectionMap.sendData(socket, token, data, expiredMS, discardable))
 	{
 		delete data;
-		LOG_ERROR("Send dat on unknown UDP socket %d is dropped.", connInfo->socket);
+		LOG_WARN("UDP data not send at socket %d, address: %s. socket maybe closed.", socket, NetworkUtil::getPeerName(socket).c_str());
 	}
 }
 
-bool UDPEpollServer::sendQuestWithBasicAnswerCallback(ConnectionInfoPtr connInfo, FPQuestPtr quest, BasicAnswerCallback* callback, int timeout)
+bool UDPEpollServer::sendQuestWithBasicAnswerCallback(int socket, uint64_t token, FPQuestPtr quest, BasicAnswerCallback* callback, int timeout, bool discardable)
 {
-	if (!quest)
-		return false;
-
-	if (quest->isTwoWay() && !callback)
-		return false;
-
-	std::string* raw = NULL;
-	try
+	if (_stopping)
 	{
-		raw = quest->raw();
-	}
-	catch (const FpnnError& ex){
-		LOG_ERROR("Quest Raw Exception:(%d)%s", ex.code(), ex.what());
-		return false;
-	}
-	catch (...)
-	{
-		LOG_ERROR("Quest Raw Exception.");
+		LOG_ERROR("Send duplex quest when server begin stopping.");
 		return false;
 	}
 
-	if (callback)
-	{
-		uint32_t seqNum = quest->seqNumLE();
-		callback->updateExpiredTime(slack_real_msec() + timeout);
-		_callbackMap.insert(connInfo, seqNum, callback);
-	}
-
-	sendData(connInfo, raw);
-
-	return true;
+	return _connectionMap.sendQuestWithBasicAnswerCallback(socket, token, quest, callback, timeout, discardable);
 }
 
-/*void UDPEpollServer::sendAnswer(ConnectionInfoPtr connInfo, FPAnswerPtr answer)
-{
-	std::string* raw = NULL;
-	try
-	{
-		raw = answer->raw();
-	}
-	catch (const FpnnError& ex){
-		answer = FpnnErrorAnswer(quest, ex.code(), std::string(ex.what()) + ", " + connInfo->str());
-		raw = answer->raw();
-	}
-	catch (...)
-	{
-		answer = FpnnErrorAnswer(quest, FPNN_EC_CORE_UNKNOWN_ERROR, std::string("exception while do answer raw, ") + connInfo->str());
-		raw = answer->raw();
-	}
-
-	Config::ServerAnswerAndSlowLog(quest, answer, connInfo->ip, connInfo->port);
-
-	sendData(connInfo, raw);
-}*/
-FPAnswerPtr UDPEpollServer::sendQuest(ConnectionInfoPtr connInfo, FPQuestPtr quest, int timeout)
+FPAnswerPtr UDPEpollServer::sendQuest(int socket, uint64_t token, FPQuestPtr quest, int timeout, bool discardable)
 {
 	if (!quest->isTwoWay())
 	{
-		sendQuestWithBasicAnswerCallback(connInfo, quest, NULL, 0);
+		sendQuestWithBasicAnswerCallback(socket, token, quest, NULL, 0, discardable);
 		return NULL;
 	}
 
@@ -781,7 +875,7 @@ FPAnswerPtr UDPEpollServer::sendQuest(ConnectionInfoPtr connInfo, FPQuestPtr que
 
 	std::mutex local_mutex;
 	std::shared_ptr<SyncedAnswerCallback> s(new SyncedAnswerCallback(&local_mutex, quest));
-	if (!sendQuestWithBasicAnswerCallback(connInfo, quest, s.get(), timeout))
+	if (!sendQuestWithBasicAnswerCallback(socket, token, quest, s.get(), timeout, discardable))
 	{
 		return FpnnErrorAnswer(quest, FPNN_EC_CORE_SEND_ERROR, "unknown sending error.");
 	}
@@ -789,33 +883,172 @@ FPAnswerPtr UDPEpollServer::sendQuest(ConnectionInfoPtr connInfo, FPQuestPtr que
 	return s->takeAnswer();
 }
 
+bool UDPEpollServer::joinEpoll(int socket)
+{
+	struct epoll_event	ev;
+
+	ev.data.fd = socket;
+	ev.events = EPOLLIN | EPOLLERR | EPOLLHUP | EPOLLET | EPOLLRDHUP | EPOLLONESHOT;
+
+	if (epoll_ctl(_epoll_fd, EPOLL_CTL_ADD, socket, &ev) != 0)
+		return false;
+	else
+		return true;
+}
+
+bool UDPEpollServer::waitForAllEvents(int socket)
+{
+	struct epoll_event	ev;
+
+	ev.data.fd = socket;
+	ev.events = EPOLLIN | EPOLLOUT | EPOLLERR | EPOLLHUP | EPOLLET | EPOLLRDHUP | EPOLLONESHOT;
+
+	if (epoll_ctl(_epoll_fd, EPOLL_CTL_MOD, socket, &ev) != 0)
+	{
+		if (errno == ENOENT)
+			return false;
+		
+		LOG_INFO("UDP Server wait socket event failed. Socket: %d, address: %s, errno: %d", socket, NetworkUtil::getPeerName(socket).c_str(), errno);
+		return false;
+	}
+	else
+		return true;
+}
+bool UDPEpollServer::waitForRecvEvent(int socket)
+{
+	struct epoll_event	ev;
+
+	ev.data.fd = socket;
+	ev.events = EPOLLIN | EPOLLERR | EPOLLHUP | EPOLLET | EPOLLRDHUP | EPOLLONESHOT;
+
+	if (epoll_ctl(_epoll_fd, EPOLL_CTL_MOD, socket, &ev) != 0)
+	{
+		if (errno == ENOENT)
+			return false;
+
+		LOG_INFO("UDP Server wait socket event failed. Socket: %d, address: %s, errno: %d", socket, NetworkUtil::getPeerName(socket).c_str(), errno);
+		return false;
+	}
+	else
+		return true;
+}
+
+void UDPEpollServer::exitEpoll(int socket)
+{
+	struct epoll_event	ev;
+
+	ev.data.fd = socket;
+	ev.events = 0;
+
+	epoll_ctl(_epoll_fd, EPOLL_CTL_DEL, socket, &ev);
+}
+
+void UDPEpollServer::closeConnection(int socket, bool force)
+{
+	if (force == false)
+	{
+		_connectionMap.markConnectionActiveCloseSignal(socket);
+	}
+	else
+	{
+		terminateConnection(socket, UDPSessionEventType::Closed, FPNN_EC_CORE_CONNECTION_CLOSED);
+	}
+}
+
+void UDPEpollServer::terminateConnection(int socket, UDPSessionEventType type, int errorCode)
+{
+	UDPServerConnection* conn = _connectionMap.remove(socket);
+	if (!conn)
+		return;
+
+	internalTerminateConnection(conn, socket, type, errorCode);
+}
+
+void UDPEpollServer::internalTerminateConnection(UDPServerConnection* conn, int socket, UDPSessionEventType type, int errorCode)
+{
+	exitEpoll(socket);
+
+	clearConnectionQuestCallbacks(conn, errorCode);
+
+	if (conn->isConnectedEventTriggered(true))
+	{
+		conn->_refCount++;
+
+		if (deliverSessionEvent(conn, type) == false)
+			conn->_refCount--;
+	}
+	
+	reclaimeConnection(conn);
+}
+
+void UDPEpollServer::clearConnectionQuestCallbacks(UDPServerConnection* conn, int errorCode)
+{
+	std::unordered_map<uint32_t, BasicAnswerCallback*> callbackMap;
+	conn->swapCallbackMap(callbackMap);
+
+	for (auto callbackPair: callbackMap)
+	{
+		BasicAnswerCallback* callback = callbackPair.second;
+		if (callback->syncedCallback())		//-- check first, then fill result.
+			callback->fillResult(NULL,  errorCode);
+		else
+		{
+			callback->fillResult(NULL, errorCode);
+
+			BasicAnswerCallbackPtr task(callback);
+			_answerCallbackPool->wakeUp(task);
+		}
+	}
+}
+
+void UDPEpollServer::periodSendingCheck()
+{
+	_connectionMap.periodSending();
+}
+
 void UDPEpollServer::checkTimeout()
 {
 	if (_running)
 	{
-		//-- Quest Timeout: process as milliseconds
-		int64_t current = slack_real_msec();
-		std::list<std::map<uint32_t, BasicAnswerCallback*> > timeouted;
+		std::list<UDPServerConnection*> invalidConnections;
+		std::unordered_map<uint32_t, BasicAnswerCallback*> timeoutedCallbacks;
+		_connectionMap.extractInvalidConnectionsAndCallbcks(invalidConnections, timeoutedCallbacks);
 
-		_callbackMap.extractTimeoutedCallback(current, timeouted);
-		for (auto& bacMap: timeouted)
+		for (UDPServerConnection* conn: invalidConnections)
+			internalTerminateConnection(conn, conn->socket(), UDPSessionEventType::Closed, FPNN_EC_CORE_INVALID_CONNECTION);
+
+		for (auto& cbPair: timeoutedCallbacks)
 		{
-			for (auto& bacPair: bacMap)
+			if (cbPair.second)
 			{
-				if (bacPair.second)
+				BasicAnswerCallback* callback = cbPair.second;
+				if (callback->syncedCallback())		//-- check first, then fill result.
+					callback->fillResult(NULL, FPNN_EC_CORE_TIMEOUT);
+				else
 				{
-					BasicAnswerCallback* callback = bacPair.second;
-					if (callback->syncedCallback())		//-- check first, then fill result.
-						callback->fillResult(NULL, FPNN_EC_CORE_TIMEOUT);
-					else
-					{
-						callback->fillResult(NULL, FPNN_EC_CORE_TIMEOUT);
+					callback->fillResult(NULL, FPNN_EC_CORE_TIMEOUT);
 
-						BasicAnswerCallbackPtr task(callback);
-						_answerCallbackPool->wakeUp(task);
-					}
+					BasicAnswerCallbackPtr task(callback);
+					_answerCallbackPool->wakeUp(task);
 				}
 			}
 		}
 	}
+}
+
+void UDPConnectionCache::insert(UDPServerReceiver& receiver, UDPServerConnection* conn)
+{
+	std::string key((const char*)receiver.sockaddr, (size_t)receiver.requiredAddrLen);
+
+	_cache.emplace(key, conn);
+}
+
+UDPServerConnection* UDPConnectionCache::check(UDPServerReceiver& receiver)
+{
+	std::string key((const char*)receiver.sockaddr, (size_t)receiver.requiredAddrLen);
+	auto it = _cache.find(key);
+	if (it == _cache.end())
+		return NULL;
+	else
+		return it->second;
 }

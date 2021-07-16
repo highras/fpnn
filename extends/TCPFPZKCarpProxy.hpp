@@ -175,6 +175,7 @@ namespace fpnn
 			TCPFPZKProxyCore(fpzkClient, serviceName, cluster, questTimeoutSeconds), _keymask(keymask)
 		{
 		}
+		virtual ~TCPFPZKCarpProxy() {}
 
 		TCPClientPtr getClient(int64_t key, bool connect)
 		{

@@ -1,4 +1,4 @@
-dirs = StressTest MassiveConnectionsTest
+dirs = TCPStressTest TCPMassiveConnectionsTest UDPStressTest UDPMassiveConnectionsTest
 
 all:
 	for x in $(dirs); do (cd $$x; make -j4) || exit 1; done

@@ -5,9 +5,10 @@
 	配置文件约束
 
 	# split by ";, "
-	Bypass.FPZK.cluster.carp.list = 
-	Bypass.FPZK.cluster.random.list = 
-	Bypass.FPZK.cluster.broadcast.list =
+	Bypass.<tagName>.FPZK.cluster.carp.list = 
+	Bypass.<tagName>.FPZK.cluster.oldest.list = 
+	Bypass.<tagName>.FPZK.cluster.random.list = 
+	Bypass.<tagName>.FPZK.cluster.broadcast.list =
 */
 
 #include <list>
@@ -18,27 +19,35 @@
 #include "FPWriter.h"
 #include "FPZKClient.h"
 #include "TCPFPZKCarpProxy.hpp"
+#include "TCPFPZKOldestProxy.hpp"
 #include "TCPFPZKRandomProxy.hpp"
-#include "TCPFPZKConsistencyProxy.hpp"
+#include "TCPFPZKBroadcastProxy.hpp"
 
 using namespace fpnn;
 
 class Bypass
 {
+	bool _empty;
 	FPZKClientPtr _fpzk;
 	std::list<TCPFPZKCarpProxyPtr> _carpList;
+	std::list<TCPFPZKOldestProxyPtr> _oldestList;
 	std::list<TCPFPZKRandomProxyPtr> _randomList;
-	std::list<TCPFPZKConsistencyProxyPtr> _broadcastList;
+	std::list<TCPFPZKBroadcastProxyPtr> _broadcastList;
 
 public:
-	Bypass(FPZKClientPtr fpzkClient): _fpzk(fpzkClient)
+	Bypass(FPZKClientPtr fpzkClient, const char* tagName): _fpzk(fpzkClient)
 	{
-		std::string carpNames = Setting::getString("Bypass.FPZK.cluster.carp.list");
-		std::string randomNames = Setting::getString("Bypass.FPZK.cluster.random.list");
-		std::string broadcastNames = Setting::getString("Bypass.FPZK.cluster.broadcast.list");
+		std::string prefix("Bypass.");
+		prefix.append(tagName);
 
-		std::vector<std::string> carpList, randomList, broadcastList;
+		std::string carpNames = Setting::getString(std::string(prefix).append(".FPZK.cluster.carp.list"));
+		std::string oldestNames = Setting::getString(std::string(prefix).append(".FPZK.cluster.oldest.list"));
+		std::string randomNames = Setting::getString(std::string(prefix).append(".FPZK.cluster.random.list"));
+		std::string broadcastNames = Setting::getString(std::string(prefix).append(".FPZK.cluster.broadcast.list"));
+
+		std::vector<std::string> carpList, oldestList, randomList, broadcastList;
 		StringUtil::split(carpNames, ";, ", carpList);
+		StringUtil::split(oldestNames, ";, ", oldestList);
 		StringUtil::split(randomNames, ";, ", randomList);
 		StringUtil::split(broadcastNames, ";, ", broadcastList);
 
@@ -46,6 +55,12 @@ public:
 		{
 			TCPFPZKCarpProxyPtr proxy(new TCPFPZKCarpProxy(_fpzk, name));
 			_carpList.push_back(proxy);
+		}
+
+		for (auto& name: oldestList)
+		{
+			TCPFPZKOldestProxyPtr proxy(new TCPFPZKOldestProxy(_fpzk, name));
+			_oldestList.push_back(proxy);
 		}
 
 		for (auto& name: randomList)
@@ -56,22 +71,24 @@ public:
 
 		for (auto& name: broadcastList)
 		{
-			TCPFPZKConsistencyProxyPtr proxy(new TCPFPZKConsistencyProxy(_fpzk, name, ConsistencySuccessCondition::AllQuestsSuccess));
+			TCPFPZKBroadcastProxyPtr proxy(new TCPFPZKBroadcastProxy(_fpzk, name));
 			_broadcastList.push_back(proxy);
 		}
+
+		_empty = (_carpList.size() + _oldestList.size() + _randomList.size() + _broadcastList.size()) == 0;
 	}
 
 	void bypass(int64_t hintId, const FPQuestPtr quest)
 	{
-		//std::string jsonBody = quest->json();
-		//FPQWriter qw(quest->method(), jsonBody);
-		//FPQuestPtr actQuest = qw.take();
+		if (_empty)
+			return;
+		
 		FPQuestPtr actQuest = FPQWriter::CloneQuest(quest->method(), quest);
 
 		for (auto proxy: _carpList)
 		{
-			//if (proxy->empty())
-			//	continue;
+			if (proxy->empty())
+				continue;
 			
 			bool status = proxy->sendQuest(hintId, actQuest, [hintId, actQuest, proxy](FPAnswerPtr answer, int errorCode)
 				{
@@ -100,10 +117,42 @@ public:
 			}
 		}
 
+		for (auto proxy: _oldestList)
+		{
+			if (proxy->empty())
+				continue;
+			
+			bool status = proxy->sendQuest(actQuest, [actQuest, proxy](FPAnswerPtr answer, int errorCode)
+				{
+					if (errorCode != fpnn::FPNN_EC_OK)
+					{
+						std::string method = actQuest->method();
+						bool status = proxy->sendQuest(actQuest, [method](FPAnswerPtr answer, int errorCode)
+						{
+							if (errorCode != fpnn::FPNN_EC_OK)
+								LOG_ERROR("Bypass event %s (oldest, secondly) return exception.", method.c_str());
+						});
+
+						if (status == false)//&& proxy->empty() != true)
+							LOG_ERROR("Bypass event %s (oldest, secondly) failed.", actQuest->method().c_str());
+					}
+				});
+			if (status == false)// && proxy->empty() != true)
+			{
+				status = proxy->sendQuest(actQuest, [actQuest](FPAnswerPtr answer, int errorCode)
+					{
+						if (errorCode != fpnn::FPNN_EC_OK)
+							LOG_ERROR("Bypass event %s (oldest, secondly) return exception.", actQuest->method().c_str());
+					});
+				if (status == false)// && proxy->empty() != true)
+					LOG_ERROR("Bypass event %s (oldest, secondly) failed.", quest->method().c_str());
+			}
+		}
+
 		for (auto proxy: _randomList)
 		{
-			//if (proxy->empty())
-			//	continue;
+			if (proxy->empty())
+				continue;
 			
 			bool status = proxy->sendQuest(actQuest, [actQuest, proxy](FPAnswerPtr answer, int errorCode)
 				{
@@ -134,8 +183,8 @@ public:
 		
 		for (auto proxy: _broadcastList)
 		{
-			//if (proxy->empty())
-			//	continue;
+			if (proxy->empty())
+				continue;
 
 			bool status = proxy->sendQuest(actQuest, [actQuest, proxy](FPAnswerPtr answer, int errorCode)
 			{

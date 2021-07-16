@@ -58,7 +58,7 @@ FPZK 是一个对等分布式集群服务，CAP 采用**可用性优先**策略�
 
 而当订阅者使用 FPNN 框架自带的 proxy 模块访问依赖服务时，所有依赖服务的变动导致的路由调整和变动，将会由框架自动处理，并对业务透明，业务服务无需关心。
 
-FPNN 框架已经自带了 [FPZK 的客户端模块](../../extends/FPZKClient.h)。
+FPNN 框架已经自带了 [FPZK 的客户端模块](APIs/extends/FPZKClient.md)。
 
 ### **服务网络的分裂与合并**
 
@@ -84,22 +84,24 @@ FPNN 框架已经自带了 [FPZK 的客户端模块](../../extends/FPZKClient.h)
 
 ### **数据路由与负载均衡**
 
-配合 FPZK 服务，FPNN 框架自带了4种数据路由与负载均衡方式。
+配合 FPZK 服务，FPNN 框架自带了6种数据路由与负载均衡方式。
 
 分别是
 
-* 随机策略的负载均衡/路由：[TCPFPZKRandomProxy](../../extends/TCPFPZKRandomProxy.hpp)
-* 轮流/轮转策略的负载均衡/路由：[TCPFPZKRotatoryProxy](../../extends/TCPFPZKRotatoryProxy.hpp)
-* 一致性哈希策略的负载均衡/路由：[TCPFPZKCarpProxy](../../extends/TCPFPZKCarpProxy.hpp)
-* 强一致/广播策略的负载均衡/路由：[TCPFPZKConsistencyProxy](../../extends/TCPFPZKConsistencyProxy.hpp)
+* 随机的负载均衡/路由策略：[TCPFPZKRandomProxy](APIs/extends/TCPFPZKRandomProxy.md)
+* 轮询的负载均衡/路由策略：[TCPFPZKRotatoryProxy](APIs/extends/TCPFPZKRotatoryProxy.md)
+* 一致性哈希的负载均衡/路由策略：[TCPFPZKCarpProxy](APIs/extends/TCPFPZKCarpProxy.md)
+* 一致性的路由策略：[TCPFPZKConsistencyProxy](APIs/extends/TCPFPZKConsistencyProxy.md)
+* 广播的路由策略：[TCPFPZKBroadcastProxy](APIs/extends/TCPFPZKBroadcastProxy.md)
+* 最早注册/最久运行的路由策略：[TCPFPZKOldestProxy](APIs/extends/TCPFPZKOldestProxy.md)
 
 业务使用 proxy 如同直接使用 TCPClient，直接调用
 
 	// sync mode
-	proxy->sendQuest(interface_name, quest);
+	proxy->sendQuest(quest);
 
 	// async mode
-	proxy->sendQuest(interface_name, quest, callback);
+	proxy->sendQuest(quest, callback);
 
 接口发送数据即可。同时，FPNN 自身提供的 proxy 也支持 server push，因此，proxy 本质上是面对 FPNN 业务集群的**集群客户端**。
 
@@ -180,7 +182,7 @@ FPNN 通过类似字典形式的参数封装，配合参数提取接口，解决
 
 对于服务的撤除，如果是减少服务实例，可根据 FPMonitor 的监控数据，直接停止相应服务实例即可。
 
-对于完全撤除某类型服务的所有实例，则可通过 FPMonitor，或者目标服务 FPNN 框架自身提供的 *infos 接口，在所有接口访问统计均为 0 后，直接停止相应服务实例即可。
+对于完全撤除某类型服务的所有实例，则可通过 FPMonitor，或者目标服务 FPNN 框架自身提供的 \*infos 接口，在所有接口访问统计均为 0 后，直接停止相应服务实例即可。
 
 
 

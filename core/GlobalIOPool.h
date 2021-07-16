@@ -2,7 +2,8 @@
 #define FPNN_Global_IO_Pool_H
 
 #include "ParamTemplateThreadPoolArray.h"
-#include "UDPClientIOWorker.h"
+#include "UDPClientConnection.h"
+#include "UDPServerIOWorker.h"
 #include "ClientIOWorker.h"
 #include "ServerIOWorker.h"
 #include "FPLog.h"
@@ -11,17 +12,20 @@ namespace fpnn
 {
 	class TCPEpollIOWorker: public ParamTemplateThreadPool<BasicConnection *>::IProcessor
 	{
-		std::shared_ptr<TCPServerIOWorker> _serverIOWorker;
-		std::shared_ptr<TCPClientIOWorker> _clientIOWorker;
+		std::shared_ptr<TCPServerIOWorker> _TCPServerIOWorker;
+		std::shared_ptr<TCPClientIOWorker> _TCPClientIOWorker;
 		std::shared_ptr<UDPClientIOWorker> _UDPClientIOWorker;
+		std::shared_ptr<UDPServerIOWorker> _UDPServerIOWorker;
 
 	public:
 		virtual void run(BasicConnection * connection)
 		{
 			if (connection->connectionType() == BasicConnection::TCPServerConnectionType)
-				_serverIOWorker->run((TCPServerConnection*)connection);
+				_TCPServerIOWorker->run((TCPServerConnection*)connection);
+			else if (connection->connectionType() == BasicConnection::UDPServerConnectionType)
+				_UDPServerIOWorker->run((UDPServerConnection*)connection);
 			else if (connection->connectionType() == BasicConnection::TCPClientConnectionType)
-				_clientIOWorker->run((TCPClientConnection*)connection);
+				_TCPClientIOWorker->run((TCPClientConnection*)connection);
 			else
 				_UDPClientIOWorker->run((UDPClientConnection*)connection);
 		}
@@ -31,10 +35,11 @@ namespace fpnn
 			If ClientEngine is not started, no client connection can come in.
 		* Server IO Worker will be set by TCPEpollServer starting. TCPEpollServer is unique in global.
 			If TCPEpollServer is not started, no server connection can come in. */
-		void setServerIOWorker(std::shared_ptr<TCPServerIOWorker> serverIOWorker) { _serverIOWorker = serverIOWorker; }
+		void setServerIOWorker(std::shared_ptr<TCPServerIOWorker> serverIOWorker) { _TCPServerIOWorker = serverIOWorker; }
+		void setServerIOWorker(std::shared_ptr<UDPServerIOWorker> serverIOWorker) { _UDPServerIOWorker = serverIOWorker; }
 		void setClientIOWorker(std::shared_ptr<TCPClientIOWorker> tcpClientIOWorker, std::shared_ptr<UDPClientIOWorker> udpClientIOWorker)
 		{
-			_clientIOWorker = tcpClientIOWorker;
+			_TCPClientIOWorker = tcpClientIOWorker;
 			_UDPClientIOWorker = udpClientIOWorker;
 		}
 	};
@@ -57,6 +62,8 @@ namespace fpnn
 
 		inline std::string ioPoolStatus() { return _ioPool.infos(); }
 		inline void setServerIOWorker(std::shared_ptr<TCPServerIOWorker> serverIOWorker)
+					{ _ioWorker->setServerIOWorker(serverIOWorker); }
+		inline void setServerIOWorker(std::shared_ptr<UDPServerIOWorker> serverIOWorker)
 					{ _ioWorker->setServerIOWorker(serverIOWorker); }
 		inline void setClientIOWorker(std::shared_ptr<TCPClientIOWorker> tcpClientIOWorker, std::shared_ptr<UDPClientIOWorker> udpClientIOWorker)
 					{ _ioWorker->setClientIOWorker(tcpClientIOWorker, udpClientIOWorker); }

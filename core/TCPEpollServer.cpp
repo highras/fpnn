@@ -861,7 +861,7 @@ void TCPEpollServer::dealAnswer(int socket, FPAnswerPtr answer)
 	BasicAnswerCallback* callback = _connectionMap.takeCallback(socket, answer->seqNumLE());
 	if (!callback)
 	{
-		LOG_WARN("Received error answer seq is %u at socket %d, address: %s, %s", answer->seqNumLE(), socket, NetworkUtil::getPeerName(socket).c_str(), answer->json().c_str());
+		LOG_WARN("Received error answer seq is %u at socket %d, address: %s", answer->seqNumLE(), socket, NetworkUtil::getPeerName(socket).c_str());
 		return;
 	}
 	if (callback->syncedCallback())		//-- check first, then fill result.

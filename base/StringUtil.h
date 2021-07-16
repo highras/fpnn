@@ -24,35 +24,38 @@ namespace StringUtil{
 	//will discard empty field
 	std::vector<std::string> &split(const std::string &s, const std::string& delim, std::vector<std::string> &elems);
 
+	//-- Only for integer or long.
 	template<typename T>
 	std::vector<T> &split(const std::string &s, const std::string& delim, std::vector<T> &elems)
 	{
 		std::vector<std::string> e;
 		e = split(s, delim, e); 
 		for(size_t i = 0; i < e.size(); ++i){
-			elems.push_back(stol(e[i]));
+			elems.push_back(atol(e[i].c_str()));
 		}   
 		return elems;
 	}
 
+	//-- Only for integer or long.
 	template<typename T>
 	std::set<T> &split(const std::string &s, const std::string& delim, std::set<T> &elems)
 	{
 		std::vector<std::string> e;
 		e = split(s, delim, e); 
 		for(size_t i = 0; i < e.size(); ++i){
-			elems.insert(stol(e[i]));
+			elems.insert(atol(e[i].c_str()));
 		}   
 		return elems;
 	}
 
+	//-- Only for integer or long.
 	template<typename T>
 	std::unordered_set<T> &split(const std::string &s, const std::string& delim, std::unordered_set<T> &elems)
 	{
 		std::vector<std::string> e;
 		e = split(s, delim, e); 
 		for(size_t i = 0; i < e.size(); ++i){
-			elems.insert(stol(e[i]));
+			elems.insert(atol(e[i].c_str()));
 		}   
 		return elems;
 	}

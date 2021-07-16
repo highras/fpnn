@@ -128,7 +128,35 @@ void ServerController::serverInfos(std::stringstream& ss, bool show_interface_st
 		{
 			s<<"\"udp\":{";
 			formatServerIPPort(s, udpServer);
-			s<<"\"ARQSupport\":"<<"false"<<"},";
+			s<<"\"MTU\":{";
+			s<<"\"internet\":"<<Config::UDP::_internet_MTU<<",";
+			s<<"\"LAN\":"<<Config::UDP::_LAN_MTU;
+			s<<"},";
+			s<<"\"ARQ\":{";
+
+			s<<"\"heartbeatIntervalSeconds\":"<<Config::UDP::_heartbeat_interval_seconds<<",";
+			s<<"\"disorderedSequenceTolerance\":{";
+			s<<"\"afterFirstPackageReceived\":"<<Config::UDP::_disordered_seq_tolerance<<",";
+			s<<"\"beforeFirstPackageReceived\":"<<Config::UDP::_disordered_seq_tolerance_before_first_package_received;
+			s<<"},";
+			s<<"\"reAckInterval(ms)\":"<<Config::UDP::_arq_reAck_interval_milliseconds<<",";
+			s<<"\"syncInterval(ms)\":"<<Config::UDP::_arq_seqs_sync_interval_milliseconds<<",";
+			s<<"\"maxUncompletedSegmentedPackageCount\":"<<Config::UDP::_max_cached_uncompleted_segment_package_count<<",";
+			s<<"\"maxCachedSecondsForUncompletedSegments\":"<<Config::UDP::_max_cached_uncompleted_segment_seconds<<",";
+			s<<"\"urgentSyncTriggeredThreshold\":"<<Config::UDP::_arq_urgent_seqs_sync_triggered_threshold<<",";
+			s<<"\"urgentSyncInterval(ms)\":"<<Config::UDP::_arq_urgnet_seqs_sync_interval_milliseconds<<",";
+//			s<<"\"UNAInterpolationRate\":"<<Config::UDP::_arq_una_include_rate<<",";
+			s<<"\"maxUncomfiredPackageCount\":"<<Config::UDP::_unconfiremed_package_limitation<<",";
+			s<<"\"maxResendCountPerCalling\":"<<Config::UDP::_max_resent_count_per_call<<",";
+			s<<"\"maxWaitingTimeForFirstReliablePackage(ms)\":"<<Config::UDP::_max_tolerated_milliseconds_before_first_package_received<<",";
+			s<<"\"maxWaitingTimeForValidReliablePackage(ms)\":"<<Config::UDP::_max_tolerated_milliseconds_before_valid_package_received<<",";
+			s<<"\"maxToleratedBeforeValidReliablePackageReceived(ms)\":"<<Config::UDP::_max_tolerated_count_before_valid_package_received<<",";
+			s<<"\"idleTimeout\":"<<Config::UDP::_max_untransmitted_seconds;
+
+			s<<"},";
+			s<<"\"untransmittedIdleSeconds\":"<<Config::UDP::_max_untransmitted_seconds<<",";
+			s<<"\"perSecondPackageSendingLimitation\":"<<Config::UDP::_max_package_sent_limitation_per_connection_second;
+			s<<"},";
 		}
 
 		//-- sProto
@@ -171,12 +199,25 @@ void ServerController::serverInfos(std::stringstream& ss, bool show_interface_st
 	if (show_interface_stat)
 		ss<<"\"stat\":"<<Statistics::str()<<",";
 
-	//-- UDP TODO: will change when UDP server is finish.
-	if (tcpServer)
-	{
-		ss<<"\"status\":{";
-		ss<<"\"currentConnections\":"<<tcpServer->currentConnections()<<"},";
-	}
+	ss<<"\"status\":{";
+	
+		if (tcpServer)
+		{
+			ss<<"\"tcp\":{";
+			ss<<"\"currentConnections\":"<<tcpServer->currentConnections()<<"}";
+		}
+
+		if (udpServer)
+		{
+			if (tcpServer)
+				ss<<",";
+
+			ss<<"\"udp\":{";
+			ss<<"\"currentSessions\":"<<udpServer->currentConnections()<<",";
+			ss<<"\"currnetARQConnections\":"<<udpServer->validARQConnections()<<"}";
+		}
+
+	ss<<"},";
 
 	if (tcpServer || udpServer)
 	{
@@ -196,6 +237,7 @@ void ServerController::serverInfos(std::stringstream& ss, bool show_interface_st
 		{
 			ss<<"\"udp\":{";
 			ss<<"\"workThreadStatus\":"<<udpServer->workerPoolStatus()<<",";
+			ss<<"\"ioThreadStatus\":"<<GlobalIOPool::nakedInstance()->ioPoolStatus()<<",";
 			ss<<"\"duplexThreadStatus\":"<<udpServer->answerCallbackPoolStatus()<<"}";
 		}
 
@@ -471,9 +513,19 @@ void timeoutCheckThread()
 
 	while (local_timeoutCheckerRunning)
 	{
-		int cyc = 100;
+		int cyc = 100, udpPeriodCheckCyc = 5;
 		while (local_timeoutCheckerRunning && cyc--)
+		{
+			if (--udpPeriodCheckCyc == 0)
+			{
+				UDPServerPtr udpServer = UDPEpollServer::instance();
+				if (udpServer)
+					udpServer->periodSendingCheck();
+
+				udpPeriodCheckCyc = 5;
+			}
 			usleep(10000);
+		}
 
 		//-- TCP Server
 		{

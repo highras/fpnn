@@ -28,6 +28,8 @@
 #include "obstack.h"
 #endif
 
+#include <stdlib.h>
+
 /* NOTE BEFORE MODIFYING THIS FILE: This version number must be
    incremented whenever callers compiled using an old obstack.h can no
    longer properly call the functions in this obstack.c.  */

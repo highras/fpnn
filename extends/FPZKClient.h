@@ -192,6 +192,7 @@ private:
 		FPZKLinearProxy(int64_t questTimeoutSeconds = -1): TCPProxyCore(questTimeoutSeconds), _index(0), _currClient(nullptr)
 		{
 		}
+		virtual ~FPZKLinearProxy() {}
 		FPAnswerPtr sendQuest(FPQuestPtr quest);
 	};
 	typedef std::shared_ptr<FPZKLinearProxy> FPZKLinearProxyPtr;
@@ -289,6 +290,11 @@ public:
 	inline std::string registeredName() const { return _registeredName; }
 	inline std::string registeredCluster() const { return _cluster; }
 	inline std::string registeredEndpoint() const { return _registeredEndpoint; }
+
+	inline void keepAlive() { _fpzkSrvProxy->keepAlive(); }
+	inline void setKeepAlivePingTimeout(int seconds) { _fpzkSrvProxy->setKeepAlivePingTimeout(seconds); }
+	inline void setKeepAliveInterval(int seconds) { _fpzkSrvProxy->setKeepAliveInterval(seconds); }
+	inline void setKeepAliveMaxPingRetryCount(int count) { _fpzkSrvProxy->setKeepAliveMaxPingRetryCount(count); }
 
 	inline void setServiceAlteredCallback(ServicesAlteredCallbackPtr callback)
 	{

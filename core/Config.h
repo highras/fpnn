@@ -6,15 +6,36 @@
 
 namespace fpnn
 {
-#define FPNN_SERVER_VERSION "0.9.3"
+#define FPNN_SERVER_VERSION "1.1.2"
 
 //in second
 #define FPNN_DEFAULT_QUEST_TIMEOUT (5)
 #define FPNN_DEFAULT_IDLE_TIMEOUT (60)
 #define FPNN_DEFAULT_MAX_PACKAGE_LEN (8*1024*1024)
 #define FPNN_PERFECT_CONNECTIONS 100000
+
+	//-- UDP max data length without IPv6 jumbogram.
 #define FPNN_UDP_MAX_DATA_LENGTH (65507)
-//-- UDP max data length without IPv6 jumbogram.
+	//-- 576: Internet/X25, 1500: Ethernet
+#define FPNN_UDP_Internet_MTU (576)
+#define FPNN_UDP_LAN_MTU (1500)
+	//-- In milliseconds
+// #define FPNN_UDP_ARQ_UNA_INCLUDE_RATE (10)
+#define FPNN_UDP_ARQ_RE_ACK_INTERVAL_MSEC (20)
+#define FPNN_UDP_ARQ_SYNC_INTERVAL_MSEC (50)
+#define FPNN_UDP_DISORDERED_SEQ_TOLERANCE (10000)
+#define FPNN_UDP_DISORDERED_SEQ_TOLERANCE_BEFORE_FIRST_PACKAGE (500)
+#define FPNN_UDP_HEARTBEAT_INTERVAL (20)
+#define FPNN_UDP_MAX_CACHED_UNCOMPLETED_SEGMENT_PACKAGES (100)
+#define FPNN_UDP_MAX_CACHED_UNCOMPLETED_SEGMENT_SECONDS (300)
+#define FPNN_UDP_ARQ_URGENT_SYNC_THRESHOLD (280)
+#define FPNN_UDP_ARQ_URGENT_SYNC_INTERVAL (20)
+#define FPNN_UDP_ARQ_MAX_UNCONFIRMED_PACKAGES (320)
+#define FPNN_UDP_ARQ_MAX_RESENT_COUNT_PER_SENDING_CALL (640)
+#define FPNN_UDP_ARQ_MAX_PACKAGE_SENT_PER_CONNECTION_SECOND (5000)
+#define FPNN_UDP_ARQ_MAX_TOLERATED_MSEC_BEFORE_FIRST_PACKAGE (3000)
+#define FPNN_UDP_ARQ_MAX_TOLERATED_MSEC_BEFORE_VALID_PACKAGE (20000)
+#define FPNN_UDP_ARQ_MAX_TOLERATED_COUNT_BEFORE_VALID_PACKAGE (1000)
 
 	class Config
 	{
@@ -45,6 +66,47 @@ namespace fpnn
 			static bool _log_client_quest;
 			static bool _log_client_answer;
 			static int16_t _log_client_slow;//no used, 
+
+			class Client
+			{
+			public:
+				class KeepAlive
+				{
+				public:
+					static bool defaultEnable;
+					static int pingInterval;			//-- In milliseconds
+					static int maxPingRetryCount;
+				};
+			};
+
+		public:
+			class UDP
+			{
+			public:
+				static int _LAN_MTU;
+				static int _internet_MTU;
+				static int _heartbeat_interval_seconds;
+				static uint32_t _disordered_seq_tolerance;
+				static uint32_t _disordered_seq_tolerance_before_first_package_received;
+				static uint64_t _arq_reAck_interval_milliseconds;
+				static uint64_t _arq_seqs_sync_interval_milliseconds;
+				static int _max_cached_uncompleted_segment_package_count;
+				static int _max_cached_uncompleted_segment_seconds;
+				static int _max_untransmitted_seconds;
+				static size_t _arq_urgent_seqs_sync_triggered_threshold;
+				static int64_t _arq_urgnet_seqs_sync_interval_milliseconds;
+//				static int _arq_una_include_rate;
+
+				static size_t _unconfiremed_package_limitation;
+				static size_t _max_package_sent_limitation_per_connection_second;
+				static int _max_resent_count_per_call;
+
+				static int _max_tolerated_milliseconds_before_first_package_received;
+				static int _max_tolerated_milliseconds_before_valid_package_received;
+				static int _max_tolerated_count_before_valid_package_received;
+
+				static void initUDPGlobalVaribles();
+			};
 
 		public:
 			static void initSystemVaribles();

@@ -1,22 +1,74 @@
+#---------#
+# 基础配置 #
+#---------#
+
 #当前server 名字
 FPNN.server.name = 
 
 #Listen IP,为空则listen所有IP
 FPNN.server.listening.ip = 
+
 #Listen Port
 FPNN.server.listening.port = 
+
 #Listen backlog大小
 FPNN.server.backlog.size = 
 
+#---------#
+# 超时配置 #
+#---------#
+
+#Connection idle 时间,秒为单位
+FPNN.server.idle.timeout = 60
+
+#Server 给client push 请求 超时时间,秒为单位
+FPNN.server.quest.timeout = 5
+
+#作为client 使用的时候,请求其他server 超时时间,单位 秒
+FPNN.client.quest.timeout = 5 
+
+
+#-------------#
+# TCP 保活配置 #
+#-------------#
+
+# 是否默认启动 TCP 保活
+FPNN.client.keepAlive.defaultEnable = false
+
+# TCP 保活 ping 间隔。单位：秒
+FPNN.client.keepAlive.pingInterval = 20
+
+# TCP 无响应最大时间。单位：秒
+# 默认 35 秒：20 秒的 ping 间隔，3次 timeout 为 5 秒的 ping 超时。
+FPNN.client.keepAlive.elapseThreshold = 35
+
+#-----------#
+# IPv6 服务 #
+#-----------#
+
 FPNN.server.ipv6.listening.ip = 
-FPNN.server.ipv6.listening.port = 
+FPNN.server.ipv6.listening.port =
+
+#-----------#
+# HTTP 支持 #
+#-----------#
+
+#server 是否支持http Post/Get请求
+FPNN.server.http.supported = false
+
+#---------#
+# 安全相关 #
+#---------#
 
 # 是否启用 ECC-AES 加密
 FPNN.server.security.ecdh.enable = false
+
 # curve 取值: secp256k1, secp256r1, secp224r1, secp192r1
 FPNN.server.security.ecdh.curve = 
+
 # privateKey 指向 privateKey (binary format, not Hex) 的文件路径
 FPNN.server.security.ecdh.privateKey = 
+
 # 所有用户接口，是否只允许加密访问
 FPNN.server.security.forceEncrypt.userMethods = false
 
@@ -31,9 +83,10 @@ FPNN.server.tcp.ipv6.ssl.listening.ip =
 FPNN.server.security.ssl.certificate = 
 FPNN.server.security.ssl.privateKey = 
 
+#---------#
+# 日志相关 #
+#---------#
 
-#server 是否支持http Post请求
-FPNN.server.http.supported = false
 #Server 是否支持统计,包括请求数,QPS等等,开启本项 会影响性能
 FPNN.server.stat = true
 
@@ -56,26 +109,25 @@ FPNN.server.status.logStatusInfos = false
 #状态信息间隔多长时间写入一次(单位：秒)
 FPNN.server.status.logStatusInterval = 60
 
+# 日志服务器endpoint
+# 默认为 unix:///tmp/fplog.sock
+# 标准输出可用 std::cout，标准错误输出可用 std::cerr
+FPNN.server.log.endpoint = 
+#日志服务器route,即本服务器标示
+FPNN.server.log.route = 
+#日志级别, DEBUG,INFO,WARN,ERROR
+FPNN.server.log.level = INFO
+
+#---------#
+# 系统相关 #
+#---------#
+
 #最大可打开句柄数
 FPNN.server.rlimit.max.nofile = 100000
 #Core 文件大小
 FPNN.server.rlimit.core.size = 0
 #线程堆栈大小, M 为单位
 FPNN.server.rlimit.stack.size = 8
-
-#Server 给client push 请求 超时时间,秒为单位
-FPNN.server.quest.timeout = 5
-#Connection idle 时间,秒为单位
-FPNN.server.idle.timeout = 60
-#作为client 使用的时候,请求其他server 超时时间,单位 秒
-FPNN.client.quest.timeout = 5
-
-#日志服务器endpoint
-FPNN.server.log.endpoint = 
-#日志服务器route,即本服务器标示
-FPNN.server.log.route = 
-#日志级别, DEBUG,INFO,WARN,ERROR
-FPNN.server.log.level = INFO
 
 #显示指定机器信息
 FP.server.domain =
@@ -89,6 +141,94 @@ FP.server.public.ip6 =
 #指定机器所属平台,目前仅有aws,qingcloud, 默认aws
 FP.server.host.platform = 
 
+#----------------#
+# TCPEpollServer #
+#----------------#
+
+# TCP Server 按照以下顺序获取监听IPv4端口配置
+FPNN.server.tcp.ipv4.listening.port =
+FPNN.server.ipv4.listening.port =
+FPNN.server.listening.port =
+
+# TCP Server 按照以下顺序获取IPv4监听IP配置
+FPNN.server.tcp.ipv4.listening.ip =
+FPNN.server.ipv4.listening.ip =
+FPNN.server.listening.ip =
+
+# TCP Server 按照以下顺序获取监听IPv6端口配置
+FPNN.server.tcp.ipv6.listening.port =
+FPNN.server.ipv6.listening.port =
+
+# TCP Server 按照以下顺序获取IPv6监听IP配置
+FPNN.server.tcp.ipv6.listening.ip =
+FPNN.server.ipv6.listening.ip =
+
+# TCP Server 按照以下顺序获取Server 给client push 请求 超时时间,秒为单位
+FPNN.server.tcp.quest.timeout =
+FPNN.server.quest.timeout =
+
+#----------------#
+# UDPEpollServer #
+#----------------#
+
+#UDP Server 按照以下顺序获取监听IPv4端口配置
+FPNN.server.udp.ipv4.listening.port =
+FPNN.server.ipv4.listening.port =
+FPNN.server.listening.port =
+
+#UDP Server 按照以下顺序获取IPv4监听IP配置
+FPNN.server.udp.ipv4.listening.ip =
+FPNN.server.ipv4.listening.ip =
+FPNN.server.listening.ip =
+
+# UDP Server 按照以下顺序获取监听IPv6端口配置
+FPNN.server.udp.ipv6.listening.port =
+FPNN.server.ipv6.listening.port =
+
+# UDP Server 按照以下顺序获取IPv6监听IP配置
+FPNN.server.udp.ipv6.listening.ip =
+FPNN.server.ipv6.listening.ip =
+
+# UDP Server 按照以下顺序获取Server 给client push 请求 超时时间,秒为单位
+FPNN.server.udp.quest.timeout =
+FPNN.server.quest.timeout =
+
+#=========================================#
+#              Extends 模块                #
+#=========================================#
+#------------#
+# FPZKClient #
+#------------#
+# FPZKServer 地址列表。逗号或者空格分割
+FPZK.client.fpzkserver_list = 
+
+# 项目名称
+FPZK.client.project_name = 
+
+# 在 FPZKServer 中的项目 token
+FPZK.client.project_token = 
+
+# 服务集群分组名称
+FPNN.server.cluster.name = 
+
+# 是否启动订阅（集群变动实时通知）。否则 2 秒同步一次。
+FPZK.client.subscribe.enable = true
+
+# 本服务实例是否其他 region 可见
+FPZK.client.sync.externalVisible = true
+
+# 是否向 FPZKServer 汇报 ipv4、ipv6、domain、sslport、sslport6 (如果存在) 等信息
+FPZK.client.sync.syncPublicInfo = false
+
+# 是否向 FPZKServer 汇报当前机器连接总数，当前系统按 CPU 平均的负载和使用率
+FPZK.client.sync.syncPerformanceInfo = false
+
+# FPZK.client.sync.externalVisible = true 时，其他区域是否可用本服务的内网地址链接访问本服务
+FPZK.client.sync.syncEndpoint = true
+
+# 日志级别为 DEBUG 时，是否输出集群变动信息
+FPZK.client.debugInfo.clusterChanged.enable = false
+
 ###############################################
 #  以下参数除非了解其明确含义和影响，否则请不要随便配置  #
 ###############################################
@@ -96,6 +236,10 @@ FP.server.host.platform =
 FPNN.global.max.package.len = 
 FPNN.global.io.thread.min.size = cpuCount
 FPNN.global.io.thread.max.size = cpuCount
+
+#--------------#
+# ClientEngine #
+#--------------#
 
 FPNN.client.iobuffer.chunk.size = 256
 FPNN.client.max.event = 1000
@@ -106,19 +250,85 @@ FPNN.client.work.thread.max.size = cpuCount
 FPNN.client.duplex.thread.min.size = 0
 FPNN.client.duplex.thread.max.size = 0
 
+#----------#
+# TCP 相关 #
+#----------#
 FPNN.server.iobuffer.chunk.size = 256
 FPNN.server.max.event = 10000
-FPNN.server.work.queue.max.size = 2000000
 
+FPNN.server.max.connections = 500000
+FPNN.server.perfect.connections = 100000
+FPNN.server.http.closeAfterAnswered = false
+
+#-------------------#
+# TCP & UDP 通用配置 #
+#-------------------#
+FPNN.server.work.queue.max.size = 2000000
 FPNN.server.work.thread.min.size = cpuCount
 FPNN.server.work.thread.max.size = cpuCount
 FPNN.server.duplex.thread.min.size = 0
 FPNN.server.duplex.thread.max.size = 0
 
+#----------#
+# TCP 配置 #
+#----------#
+FPNN.server.tcp.work.queue.max.size =
+FPNN.server.tcp.work.thread.min.size =
+FPNN.server.tcp.work.thread.max.size =
+FPNN.server.tcp.duplex.thread.min.size =
+FPNN.server.tcp.duplex.thread.max.size =
+
+#----------#
+# UDP 配置 #
+#----------#
+
+FPNN.server.udp.work.queue.max.size =
+FPNN.server.udp.work.thread.min.size =
+FPNN.server.udp.work.thread.max.size =
+FPNN.server.udp.duplex.thread.min.size =
+FPNN.server.udp.duplex.thread.max.size =
+
+#---------#
+# 系统相关 #
+#---------#
+
 FPNN.server.user = infras
 FPNN.server.group = infras
 FPNN.server.preset.signal = true
 
-FPNN.server.max.connections = 500000
-FPNN.server.perfect.connections = 100000
-FPNN.server.http.closeAfterAnswered = false
+#--------------#
+# UDP ARQ 相关 #
+#--------------#
+
+# 576: Internet/X25, 1500: Ethernet
+# 1492: PPoE, 4352: FDDI
+# Unit: bytes
+FPNN.global.udp.mtu.internet = 576
+FPNN.global.udp.mtu.lan = 1500
+
+# Unit: milliseconds
+FPNN.global.udp.arq.reAckInterval = 20
+
+# Unit: milliseconds
+FPNN.global.udp.arq.syncInterval = 50
+
+FPNN.global.udp.disorderedSeq.tolerance.afterFirstPackageReceived = 10000
+FPNN.global.udp.disorderedSeq.tolerance.beforeFirstPackageReceived = 500
+
+# Unit: seconds
+FPNN.global.udp.arq.heartbeatInterval = 20
+FPNN.global.udp.arq.uncompletedSegment.maxCacheCount = 100
+FPNN.global.udp.arq.uncompletedSegment.maxCacheSeconds = 300
+FPNN.global.udp.arq.maxUntransmittedSeconds = 60
+FPNN.global.udp.arq.urgentSync.triggeredThreshold = 280
+
+# Unit: milliseconds
+FPNN.global.udp.arq.urgentSync.minInterval = 20
+
+FPNN.global.udp.arq.unconfiremedPackage.maxCount = 320
+FPNN.global.udp.arq.maxSendCountPerConnectionSecond = 5000
+FPNN.global.udp.arq.resentPerSecondLimitation = 640
+
+FPNN.global.udp.arq.maxMsecToleranceBeforeFirstPackageReceived = 3000
+FPNN.global.udp.arq.maxMsecToleranceBeforeValidPackageReceived = 20000
+FPNN.global.udp.arq.maxToleranceCountBeforeValidPackageReceived = 1000

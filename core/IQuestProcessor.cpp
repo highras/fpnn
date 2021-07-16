@@ -5,6 +5,8 @@
 
 using namespace fpnn;
 
+std::atomic<uint64_t> ConnectionInfo::uniqueIdBase(0);
+
 struct AnswerStatus
 {
 	bool _answered;
@@ -48,10 +50,18 @@ bool IQuestProcessor::sendAnswer(FPAnswerPtr answer)
 
 	ConnectionInfoPtr connInfo = gtl_answerStatus->_connInfo;
 
-	if (standardInterface(*connInfo))
+	if (connInfo->isTCP())
 		_concurrentSender->sendData(connInfo->socket, connInfo->token, raw);
+	else if (connInfo->isServerConnection())
+	{
+		//int64_t expiredMS = UDPEpollServer::instance()->getQuestTimeout() * 1000;
+		_concurrentUDPSender->sendData(connInfo->socket, connInfo->token, raw, 0/*slack_real_msec() + expiredMS*/, false);
+	}
 	else
-		_concurrentUDPSender->sendData(connInfo, raw);
+	{
+		//int64_t expiredMS = ClientEngine::instance()->getQuestTimeout() * 1000;
+		ClientEngine::instance()->sendUDPData(connInfo->socket, connInfo->token, raw, 0/*slack_real_msec() + expiredMS*/, false);
+	}
 
 	Config::ServerAnswerAndSlowLog(gtl_answerStatus->_quest, answer, connInfo->ip, connInfo->port);
 	gtl_answerStatus->_answered = true;
@@ -83,56 +93,98 @@ IAsyncAnswerPtr IQuestProcessor::genAsyncAnswer()
 
 QuestSenderPtr IQuestProcessor::genQuestSender(const ConnectionInfo& connectionInfo)
 {
-	if (standardInterface(connectionInfo))
+	if (connectionInfo.isTCP())
 		return std::make_shared<TCPQuestSender>(_concurrentSender, connectionInfo, connectionInfo._mutex);
 	else
 	{
 		if (gtl_answerStatus)
 			return std::make_shared<UDPQuestSender>(_concurrentUDPSender, gtl_answerStatus->_connInfo);
 
+		LOG_ERROR("!!!! cannot be triggered here in func IQuestProcessor::genQuestSender. If you see this message, please tell swxlion to fix the rotune.");
+
 		ConnectionInfoPtr ci(new ConnectionInfo(connectionInfo));
 		return std::make_shared<UDPQuestSender>(_concurrentUDPSender, ci);
 	}
 }
 
-FPAnswerPtr IQuestProcessor::sendQuest(const ConnectionInfo& connectionInfo, FPQuestPtr quest, int timeout)
+FPAnswerPtr IQuestProcessor::sendQuest(FPQuestPtr quest, int timeout)
 {
-	if (standardInterface(connectionInfo))
-		return _concurrentSender->sendQuest(connectionInfo.socket, connectionInfo.token, connectionInfo._mutex, quest, timeout * 1000);
+	return sendQuestEx(quest, quest->isOneWay(), timeout * 1000);
+}
+
+bool IQuestProcessor::sendQuest(FPQuestPtr quest, AnswerCallback* callback, int timeout)
+{
+	return sendQuestEx(quest, callback, quest->isOneWay(), timeout * 1000);
+}
+
+bool IQuestProcessor::sendQuest(FPQuestPtr quest, std::function<void (FPAnswerPtr answer, int errorCode)> task, int timeout)
+{
+	return sendQuestEx(quest, std::move(task), quest->isOneWay(), timeout * 1000);
+}
+
+FPAnswerPtr IQuestProcessor::sendQuestEx(FPQuestPtr quest, bool discardable, int timeoutMsec)
+{
+	if (!gtl_answerStatus)
+	{
+		if (quest->isTwoWay())
+			return FPAWriter::errorAnswer(quest, FPNN_EC_CORE_FORBIDDEN, "Please call this method in the duplex thread.");
+		else
+			return nullptr;
+	}
+
+	ConnectionInfoPtr connInfo = gtl_answerStatus->_connInfo;
+
+	if (connInfo->isTCP())
+		return _concurrentSender->sendQuest(connInfo->socket, connInfo->token, connInfo->_mutex, quest, timeoutMsec);
 	else
 	{
-		if (gtl_answerStatus)
-			return _concurrentUDPSender->sendQuest(gtl_answerStatus->_connInfo, quest, timeout * 1000);
+		if (connInfo->isServerConnection())
+		{
+			return _concurrentUDPSender->sendQuest(connInfo->socket, connInfo->token, quest, timeoutMsec, discardable);
+		}
+		else
+			return ClientEngine::instance()->sendQuest(connInfo->socket,
+				connInfo->token, connInfo->_mutex, quest, timeoutMsec, discardable);
+	}
+}
+bool IQuestProcessor::sendQuestEx(FPQuestPtr quest, AnswerCallback* callback, bool discardable, int timeoutMsec)
+{
+	if (!gtl_answerStatus)
+		return false;
 
-		ConnectionInfoPtr ci(new ConnectionInfo(connectionInfo));
-		return _concurrentUDPSender->sendQuest(ci, quest, timeout * 1000);
+	ConnectionInfoPtr connInfo = gtl_answerStatus->_connInfo;
+
+	if (connInfo->isTCP())
+		return _concurrentSender->sendQuest(connInfo->socket, connInfo->token, quest, callback, timeoutMsec);
+	else
+	{
+		if (connInfo->isServerConnection())
+		{
+			return _concurrentUDPSender->sendQuest(connInfo->socket, connInfo->token, quest, callback, timeoutMsec, discardable);
+		}
+		else
+			return ClientEngine::instance()->sendQuest(connInfo->socket,
+				connInfo->token, quest, callback, timeoutMsec, discardable);
+	}
+}
+bool IQuestProcessor::sendQuestEx(FPQuestPtr quest, std::function<void (FPAnswerPtr answer, int errorCode)> task, bool discardable, int timeoutMsec)
+{
+	if (!gtl_answerStatus)
+		return false;
+
+	ConnectionInfoPtr connInfo = gtl_answerStatus->_connInfo;
+
+	if (connInfo->isTCP())
+		return _concurrentSender->sendQuest(connInfo->socket, connInfo->token, quest, std::move(task), timeoutMsec);
+	else
+	{
+		if (connInfo->isServerConnection())
+		{
+			return _concurrentUDPSender->sendQuest(connInfo->socket, connInfo->token, quest, std::move(task), timeoutMsec, discardable);
+		}
+		else
+			return ClientEngine::instance()->sendQuest(connInfo->socket,
+				connInfo->token, quest, std::move(task), timeoutMsec, discardable);
 	}
 }
 
-bool IQuestProcessor::sendQuest(const ConnectionInfo& connectionInfo, FPQuestPtr quest, AnswerCallback* callback, int timeout)
-{
-	if (standardInterface(connectionInfo))
-		return _concurrentSender->sendQuest(connectionInfo.socket, connectionInfo.token, quest, callback, timeout * 1000);
-	else
-	{
-		if (gtl_answerStatus)
-			return _concurrentUDPSender->sendQuest(gtl_answerStatus->_connInfo, quest, callback, timeout * 1000);
-
-		ConnectionInfoPtr ci(new ConnectionInfo(connectionInfo));
-		return _concurrentUDPSender->sendQuest(ci, quest, callback, timeout * 1000);
-	}
-}
-
-bool IQuestProcessor::sendQuest(const ConnectionInfo& connectionInfo, FPQuestPtr quest, std::function<void (FPAnswerPtr answer, int errorCode)> task, int timeout)
-{
-	if (standardInterface(connectionInfo))
-		return _concurrentSender->sendQuest(connectionInfo.socket, connectionInfo.token, quest, std::move(task), timeout * 1000);
-	else
-	{
-		if (gtl_answerStatus)
-			return _concurrentUDPSender->sendQuest(gtl_answerStatus->_connInfo, quest, std::move(task), timeout * 1000);
-
-		ConnectionInfoPtr ci(new ConnectionInfo(connectionInfo));
-		return _concurrentUDPSender->sendQuest(ci, quest, std::move(task), timeout * 1000);
-	}
-}

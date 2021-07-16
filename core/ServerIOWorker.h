@@ -101,6 +101,7 @@ namespace fpnn
 		bool deliverAnswer(TCPServerConnection * connection, FPAnswerPtr answer);
 		bool deliverQuest(TCPServerConnection * connection, FPQuestPtr quest, bool& additionalSend);	//-- additionalSend: don't assign false.
 		bool processECDH(TCPServerConnection * connection, FPQuestPtr quest);  //-- ECDH: Elliptic Curve Diffie–Hellman key Exchange
+		bool processPing(TCPServerConnection * connection, FPQuestPtr quest);  //-- For keep alive.
 		bool returnServerStoppingAnswer(TCPServerConnection * connection, FPQuestPtr quest);
 
 		void closeConnection(TCPServerConnection * connection, bool error);

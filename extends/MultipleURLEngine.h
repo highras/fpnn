@@ -67,6 +67,7 @@ private:
 	protected:
 		int64_t _startTime;
 		CURL* _handle;
+		struct curl_slist *_headerChunk;
 		std::string _postBody;
 		ChainBuffer *_dataBuffer;
 		long _responseCode;
@@ -112,12 +113,16 @@ private:
 		}
 
 	public:
-		BaiscResultCallback(): _startTime(0), _handle(0), _dataBuffer(0), _responseCode(0), _curlCode(CURLE_OK),
-			_expireSeconds(300), _visitState(VISIT_READY), _errorInfo(0) {}
+		BaiscResultCallback(): _startTime(0), _handle(0), _headerChunk(NULL), _dataBuffer(0),
+			_responseCode(0), _curlCode(CURLE_OK), _expireSeconds(300), _visitState(VISIT_READY),
+			_errorInfo(0) {}
 		virtual ~BaiscResultCallback()
 		{
 			if (_handle)
 				curl_easy_cleanup(_handle);
+
+			if (_headerChunk)
+				curl_slist_free_all(_headerChunk);
 
 			if (_dataBuffer)
 				delete _dataBuffer;
@@ -409,39 +414,43 @@ public:
 	//-          Sync Interfaces            -//
 	//---------------------------------------//
 	bool visit(const std::string& url, Result &result, int timeoutSeconds = 120,
-		const std::string& postBody = std::string());
+		bool saveResponseData = true, const std::string& postBody = std::string(),
+		const std::vector<std::string>& header = std::vector<std::string>());
 
 	/* If return true, don't cleanup curl; if return false, please cleanup curl. */
 	bool visit(CURL *curl, Result &result, int timeoutSeconds = 120,
-		bool saveResponseData = false, const std::string& postBody = std::string());
-
+		bool saveResponseData = true, const std::string& postBody = std::string(),
+		const std::vector<std::string>& header = std::vector<std::string>());
 
 	//---------------------------------------//
 	//-  Async Interfaces: callback classes -//
 	//---------------------------------------//
 	bool visit(const std::string& url, ResultCallbackPtr callback, int timeoutSeconds = 120,
-		const std::string& postBody = std::string());
+		bool saveResponseData = true, const std::string& postBody = std::string(),
+		const std::vector<std::string>& header = std::vector<std::string>());
 
 	/* If return true, don't cleanup curl; if return false, please cleanup curl. */
 	inline bool visit(CURL *curl, ResultCallbackPtr callback, int timeoutSeconds = 120,
-		bool saveResponseData = false, const std::string& postBody = std::string())
+		bool saveResponseData = true, const std::string& postBody = std::string(),
+		const std::vector<std::string>& header = std::vector<std::string>())
 	{
-		return real_visit(curl, callback, timeoutSeconds, saveResponseData, postBody);
+		return real_visit(curl, callback, timeoutSeconds, saveResponseData, header, postBody);
 	}
 
 	//---------------------------------------//
 	//-  Async Interfaces: Lambda callback  -//
 	//---------------------------------------//
 	bool visit(const std::string& url, std::function<void (Result &result)> callback,
-		int timeoutSeconds = 120, const std::string& postBody = std::string());
+		int timeoutSeconds = 120, bool saveResponseData = true, const std::string& postBody = std::string(),
+		const std::vector<std::string>& header = std::vector<std::string>());
 
 	/* If return true, don't cleanup curl; if return false, please cleanup curl. */
 	inline bool visit(CURL *curl, std::function<void (Result &result)> callback,
-		int timeoutSeconds = 120,
-		bool saveResponseData = false, const std::string& postBody = std::string())
+		int timeoutSeconds = 120, bool saveResponseData = true, const std::string& postBody = std::string(),
+		const std::vector<std::string>& header = std::vector<std::string>())
 	{
 		std::shared_ptr<FunctionResultCallback>  fcb(new FunctionResultCallback(std::move(callback)));
-		return real_visit(curl, fcb, timeoutSeconds, saveResponseData, postBody);
+		return real_visit(curl, fcb, timeoutSeconds, saveResponseData, header, postBody);
 	}
 
 	//==================================================================//
@@ -451,30 +460,33 @@ public:
 	//-  Async Interfaces: callback classes -//
 	//---------------------------------------//
 	bool addToBatch(const std::string& url, ResultCallbackPtr callback, int timeoutSeconds = 120,
-		const std::string& postBody = std::string());
+		bool saveResponseData = true, const std::string& postBody = std::string(),
+		const std::vector<std::string>& header = std::vector<std::string>());
 
 	/* If return true, don't cleanup curl; if return false, please cleanup curl. */
 	inline bool addToBatch(CURL *curl, ResultCallbackPtr callback, int timeoutSeconds = 120,
-		bool saveResponseData = false, const std::string& postBody = std::string())
+		bool saveResponseData = true, const std::string& postBody = std::string(),
+		const std::vector<std::string>& header = std::vector<std::string>())
 	{
-		return real_addToBatch(curl, callback, timeoutSeconds, saveResponseData, postBody);
+		return real_addToBatch(curl, callback, timeoutSeconds, saveResponseData, header, postBody);
 	}
 
 	//---------------------------------------//
 	//-  Async Interfaces: Lambda callback  -//
 	//---------------------------------------//
 	bool addToBatch(const std::string& url, std::function<void (Result &result)> callback,
-		int timeoutSeconds = 120, const std::string& postBody = std::string());
+		int timeoutSeconds = 120, bool saveResponseData = true, const std::string& postBody = std::string(),
+		const std::vector<std::string>& header = std::vector<std::string>());
 
 	/* If return true, don't cleanup curl; if return false, please cleanup curl. */
 	inline bool addToBatch(CURL *curl, std::function<void (Result &result)> callback,
-		int timeoutSeconds = 120,
-		bool saveResponseData = false, const std::string& postBody = std::string())
+		int timeoutSeconds = 120, bool saveResponseData = true, const std::string& postBody = std::string(),
+		const std::vector<std::string>& header = std::vector<std::string>())
 	{
 		std::shared_ptr<FunctionResultCallback>  fcb(new FunctionResultCallback(std::move(callback)));
-		return real_addToBatch(curl, fcb, timeoutSeconds, saveResponseData, postBody);
+		return real_addToBatch(curl, fcb, timeoutSeconds, saveResponseData, header, postBody);
 	}
-	
+
 	bool commitBatch();
 	std::string status();
 
@@ -525,13 +537,13 @@ private:
 	int getSystemAvailablePortsCount();
 
 	bool prepareEasyHandle(CURL *curl, BaiscResultCallbackPtr callback, int timeoutSeconds,
-		bool saveResponseData, const std::string& postBody);
+		bool saveResponseData, const std::vector<std::string>& headers, const std::string& postBody);
 
 	bool real_visit(CURL *curl, BaiscResultCallbackPtr callback, int timeoutSeconds,
-		bool saveResponseData, const std::string& postBody);
+		bool saveResponseData, const std::vector<std::string>& headers, const std::string& postBody);
 
 	bool real_addToBatch(CURL *curl, BaiscResultCallbackPtr callback, int timeoutSeconds,
-		bool saveResponseData, const std::string& postBody);
+		bool saveResponseData, const std::vector<std::string>& headers, const std::string& postBody);
 
 	static void cleanLocalCache(std::vector<BaiscResultCallbackPtr> *);
 	static thread_local std::unique_ptr<std::vector<BaiscResultCallbackPtr>, void(*)(std::vector<BaiscResultCallbackPtr> *)> _localTaskCache; 

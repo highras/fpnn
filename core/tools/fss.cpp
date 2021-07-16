@@ -2,6 +2,7 @@
 #include <string>
 #include <string.h>
 #include "TCPClient.h"
+#include "UDPClient.h"
 #include "StringUtil.h"
 #include "FileSystemUtil.h"
 #include "linenoise.h"
@@ -12,6 +13,7 @@ using namespace fpnn;
 void showUsage(const char* appName)
 {
 	cout<<"Usage: "<<appName<<" ip port"<<endl;
+	cout<<"Usage: "<<appName<<" ip port -udp"<<endl;
 	cout<<"Usage: "<<appName<<" ip port -ssl"<<endl;
 	cout<<"Usage: "<<appName<<" ip port -pem pem-file [encrypt-mode-opt] [encrypt-strength-opt]"<<endl;
 	cout<<"Usage: "<<appName<<" ip port -der der-file [encrypt-mode-opt] [encrypt-strength-opt]"<<endl;
@@ -51,12 +53,18 @@ bool checkCurveName(const char* name)
 	return false;
 }
 
-TCPClientPtr buildClient(int argc, const char* argv[])
+ClientPtr buildClient(int argc, const char* argv[])
 {
 	if (argc < 3 || argc > 7)
 	{
 		showUsage(argv[0]);
 		return 0;
+	}
+
+	if (argc == 4 && strcmp(argv[3], "-udp") == 0)
+	{
+		UDPClientPtr client = UDPClient::createClient(argv[1], atoi(argv[2]));
+		return client;
 	}
 
 	TCPClientPtr client = TCPClient::createClient(argv[1], atoi(argv[2]));
@@ -125,7 +133,7 @@ TCPClientPtr buildClient(int argc, const char* argv[])
 	return client;
 }
 
-bool executeCommand(TCPClientPtr client, const std::string& cmd)
+bool executeCommand(ClientPtr client, const std::string& cmd)
 {
 	size_t pos = cmd.find_first_of('{', 0);
 	if (pos == std::string::npos)
@@ -179,7 +187,7 @@ int main(int argc, const char* argv[])
 {
 	cout<<"FPNN Secure Shell v1.1"<<endl;
 
-	TCPClientPtr client = buildClient(argc, argv);
+	ClientPtr client = buildClient(argc, argv);
 	cout<<"Command format: method json-body [oneway] [timeout=xxx]"<<endl<<endl;
 
 	char *rawline;

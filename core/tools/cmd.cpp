@@ -3,6 +3,7 @@
 #include <thread>
 #include <assert.h>
 #include "TCPClient.h"
+#include "UDPClient.h"
 #include "FileSystemUtil.h"
 #include "CommandLineUtil.h"
 
@@ -68,6 +69,25 @@ bool prepareEncrypt(TCPClientPtr client)
 	return true;
 }
 
+void tcpCmd(const std::string& ip, int port, ClientPtr& client, FPAnswerPtr& answer, FPQuestPtr quest, int timeout)
+{
+	std::shared_ptr<TCPClient> tcpClient = TCPClient::createClient(ip, port);
+	if (!prepareEncrypt(tcpClient))
+		return;
+
+	client = tcpClient;
+	answer = tcpClient->sendQuest(quest, timeout);
+}
+
+void udpCmd(const std::string& ip, int port, ClientPtr& client, FPAnswerPtr& answer, FPQuestPtr quest, int timeout)
+{
+	bool discardable = !CommandLineParser::exist("discardable");
+	std::shared_ptr<UDPClient> udpClient = UDPClient::createClient(ip, port);
+
+	client = udpClient;
+	answer = udpClient->sendQuestEx(quest, discardable, timeout);
+}
+
 int main(int argc, char* argv[])
 {
 	CommandLineParser::init(argc, argv);
@@ -79,6 +99,7 @@ int main(int argc, char* argv[])
 		cout<<"Usage: "<<argv[0]<<" ip port method body(json) [-ecc-pem ecc-pem-file] [-json] [-oneway] [-t timeout]"<<endl;
 		cout<<"Usage: "<<argv[0]<<" ip port method body(json) [-ecc-der ecc-der-file] [-json] [-oneway] [-t timeout]"<<endl;
 		cout<<"Usage: "<<argv[0]<<" ip port method body(json) [-ecc-curve ecc-curve-name -ecc-raw-key ecc-raw-public-key-file] [-json] [-oneway] [-t timeout]"<<endl;
+		cout<<"Usage: "<<argv[0]<<" ip port method body(json) [-udp] [-json] [-oneway] [-discardable] [-t timeout]"<<endl;
 		return 0;
 	}
 
@@ -87,23 +108,31 @@ int main(int argc, char* argv[])
 	std::string method = mainParams[2];
 	std::string jsonBody = mainParams[3];
 
-	bool isTwoWay = CommandLineParser::exist("oneway");
+	bool isOneWay = CommandLineParser::exist("oneway");
 	bool isMsgPack = !CommandLineParser::exist("json");
 	int timeout = CommandLineParser::getInt("t", 0);
 
-	std::shared_ptr<TCPClient> client = TCPClient::createClient(ip, port);
-	if (!prepareEncrypt(client))
-		return 0;
-
-	FPQWriter qw(method, jsonBody, isTwoWay, isMsgPack ? FPMessage::FP_PACK_MSGPACK : FPMessage::FP_PACK_JSON);
+	FPQWriter qw(method, jsonBody, isOneWay, isMsgPack ? FPMessage::FP_PACK_MSGPACK : FPMessage::FP_PACK_JSON);
 	FPQuestPtr quest = qw.take();
 
-	FPAnswerPtr answer = client->sendQuest(quest, timeout);
-	if (quest->isTwoWay()) {
+	ClientPtr client;
+	FPAnswerPtr answer;
+
+	if (!CommandLineParser::exist("udp"))
+		tcpCmd(ip, port, client, answer, quest, timeout);
+	else
+		udpCmd(ip, port, client, answer, quest, timeout);	
+
+	if (answer && quest->isTwoWay()) {
 		assert(quest->seqNum() == answer->seqNum());
 		cout<<"Return:"<<answer->json()<<endl;
 	}
 
-	client->close();
+	if (isOneWay)
+		sleep(1);
+
+	if (client)
+		client->close();
+
 	return 0;
 }

@@ -10,12 +10,25 @@
 
 namespace fpnn
 {
+	enum class UDPSessionEventType
+	{
+		Connected,
+		Quest,
+		Closed,
+		Error
+	};
+
 	struct UDPRequestPackage
 	{
+		UDPSessionEventType _type;
 		ConnectionInfoPtr _connectionInfo;
+		UDPServerConnection* _connection;		//-- Only for non-Quest case.
 		FPQuestPtr _quest;
 
-		UDPRequestPackage(ConnectionInfoPtr info, FPQuestPtr quest): _connectionInfo(info), _quest(quest) {}
+		UDPRequestPackage(ConnectionInfoPtr connInfo, FPQuestPtr quest):
+			_type(UDPSessionEventType::Quest), _connectionInfo(connInfo), _connection(NULL), _quest(quest) {}
+		UDPRequestPackage(UDPServerConnection* conn, UDPSessionEventType type):
+			_type(type), _connectionInfo(conn->_connectionInfo), _connection(conn) {}
 	};
 
 	class UDPEpollServer;
@@ -25,6 +38,7 @@ namespace fpnn
 
 	private:
 		HashMap<std::string, MethodFunc>* _methodMap;
+		std::atomic<int> _validARQConnections;
 		IQuestProcessorPtr _questProcessor;
 		UDPEpollServer* _server;
 
@@ -36,7 +50,7 @@ namespace fpnn
 		void dealQuest(UDPRequestPackage * requestPackage);
 
 	public:
-		UDPServerMasterProcessor(): _methodMap(0), _server(0)
+		UDPServerMasterProcessor(): _methodMap(0), _validARQConnections(0), _server(0)
 		{
 			prepare();
 		}
@@ -51,6 +65,7 @@ namespace fpnn
 		inline bool isMasterMethod(const std::string& method) { return _methodMap->find(method); }
 		inline bool checkQuestProcessor() { return (_questProcessor != nullptr); }
 		inline IQuestProcessorPtr getQuestProcessor() { return _questProcessor; }
+		inline int validARQConnectionCount() { return _validARQConnections; }
 	};
 }
 

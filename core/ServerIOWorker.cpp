@@ -39,7 +39,7 @@ bool TCPServerConnection::waitForAllEvents()
 
 	if (epoll_ctl(_epoll_fd, EPOLL_CTL_MOD, _connectionInfo->socket, &ev) != 0)
 	{
-		LOG_ERROR("Server wait socket event failed. Socket: %d, address: %s, errno: %d", _connectionInfo->socket, NetworkUtil::getPeerName(_connectionInfo->socket).c_str(), errno);
+		LOG_INFO("Server wait socket event failed. Socket: %d, address: %s, errno: %d", _connectionInfo->socket, NetworkUtil::getPeerName(_connectionInfo->socket).c_str(), errno);
 		return false;
 	}
 	else
@@ -57,7 +57,7 @@ bool TCPServerConnection::waitForRecvEvent()
 
 	if (epoll_ctl(_epoll_fd, EPOLL_CTL_MOD, _connectionInfo->socket, &ev) != 0)
 	{
-		LOG_ERROR("Server wait socket event failed. Socket: %d, address: %s, errno: %d", _connectionInfo->socket, NetworkUtil::getPeerName(_connectionInfo->socket).c_str(), errno);
+		LOG_INFO("Server wait socket event failed. Socket: %d, address: %s, errno: %d", _connectionInfo->socket, NetworkUtil::getPeerName(_connectionInfo->socket).c_str(), errno);
 		return false;
 	}
 	else
@@ -92,7 +92,7 @@ bool TCPServerIOWorker::read(TCPServerConnection * connection, bool& additionalS
 		if (connection->recvPackage(needNextEvent) == false)
 		{
 			connection->_recvBuffer.returnToken();
-			LOG_WARN("Error occurred when server receiving. Connection will be closed soon. %s", connection->_connectionInfo->str().c_str());
+			LOG_INFO("Error occurred when server receiving. Connection will be closed soon. %s", connection->_connectionInfo->str().c_str());
 			return false;
 		}
 		
@@ -110,7 +110,7 @@ bool TCPServerIOWorker::read(TCPServerConnection * connection, bool& additionalS
 		bool status = connection->_recvBuffer.fetch(quest, answer, isHTTP);
 		if (status == false)
 		{
-			LOG_WARN("Server receiving & decoding data error. Connection will be closed soon. %s", connection->_connectionInfo->str().c_str());
+			LOG_INFO("Server receiving & decoding data error. Connection will be closed soon. %s", connection->_connectionInfo->str().c_str());
 			return false;
 		}
 		if (isHTTP == false)
@@ -254,6 +254,18 @@ bool TCPServerIOWorker::processECDH(TCPServerConnection * connection, FPQuestPtr
 	}
 }
 
+bool TCPServerIOWorker::processPing(TCPServerConnection * connection, FPQuestPtr quest)
+{
+	FPAWriter aw(1, quest);
+	aw.param("ts", slack_real_msec());
+	FPAnswerPtr answer = aw.take();
+
+	std::string *raw = answer->raw();
+	connection->_sendBuffer.appendData(raw);
+
+	return true;
+}
+
 bool TCPServerIOWorker::returnServerStoppingAnswer(TCPServerConnection * connection, FPQuestPtr quest)
 {
 	try
@@ -265,13 +277,13 @@ bool TCPServerIOWorker::returnServerStoppingAnswer(TCPServerConnection * connect
 	}
 	catch (const FpnnError& ex)
 	{
-		LOG_ERROR("Connection will be closed by server when return server stopping answer. %s, exception:(%d)%s",
+		LOG_WARN("Connection will be closed by server when return server stopping answer. %s, exception:(%d)%s",
 			connection->_connectionInfo->str().c_str(), ex.code(), ex.what());
 		return false;
 	}
 	catch (...)
 	{
-		LOG_ERROR("Connection will be closed by server when return server stopping answer. %s", connection->_connectionInfo->str().c_str());
+		LOG_WARN("Connection will be closed by server when return server stopping answer. %s", connection->_connectionInfo->str().c_str());
 		return false;
 	}
 }
@@ -287,6 +299,9 @@ bool TCPServerIOWorker::deliverQuest(TCPServerConnection * connection, FPQuestPt
 	//-- additionalSend: Don't assign false. avoid erase the flag in other quest deliver in parent's cycle.
 	if (_serverIsStopping)
 	{
+		if (quest->isOneWay())
+			return true;
+		
 		if (returnServerStoppingAnswer(connection, quest))
 		{
 			additionalSend = true;
@@ -300,7 +315,14 @@ bool TCPServerIOWorker::deliverQuest(TCPServerConnection * connection, FPQuestPt
 
 	if (questMethod[0] == '*')
 	{
-		if (questMethod == "*key")
+		if (questMethod == "*ping")
+		{
+			if (processPing(connection, quest))
+				additionalSend = true;
+
+			return true;
+		}
+		else if (questMethod == "*key")
 		{
 			if (processECDH(connection, quest))
 			{
@@ -534,7 +556,7 @@ void TCPServerIOWorker::run(TCPServerConnection * connection)
 			}
 		}
 
-		LOG_ERROR("Server wait socket event failed. Connection will be closed. %s", connection->_connectionInfo->str().c_str());
+		LOG_WARN("Server wait socket event failed. Connection will be closed. %s", connection->_connectionInfo->str().c_str());
 	}
 
 	closeConnection(connection, true);

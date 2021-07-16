@@ -3,6 +3,8 @@
 #include <thread>
 #include <assert.h>
 #include "TCPClient.h"
+#include "UDPClient.h"
+#include "CommandLineUtil.h"
 #include "IQuestProcessor.h"
 
 using namespace std;
@@ -10,19 +12,22 @@ using namespace fpnn;
 
 int main(int argc, char* argv[])
 {
-	if (argc != 2 && argc != 3)
+	CommandLineParser::init(argc, argv);
+	std::vector<std::string> mainParams = CommandLineParser::getRestParams();
+	
+	if (mainParams.size() != 1 && mainParams.size() != 2)
 	{   
-		cout<<"Usage: "<<argv[0]<<" [localhost] port"<<endl;
+		cout<<"Usage: "<<argv[0]<<" [localhost] port [-udp]"<<endl;
 		return 0;
 	}   
 	string ip = "localhost";
 	int port = 0;
-	if(argc == 3){
-		ip = argv[1];
-		port = atoi(argv[2]);
+	if(mainParams.size() == 2){
+		ip = mainParams[0];
+		port = std::stoi(mainParams[1]);
 	}
 	else{
-		port = atoi(argv[1]);
+		port = std::stoi(mainParams[0]);
 	}
 	
 	string method = "*infos";
@@ -35,7 +40,11 @@ int main(int argc, char* argv[])
 	FPQWriter qw(method, body, isOnway, isMsgPack?FPMessage::FP_PACK_MSGPACK:FPMessage::FP_PACK_JSON);
 	FPQuestPtr quest = qw.take();
 
-	std::shared_ptr<TCPClient> client = TCPClient::createClient(ip, port);
+	ClientPtr client;
+	if (!CommandLineParser::exist("udp"))
+		client = TCPClient::createClient(ip, port);
+	else
+		client = UDPClient::createClient(ip, port);
 
 	try{
 		FPAnswerPtr answer = client->sendQuest(quest);

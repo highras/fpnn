@@ -12,9 +12,9 @@ CFLAGS += $(DEFAULTPLATFORM)
 
 CXXFLAGS += -std=c++11 $(DEFAULTPLATFORM)
 
-CPPFLAGS += -g -Wall -rdynamic -Werror -fPIC $(OPTIMIZE) 
+CPPFLAGS += -g -Wall -Werror -fPIC $(OPTIMIZE) 
 
-LIBS += $(OPTIMIZE) -lstdc++ -lfpnn -lfpproto -lextends -lfpbase -lpthread -lz -lssl -lcrypto -lcurl $(LINKARGS)
+LIBS += $(OPTIMIZE) -rdynamic -lstdc++ -lfpnn -lfpproto -lextends -lfpbase -lpthread -lz -lssl -lcrypto -lcurl $(LINKARGS)
 #LIBS += $(OPTIMIZE) -static-libstdc++ -lcurl -lfpnn -lfpproto -lextends -lfpbase -lpthread -lz -lssl -lcrypto $(LINKARGS)
 
 #for apps

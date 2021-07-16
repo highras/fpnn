@@ -8,7 +8,6 @@
 #include "HashMap.h"
 //#include "ParamTemplateThreadPoolArray.h"
 #include "TaskThreadPoolArray.h"
-#include "UDPClientIOWorker.h"
 #include "ClientIOWorker.h"
 #include "IQuestProcessor.h"
 #include "ConcurrentSenderInterface.h"
@@ -98,6 +97,11 @@ namespace fpnn
 		static bool created();
 
 		/*===============================================================================
+		  Call by framwwork.
+		=============================================================================== */
+		void closeUDPConnection(UDPClientConnection* connection);
+
+		/*===============================================================================
 		  Configuration.
 		=============================================================================== */
 		inline static void setMaxEvents(int maxCount) { nakedInstance()->_max_events = maxCount; }
@@ -172,9 +176,22 @@ namespace fpnn
 		{
 			return _connectionMap.takeCallback(socket, seqNum);
 		}
+		inline void keepAlive(int socket, bool keepAlive)		//-- Only for ARQ UDP
+		{
+			_connectionMap.keepAlive(socket, keepAlive);
+		}
+		inline void setUDPUntransmittedSeconds(int socket, int untransmittedSeconds)
+		{
+			_connectionMap.setUDPUntransmittedSeconds(socket, untransmittedSeconds);
+		}
+		inline void executeConnectionAction(int socket, std::function<void (BasicConnection* conn)> action)		//-- Only for ARQ UDP
+		{
+			_connectionMap.executeConnectionAction(socket, std::move(action));
+		}
 		void clearConnectionQuestCallbacks(BasicConnection*, int errorCode);
 		
 		virtual void sendData(int socket, uint64_t token, std::string* data);
+		virtual void sendUDPData(int socket, uint64_t token, std::string* data, int64_t expiredMS, bool discardable);
 
 		/**
 			All SendQuest():
@@ -184,17 +201,33 @@ namespace fpnn
 		virtual FPAnswerPtr sendQuest(int socket, uint64_t token, std::mutex* mutex, FPQuestPtr quest, int timeout = 0)
 		{
 			if (timeout == 0) timeout = _timeoutQuest;
-			return _connectionMap.sendQuest(socket, token, mutex, quest, timeout);
+			return _connectionMap.sendQuest(socket, token, mutex, quest, timeout, quest->isOneWay());
 		}
 		virtual bool sendQuest(int socket, uint64_t token, FPQuestPtr quest, AnswerCallback* callback, int timeout = 0)
 		{
 			if (timeout == 0) timeout = _timeoutQuest;
-			return _connectionMap.sendQuest(socket, token, quest, callback, timeout);
+			return _connectionMap.sendQuest(socket, token, quest, callback, timeout, quest->isOneWay());
 		}
 		virtual bool sendQuest(int socket, uint64_t token, FPQuestPtr quest, std::function<void (FPAnswerPtr answer, int errorCode)> task, int timeout = 0)
 		{
 			if (timeout == 0) timeout = _timeoutQuest;
-			return _connectionMap.sendQuest(socket, token, quest, std::move(task), timeout);
+			return _connectionMap.sendQuest(socket, token, quest, std::move(task), timeout, quest->isOneWay());
+		}
+		//-- For UDP Client
+		virtual FPAnswerPtr sendQuest(int socket, uint64_t token, std::mutex* mutex, FPQuestPtr quest, int timeout, bool discardableUDPQuest)
+		{
+			if (timeout == 0) timeout = _timeoutQuest;
+			return _connectionMap.sendQuest(socket, token, mutex, quest, timeout, discardableUDPQuest);
+		}
+		virtual bool sendQuest(int socket, uint64_t token, FPQuestPtr quest, AnswerCallback* callback, int timeout, bool discardableUDPQuest)
+		{
+			if (timeout == 0) timeout = _timeoutQuest;
+			return _connectionMap.sendQuest(socket, token, quest, callback, timeout, discardableUDPQuest);
+		}
+		virtual bool sendQuest(int socket, uint64_t token, FPQuestPtr quest, std::function<void (FPAnswerPtr answer, int errorCode)> task, int timeout, bool discardableUDPQuest)
+		{
+			if (timeout == 0) timeout = _timeoutQuest;
+			return _connectionMap.sendQuest(socket, token, quest, std::move(task), timeout, discardableUDPQuest);
 		}
 
 		bool joinEpoll(BasicConnection* connection);
@@ -221,6 +254,8 @@ namespace fpnn
 		{
 			_reclaimer->reclaim(object);
 		}
+
+		size_t count() { return _connectionMap.count(); }
 	};
 
 

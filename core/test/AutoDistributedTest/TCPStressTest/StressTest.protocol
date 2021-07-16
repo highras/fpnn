@@ -1,0 +1,41 @@
+=================================
+  FPNN Standard TCP Stress Actor & Controller
+=================================
+
+=================
+  beginStress
+=================
+
+-----------
+  action
+-----------
+method: beginStress
+payload:
+	{ endpoint:%s, connections:%d, totalQPS:%d }
+	{ endpoint:%s, connections:%d, totalQPS:%d, ssl:true }
+	{ endpoint:%s, connections:%d, totalQPS:%d, eccPem:%s, ?packageMode:%b, ?reinforce:%b }
+
+----------------
+  actorStatus
+----------------
+payload { connections:%d, period:%d, send:%d, recv:%d, serror:%d, rerror:%d, allcost:%d }     //-- period: in seconds, allcost: in usec
+
+
+=================
+  stopStress
+=================
+-----------
+  action
+-----------
+method: stopStress
+payload: { taskId:%d }
+
+
+=================
+  quit
+=================
+-----------
+  action
+-----------
+method: quit
+payload: {}

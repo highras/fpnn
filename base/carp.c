@@ -1,6 +1,5 @@
 #include "carp.h"
 #include "heap.h"
-#include <endian.h>
 #include <stdlib.h>
 #include <stdint.h>
 #include <stdbool.h>

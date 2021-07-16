@@ -1,0 +1,406 @@
+#include <iostream>
+#include <sys/types.h>
+#include <unistd.h>
+#include "uuid.h"
+#include "FPJson.h"
+#include "ignoreSignals.h"
+#include "FileSystemUtil.h"
+#include "CommandLineUtil.h"
+#include "StressController.h"
+
+using namespace std;
+using namespace fpnn;
+
+std::mutex gc_outputMutex;
+
+int showUsage(const char* appName)
+{
+	cout<<"Usgae:"<<endl;
+	cout<<"\t"<<appName<<"<required-params> [optional-params]"<<endl;
+	cout<<endl;
+	cout<<"  Required-params:"<<endl;
+	cout<<"\t--contorlCenterEndpoint      DATS Control Center endpoint"<<endl;
+	cout<<"\t--testEndpoint               Tested target server endpoint"<<endl;
+	cout<<endl;
+	cout<<"  Optional-params:"<<endl;
+	cout<<"\t--actor                      Actor binary file path"<<endl;
+	cout<<"\t--output                     CSV file name"<<endl;
+	cout<<"\t--minCPUs                    Minimum required CPU cores' count. Default is 4"<<endl;
+	cout<<"\t--stopPerCPULoad             Test will be stopped when load/cpu > this value consecutive 9 times. Default is 1.5"<<endl;
+	cout<<"\t--stopTimeCostMsec           Test will be stopped when quest time cost > this value consecutive 9 times. Default is 600"<<endl;
+	cout<<"\t--stressTimeout              Stress quest timeout in seconds. Default 60 seconds"<<endl;
+	cout<<"\t--answerPoolThread           Client work threads count of actor. Default is CPU count"<<endl;
+	cout<<"\t--perStressConnections       Total Connections for a stress task. Default is 200"<<endl;
+	cout<<"\t--perStressQPS               Total QPS for a stress task. Default is 20000"<<endl;
+	cout<<"\t--mtu                        MTU for UDP client. 576 for Internet/X.25, 1500 for Ethernet, 1492 for PPPoE, 4352 for FDDI. Default is 576"<<endl;
+	cout<<"\t--eccPublicKey               ECC public key in PEM format. Enable FPNN ECC encryption."<<endl;
+	cout<<"\t--eccEncryptMode             Value: [stream | package]. Default is package."<<endl;
+	cout<<"\t--eccReinforce               True means using 256 bits key, false means using 128 bits key."<<endl;
+	return -1;
+}
+
+bool StressController::init()
+{
+	int timecostThreshold = CommandLineParser::getInt("stopTimeCostMsec", 60);
+	std::string endpoint = CommandLineParser::getString("contorlCenterEndpoint");
+	_client = TCPClient::createClient(endpoint);
+	if (!_client)
+		return false;
+
+	_processor = std::make_shared<CtrlQuestProcessor>();
+	_processor->setTimecostThreshold(timecostThreshold * 1000);
+	_client->setQuestProcessor(_processor);
+	_client->connect();
+
+	return true;
+}
+
+std::string StressController::prepareUniqueId()
+{
+	uuid_t uuidBuf;
+	uuid_generate(uuidBuf);
+
+	char strbuf[64];
+	uuid_string(uuidBuf, strbuf, 64);
+
+	return std::string(strbuf);
+}
+
+std::string StressController::prepareActorParams(const std::string& uuid)
+{
+	std::string actorParams;
+
+	int timeout = CommandLineParser::getInt("stressTimeout", 300);
+	int clientWorkThreads = CommandLineParser::getInt("answerPoolThread", 0);
+
+	if (timeout > 0)
+		actorParams.append(" --timeout ").append(std::to_string(timeout));
+
+	if (clientWorkThreads > 0)
+		actorParams.append(" --answerPoolThread ").append(std::to_string(clientWorkThreads));
+
+	actorParams.append(" --uniqueId ").append(uuid);
+
+	return actorParams;
+}
+
+void StressController::printActionHint(const std::string& hintLineInfo)
+{
+	cout<<"  .. "<<hintLineInfo<<" ..."<<endl;
+}
+
+void StressController::prepareAutoTest(std::string& actorInstanceName, std::string& launchParams, int& perConnCount, int& perQPS)
+{
+	std::string uuid = prepareUniqueId();
+	launchParams = prepareActorParams(uuid);
+
+	actorInstanceName = actorName();
+	actorInstanceName.append("-").append(uuid);
+
+	perConnCount = CommandLineParser::getInt("perStressConnections", 200);
+	perQPS = CommandLineParser::getInt("perStressQPS", 20000);
+}
+
+bool StressController::prepareEncryptInfo(struct EncryptInfo& info)
+{
+	std::string fileName = CommandLineParser::getString("eccPublicKey");
+	if (fileName.size())
+	{
+		if (FileSystemUtil::readFileContent(fileName, info.eccPemData) == false)
+		{
+			cout<<"Load ECC public key error. File: "<<fileName<<endl;
+			return false;
+		}
+
+		std::string encryptMode = CommandLineParser::getString("eccEncryptMode");
+		info.packagemode = (encryptMode != "stream");
+		info.reinforce = CommandLineParser::getBool("eccReinforce", false);
+	}
+
+	return true;
+}
+
+void StressController::targetServerInfos(UDPClientPtr client, const std::string& interface)
+{
+	FPAnswerPtr answer = client->sendQuest(FPQWriter::emptyQuest("*infos"));
+	if (answer)
+	{
+		if (answer->status())
+		{
+			std::unique_lock<std::mutex> lck(gc_outputMutex);
+			cout<<"[Target Server] fetch infos failed. Info: "<<answer->json()<<endl;
+			return;
+		}
+
+		std::string payload = answer->json();
+		JsonPtr json = Json::parse(payload.c_str());
+
+		std::string path("FPNN.status/server/stat/");
+		path.append(interface).append("/QPS");
+		int QPS = json->getInt(path, -1, "/");
+
+		int currentSessions = json->getInt("FPNN.status/server/status/udp/currentSessions", -1, "/");
+		int currnetARQConnections = json->getInt("FPNN.status/server/status/udp/currnetARQConnections", -1, "/");
+
+		if (QPS > 0)
+			_processor->stressRecorder.addQPS(QPS);
+
+		if (currentSessions > 0)
+			_processor->stressRecorder.addSessions(currentSessions);
+
+		if (currnetARQConnections > 0)
+			_processor->stressRecorder.addARQSessions(currnetARQConnections);
+		
+		std::unique_lock<std::mutex> lck(gc_outputMutex);
+		cout<<"[Target Server] QPS: "<<QPS<<", UDP session: "<<currentSessions<<", ARQ session: "<<currnetARQConnections<<endl;
+	}
+}
+
+void StressController::monitor()
+{
+	int cpu;
+	struct MachineStatus ms;
+
+	struct EncryptInfo encryptInfo;
+	prepareEncryptInfo(encryptInfo);
+
+	int qpsTicket = 0;
+	std::string endpoint = CommandLineParser::getString("testEndpoint");
+	UDPClientPtr targetSrvClient = UDPClient::createClient(endpoint);
+	
+	//if (encryptInfo.eccPemData.size())
+	//	targetSrvClient->enableEncryptorByPemData(encryptInfo.eccPemData, encryptInfo.packagemode, encryptInfo.reinforce);
+
+	targetSrvClient->connect();
+
+	while (_running)
+	{
+		cpu = monitorTargetServer(_targetHost, ms);
+		if (cpu > 0)
+		{
+			_processor->stressRecorder.addMachineStatus(cpu, ms);
+			std::unique_lock<std::mutex> lck(gc_outputMutex);
+			cout<<"[Target Server] load: "<<ms.load<<", connCount: "<<ms.connCount<<endl;
+		}
+
+		sleep(2);
+
+		qpsTicket += 2;
+		if (qpsTicket >= 20)
+		{
+			qpsTicket = 0;
+			targetServerInfos(targetSrvClient, "two way demo");
+		}
+	}
+
+	int delayForThisMintueAchived = 62;
+	while (delayForThisMintueAchived > 0)
+	{
+		cpu = monitorTargetServer(_targetHost, ms);
+		if (cpu > 0)
+		{
+			_processor->stressRecorder.addMachineStatus(cpu, ms);
+			std::unique_lock<std::mutex> lck(gc_outputMutex);
+			cout<<"[Target Server] load: "<<ms.load<<", connCount: "<<ms.connCount<<endl;
+		}
+
+		sleep(2);
+		delayForThisMintueAchived -= 2;
+
+		qpsTicket += 2;
+		if (qpsTicket >= 20)
+		{
+			qpsTicket = 0;
+			targetServerInfos(targetSrvClient, "two way demo");
+		}
+	}
+}
+
+void StressController::autoTest()
+{
+	if (!startMonitor())
+		return;
+
+	std::set<std::string> actorDeployEps;
+	if (!checkActor(actorDeployEps))
+		return;
+
+	int perQPS;
+	int perConnCount;
+	std::string launchParams;
+	std::string actorInstanceName;
+	
+	prepareAutoTest(actorInstanceName, launchParams, perConnCount, perQPS);
+
+	int optionalParamsCount = 0;
+	int mtu = CommandLineParser::getInt("mtu");
+	if (mtu > 0)
+		optionalParamsCount += 1;
+
+	struct EncryptInfo encryptInfo;
+	if (!prepareEncryptInfo(encryptInfo))
+		return;
+
+	struct LoadStatus targetStatus;
+	{
+		int port;
+		targetStatus.endpoint = CommandLineParser::getString("testEndpoint");
+		if (!parseAddress(targetStatus.endpoint, targetStatus.host, port))
+		{
+			cout<<"Prepare target server info error. Endpoint "<<targetStatus.endpoint<<" is invalid."<<endl;
+			return;
+		}
+		_targetHost = targetStatus.host;
+	}
+
+	std::map<std::string, struct MachineActorStatus> actorStatus;
+	{
+		for (auto& deployerEndpoint: actorDeployEps)
+		{
+			struct MachineActorStatus& macStatus = actorStatus[deployerEndpoint];
+			int port;
+			parseAddress(deployerEndpoint, macStatus.host, port);
+		}
+
+		if (!gathermachineStatus(actorStatus, targetStatus))
+			return;
+	}
+
+	_running = true;
+	const char* stopReason = "";
+	std::thread monitorThread(&StressController::monitor, this);
+
+	cout<<"============================[ stress test start ]====================================="<<endl;
+
+	int overloadCount = 0;
+	int newInstanceCount = -1;
+	double loadThreshold = CommandLineParser::getReal("stopPerCPULoad", 1.5);	//-- 4 core load >= 6, 8 core load >= 12
+	while (newInstanceCount && _running)
+	{
+		newInstanceCount = 0;
+		for (auto& deployerEndpoint: actorDeployEps)
+		{
+			struct MachineActorStatus& macStatus = actorStatus[deployerEndpoint];
+
+			if (macStatus.load/macStatus.cpus >= DATS_DEPLOY_MAX_CPU_LOAD)
+				continue;
+		
+			printActionHint("launch new stress source");
+
+			int pid = launchActor(deployerEndpoint, actorInstanceName, launchParams, macStatus);
+			if (pid == 0)
+				continue;
+
+			newInstanceCount++;
+
+			if (encryptInfo.eccPemData.size())
+			{
+				FPWriter pw(6 + optionalParamsCount);
+				pw.param("endpoint", targetStatus.endpoint);
+				pw.param("connections", perConnCount);
+				pw.param("totalQPS", perQPS);
+
+				pw.param("eccPem", encryptInfo.eccPemData);
+				pw.param("packageMode", encryptInfo.packagemode);
+				pw.param("reinforce", encryptInfo.reinforce);
+
+				if (mtu > 0)
+					pw.param("mtu", mtu);
+
+				printActionHint("add new stress");
+				sendAction(actorInstanceName, macStatus.pidEpMap[pid], pid, "beginStress", pw, "FPNN ECC Stress instance");
+			}
+			else
+			{
+				FPWriter pw(3 + optionalParamsCount);
+				pw.param("endpoint", targetStatus.endpoint);
+				pw.param("connections", perConnCount);
+				pw.param("totalQPS", perQPS);
+
+				if (mtu > 0)
+					pw.param("mtu", mtu);
+
+				printActionHint("add new stress");
+				sendAction(actorInstanceName, macStatus.pidEpMap[pid], pid, "beginStress", pw, "Stress instance");
+			}
+			sleep(1);
+
+			int intervalSeconds = 5 * 60;
+			while (intervalSeconds > 0 && _running)
+			{
+				sleep(2);
+				intervalSeconds -= 2;
+				gathermachineStatus(macStatus, targetStatus);
+
+				_running = !_processor->needStop();
+				if (!_running)
+					stopReason = "quest time cost catch threshold.";
+
+				if (targetStatus.load/targetStatus.cpus > loadThreshold)
+				{
+					overloadCount += 1;
+					if (overloadCount > 9)
+					{
+						stopReason = "target server per CPU load catch threshold.";
+						_running = false;
+					}
+				}
+				else
+					overloadCount = 0;
+
+				if (targetStatus.freeMemories < 1024 * 1024 * 100)	//-- 100 MB free
+				{
+					stopReason = "target server free memories catch threshold.";
+					_running = false;
+				}
+			}
+
+			if (!_running)
+				break;
+		}
+
+		if (newInstanceCount == 0)
+		{
+			_running = false;
+			stopReason = "no available deployer/actor machine can be scheduled.";
+		}
+	}
+
+	{
+		std::unique_lock<std::mutex> lck(gc_outputMutex);
+		cout<<"Test will be stopped, "<<stopReason<<" Wait 60 seconds for gathering and archiving the last minute data ..."<<endl;
+	}
+	//-- wait 60 second for merge last minute data.
+	monitorThread.join();
+
+	std::string csvFilename = CommandLineParser::getString("output");
+	if (csvFilename.size())
+		_processor->stressRecorder.saveToCSVFormat(csvFilename);
+
+	//-- stop all actor
+	//-- std::map<std::string, struct MachineActorStatus> actorStatus;
+	for (auto& pp: actorStatus)
+	{
+		for (auto& pp2: pp.second.pidEpMap)
+			quitActor(pp2.second, actorInstanceName, pp2.first);
+	}
+
+	_processor->stressRecorder.showRecords();
+}
+
+int main(int argc, const char* argv[])
+{
+	ignoreSignals();
+	ClientEngine::configAnswerCallbackThreadPool(2, 1, 2, 4);
+	ClientEngine::configQuestProcessThreadPool(0, 1, 2, 10, 0);
+
+	CommandLineParser::init(argc, argv);
+	
+	StressController controller;
+	if (!controller.init())
+		return showUsage(argv[0]);
+
+	controller.autoTest();
+
+	return 0;
+}

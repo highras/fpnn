@@ -11,7 +11,7 @@
 #include <netinet/tcp.h>
 #include <net/if.h>
 #include <net/if_arp.h>
-#include <endian.h>
+#include <string.h>
 #include <poll.h>
 #include <unistd.h>
 #include <netdb.h>

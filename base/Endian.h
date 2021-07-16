@@ -58,7 +58,7 @@ class Endian
 			double d = 1.982031;
 			char *c = (char *)&d;
 
-			if (c[0] == 0xe4)
+			if ((uint8_t)c[0] == 0xe4)
 				return LittleEndian;
 			if (c[0] == 0x3f)
 				return BigEndian;

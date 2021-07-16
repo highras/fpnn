@@ -12,7 +12,14 @@
 
 using namespace fpnn;
 
-UDPClient::UDPClient(const std::string& host, int port, bool autoReconnect): Client(host, port, autoReconnect) {}
+UDPClient::UDPClient(const std::string& host, int port, bool autoReconnect): Client(host, port, autoReconnect),
+	_MTU(Config::UDP::_internet_MTU), _keepAlive(false), _untransmittedSeconds(0)
+	{
+		if (_connectionInfo->isPrivateIP())
+			_MTU = Config::UDP::_LAN_MTU;
+		else
+			_MTU = Config::UDP::_internet_MTU;
+	}
 
 class UDPQuestTask: public ITaskThreadPool::ITask
 {
@@ -84,7 +91,8 @@ void UDPClient::dealQuest(FPQuestPtr quest, ConnectionInfoPtr connectionInfo)		/
 				{
 					FPAnswerPtr answer = FpnnErrorAnswer(quest, FPNN_EC_CORE_WORK_QUEUE_FULL, std::string("worker queue full, ") + connectionInfo->str().c_str());
 					std::string *raw = answer->raw();
-					_engine->sendData(connectionInfo->socket, connectionInfo->token, raw);
+					//_engine->sendData(connectionInfo->socket, connectionInfo->token, raw);
+					_engine->sendUDPData(connectionInfo->socket, connectionInfo->token, raw, slack_real_msec() + _timeoutQuest, quest->isOneWay());
 				}
 				catch (const FpnnError& ex)
 				{
@@ -108,7 +116,12 @@ void UDPClient::dealQuest(FPQuestPtr quest, ConnectionInfoPtr connectionInfo)		/
 
 bool UDPClient::perpareConnection(ConnectionInfoPtr currConnInfo)
 {
-	UDPClientConnection* connection = new UDPClientConnection(shared_from_this(), &_mutex, currConnInfo);
+	UDPClientConnection* connection = new UDPClientConnection(shared_from_this(), currConnInfo, _MTU);
+	if (_keepAlive)
+		connection->enableKeepAlive();
+	
+	if (_untransmittedSeconds != 0)
+		connection->setUntransmittedSeconds(_untransmittedSeconds);
 
 	connected(connection);
 
@@ -151,7 +164,7 @@ int UDPClient::connectIPv4Address(ConnectionInfoPtr currConnInfo)
 		return 0;
 	}
 
-	currConnInfo->changToUDP(socketfd, (uint8_t*)serverAddr);
+	currConnInfo->changeToUDP(socketfd, (uint8_t*)serverAddr);
 
 	return socketfd;
 }
@@ -182,7 +195,7 @@ int UDPClient::connectIPv6Address(ConnectionInfoPtr currConnInfo)
 		return 0;
 	}
 
-	currConnInfo->changToUDP(socketfd, (uint8_t*)serverAddr);
+	currConnInfo->changeToUDP(socketfd, (uint8_t*)serverAddr);
 
 	return socketfd;
 }
@@ -216,6 +229,7 @@ bool UDPClient::connect()
 			if (self->_connectionInfo->socket)
 			{
 				ConnectionInfoPtr newConnectionInfo(new ConnectionInfo(0, self->_connectionInfo->port, self->_connectionInfo->ip, self->_isIPv4, false));
+				newConnectionInfo->changeToUDP();
 				self->_connectionInfo = newConnectionInfo;
 			}
 
@@ -283,4 +297,140 @@ UDPClientPtr Client::createUDPClient(const std::string& host, int port, bool aut
 UDPClientPtr Client::createUDPClient(const std::string& endpoint, bool autoReconnect)
 {
 	return UDPClient::createClient(endpoint, autoReconnect);
+}
+
+void UDPClient::close()
+{
+	if (!_connected)
+		return;
+
+	ConnectionInfoPtr oldConnInfo;
+	IQuestProcessorPtr questProcessor;
+	{
+		std::unique_lock<std::mutex> lck(_mutex);
+		while (_connStatus == ConnStatus::Connecting || _connStatus == ConnStatus::KeyExchanging)
+			_condition.wait(lck);
+
+		if (_connStatus == ConnStatus::NoConnected)
+			return;
+
+		oldConnInfo = _connectionInfo;
+
+		ConnectionInfoPtr newConnectionInfo(new ConnectionInfo(0, _connectionInfo->port, _connectionInfo->ip, _isIPv4, false));
+		newConnectionInfo->changeToUDP();
+		_connectionInfo = newConnectionInfo;
+		_connected = false;
+		_connStatus = ConnStatus::NoConnected;
+
+		questProcessor = _questProcessor;
+	}
+
+	_engine->executeConnectionAction(oldConnInfo->socket, [questProcessor](BasicConnection* connection){
+		UDPClientConnection* conn = (UDPClientConnection*)connection;
+
+		bool needWaitSendEvent = false;
+		conn->sendCloseSignal(needWaitSendEvent, questProcessor);
+
+		if (needWaitSendEvent)
+			conn->waitForAllEvents();
+	});
+}
+
+FPAnswerPtr UDPClient::sendQuestEx(FPQuestPtr quest, bool discardable, int timeoutMsec)
+{
+	if (!_connected)
+	{
+		if (!_autoReconnect)
+		{
+			if (quest->isTwoWay())
+				return FpnnErrorAnswer(quest, FPNN_EC_CORE_CONNECTION_CLOSED, "Client is not allowed auto-connected.");
+			else
+				return NULL;
+		}
+
+		if (!reconnect())
+		{
+			if (quest->isTwoWay())
+				return FpnnErrorAnswer(quest, FPNN_EC_CORE_CONNECTION_CLOSED, "Reconnection failed.");
+			else
+				return NULL;
+		}
+	}
+
+	ConnectionInfoPtr connInfo;
+	{
+		std::unique_lock<std::mutex> lck(_mutex);
+		connInfo = _connectionInfo;
+	}
+	Config::ClientQuestLog(quest, connInfo->ip, connInfo->port);
+
+	if (timeoutMsec == 0)
+		return ClientEngine::nakedInstance()->sendQuest(connInfo->socket, connInfo->token, &_mutex, quest, _timeoutQuest, discardable);
+	else
+		return ClientEngine::nakedInstance()->sendQuest(connInfo->socket, connInfo->token, &_mutex, quest, timeoutMsec, discardable);
+}
+bool UDPClient::sendQuestEx(FPQuestPtr quest, AnswerCallback* callback, bool discardable, int timeoutMsec)
+{
+	if (!_connected)
+	{
+		if (!_autoReconnect)
+			return false;
+
+		if (!reconnect())
+			return false;
+	}
+
+	ConnectionInfoPtr connInfo;
+	{
+		std::unique_lock<std::mutex> lck(_mutex);
+		connInfo = _connectionInfo;
+	}
+	Config::ClientQuestLog(quest, connInfo->ip, connInfo->port);
+
+	if (timeoutMsec == 0)
+		return ClientEngine::nakedInstance()->sendQuest(connInfo->socket, connInfo->token, quest, callback, _timeoutQuest, discardable);
+	else
+		return ClientEngine::nakedInstance()->sendQuest(connInfo->socket, connInfo->token, quest, callback, timeoutMsec, discardable);
+}
+bool UDPClient::sendQuestEx(FPQuestPtr quest, std::function<void (FPAnswerPtr answer, int errorCode)> task, bool discardable, int timeoutMsec)
+{
+	if (!_connected)
+	{
+		if (!_autoReconnect)
+			return false;
+
+		if (!reconnect())
+			return false;
+	}
+
+	ConnectionInfoPtr connInfo;
+	{
+		std::unique_lock<std::mutex> lck(_mutex);
+		connInfo = _connectionInfo;
+	}
+	Config::ClientQuestLog(quest, connInfo->ip, connInfo->port);
+
+	bool res;
+	if (timeoutMsec == 0)
+		res = ClientEngine::nakedInstance()->sendQuest(connInfo->socket, connInfo->token, quest, std::move(task), _timeoutQuest, discardable);
+	else
+		res = ClientEngine::nakedInstance()->sendQuest(connInfo->socket, connInfo->token, quest, std::move(task), timeoutMsec, discardable);
+
+	return res;
+}
+
+void UDPClient::keepAlive()
+{
+	_keepAlive = true;
+	int connSocket = socket();
+	if (connSocket)
+		_engine->keepAlive(connSocket, true);
+}
+
+void UDPClient::setUntransmittedSeconds(int untransmittedSeconds)
+{
+	_untransmittedSeconds = untransmittedSeconds;
+	int connSocket = socket();
+	if (connSocket)
+		_engine->setUDPUntransmittedSeconds(connSocket, untransmittedSeconds);
 }

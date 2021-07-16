@@ -96,7 +96,15 @@ bool PemGenerator::buildPemContent()
 		return false;
 	}
 
-	char *buf = new char[BASE64_LEN(_derData.length())];
+	int bufLen = BASE64_LEN(_derData.length());
+	//-- Base64 padding
+	int padding = bufLen % 3;
+	if (padding) padding = 3 - padding;
+
+	bufLen += padding;
+	bufLen += bufLen/76;	//-- BASE64_AUTO_NEWLINE: 76 bytes append "\n"
+
+	char *buf = new char[bufLen];
 	AutoDeleteArrayGuard<char> guard(buf);
 
 	int len = base64_encode(&b64, buf, _derData.data(), _derData.length(), BASE64_AUTO_NEWLINE);

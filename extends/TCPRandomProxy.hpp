@@ -30,6 +30,7 @@ namespace fpnn
 		TCPRandomProxy(int64_t questTimeoutSeconds = -1): TCPProxyCore(questTimeoutSeconds)
 		{
 		}
+		virtual ~TCPRandomProxy() {}
 
 		TCPClientPtr getClient(bool connect)
 		{

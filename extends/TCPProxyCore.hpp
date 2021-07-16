@@ -38,6 +38,9 @@ namespace fpnn
 
 		IProxyQuestProcessorFactoryPtr _questProcessorFactory;
 
+		//============[ Keep alive infos ]==============//
+		TCPClientKeepAliveParams* _keepAliveParams;
+
 	protected:
 		void checkClientMap()
 		{
@@ -63,6 +66,9 @@ namespace fpnn
 
 				if (_questTimeout >= 0)
 					client->setQuestTimeout(_questTimeout);
+
+				if (_keepAliveParams)
+					client->configKeepAliveParams(_keepAliveParams);
 
 				if (_questProcessorFactory)
 				{
@@ -91,11 +97,13 @@ namespace fpnn
 
 	public:
 		//-- If questTimeoutSeconds less then zero, mean using global settings.
-		TCPProxyCore(int64_t questTimeoutSeconds = -1): _questTimeout(questTimeoutSeconds)
+		TCPProxyCore(int64_t questTimeoutSeconds = -1): _questTimeout(questTimeoutSeconds), _keepAliveParams(NULL)
 		{
 		}
 		virtual ~TCPProxyCore()
 		{
+			if (_keepAliveParams)
+				delete _keepAliveParams;
 		}
 
 		void enablePrivateQuestProcessor(IProxyQuestProcessorFactoryPtr factory)
@@ -136,6 +144,35 @@ namespace fpnn
 			std::unique_lock<std::mutex> lck(_mutex);
 			for (auto& clientPair: _clients)
 				clientPair.second->setQuestProcessThreadPool(_sharedQuestProcessPool);
+		}
+
+		void keepAlive()
+		{
+			std::unique_lock<std::mutex> lck(_mutex);
+
+			if (!_keepAliveParams)
+			{
+				_keepAliveParams = new TCPClientKeepAliveParams;
+
+				_keepAliveParams->pingTimeout = 0;
+				_keepAliveParams->pingInterval = Config::Client::KeepAlive::pingInterval;
+				_keepAliveParams->maxPingRetryCount = Config::Client::KeepAlive::maxPingRetryCount;
+			}
+		}
+		void setKeepAlivePingTimeout(int seconds)
+		{
+			keepAlive();
+			_keepAliveParams->pingTimeout = seconds * 1000;
+		}
+		void setKeepAliveInterval(int seconds)
+		{
+			keepAlive();
+			_keepAliveParams->pingInterval = seconds * 1000;
+		}
+		void setKeepAliveMaxPingRetryCount(int count)
+		{
+			keepAlive();
+			_keepAliveParams->maxPingRetryCount = count;
 		}
 
 		void updateEndpoints(const std::vector<std::string>& newEndpoints)	//-- FPZK Proxy needn't using this function.

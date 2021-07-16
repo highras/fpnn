@@ -50,6 +50,7 @@ namespace fpnn
 		TCPCarpProxy(int64_t questTimeoutSeconds = -1, uint32_t keymask = 0): TCPProxyCore(questTimeoutSeconds), _keymask(keymask)
 		{
 		}
+		virtual ~TCPCarpProxy() {}
 
 		TCPClientPtr getClient(int64_t key, bool connect)
 		{

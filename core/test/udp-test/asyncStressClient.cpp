@@ -2,12 +2,31 @@
 #include <vector>
 #include <thread>
 #include <atomic>
+#include "Setting.h"
 #include "UDPClient.h"
+#include "IQuestProcessor.h"
 
 using std::cout;
 using std::cerr;
 using std::endl;
 using namespace fpnn;
+
+class QuestProcessor: public IQuestProcessor
+{
+	QuestProcessorClassPrivateFields(QuestProcessor)
+	
+public:
+	virtual void connected(const ConnectionInfo& ci)
+	{
+		cout<<"client "<<ci.token<<" socket "<<ci.socket<<" connected."<<endl;
+	}
+	virtual void connectionWillClose(const ConnectionInfo& ci, bool closeByError)
+	{
+		cout<<"client "<<ci.token<<" socket "<<ci.socket<<" closed by "<<(closeByError ? "error" : "normal")<<"."<<endl;
+	}
+
+	QuestProcessorClassBasicPublicFuncs
+};
 
 FPQuestPtr QWriter(const char* method, bool oneway, FPMessage::FP_Pack_Type def_ptype){
     FPQWriter qw(6,method, oneway, def_ptype);
@@ -91,6 +110,8 @@ public:
 		int64_t recvError = _recvError;
 		int64_t timecost = _timecost;
 
+		ClientEnginePtr ce;
+
 
 		while (true)
 		{
@@ -123,6 +144,8 @@ public:
 			if (dr)
 				dtc = dtc / dr;
 
+			cout<<"\n====[send diff] "<<ds<<", [recv diff] "<<dr<<endl;
+
 			ds = ds * 1000 * 1000 / real_time;
 			dr = dr * 1000 * 1000 / real_time;
 			//dse = dse * 1000 * 1000 / real_time;
@@ -130,6 +153,11 @@ public:
 
 			cout<<"time interval: "<<(real_time / 1000.0)<<" ms, send error: "<<dse<<", recv error: "<<dre<<endl;
 			cout<<"[QPS] send: "<<ds<<", recv: "<<dr<<", per quest time cost: "<<dtc<<" usec"<<endl;
+
+			if (!ce)
+				ce = ClientEngine::instance();
+
+			cout<<"[Conn Count] "<<ce->count()<<endl;
 		}
 	}
 };
@@ -142,7 +170,8 @@ void Tester::test_worker(int qps)
 	cout<<"-- qps: "<<qps<<", usec: "<<usec<<endl;
 
 	UDPClientPtr client = UDPClient::createClient(_ip, _port);
-
+	client->setQuestProcessor(std::make_shared<QuestProcessor>());
+	client->setMTU(1500);
 	//client->connect();
 
 	while (true)
@@ -155,10 +184,10 @@ void Tester::test_worker(int qps)
 					if (errorCode != FPNN_EC_OK)
 					{
 						ins->incRecvError();
-						if (errorCode == FPNN_EC_CORE_TIMEOUT)
-							cout<<"Timeouted occurred when recving."<<endl;
-						else
-							cout<<"error occurred when recving."<<endl;
+					//	if (errorCode == FPNN_EC_CORE_TIMEOUT)
+					//		cout<<"Timeouted occurred when recving."<<endl;
+					//	else
+					//		cout<<"error occurred when recving."<<endl;
 						return;
 					}
 
@@ -188,16 +217,23 @@ int main(int argc, char* argv[])
 {
 	if (argc < 5 || argc > 6)
 	{
-		cout<<"Usage: "<<argv[0]<<" ip port connections qps [client_work_thread]"<<endl;
+		//cout<<"Usage: "<<argv[0]<<" ip port connections qps [client_work_thread]"<<endl;
+		cout<<"Usage: "<<argv[0]<<" ip port connections qps [config-file]"<<endl;
 		return 0;
 	}
 
-	ClientEngine::setQuestTimeout(300);
 	if (argc == 6)
-	{
-		int count = atoi(argv[5]);
-		ClientEngine::configAnswerCallbackThreadPool(count, 1, count, count);
-	}
+		if(!Setting::load(argv[5])){
+			cout<<"Config file error:"<< argv[5]<<endl;
+			return 1;
+		}
+
+	ClientEngine::setQuestTimeout(300);
+	// if (argc == 6)
+	// {
+	// 	int count = atoi(argv[5]);
+	// 	ClientEngine::configAnswerCallbackThreadPool(count, 1, count, count);
+	// }
 
 	Tester tester(argv[1], atoi(argv[2]), atoi(argv[3]), atoi(argv[4]));
 

@@ -1,6 +1,5 @@
 #ifndef NET_H_
 #define NET_H_
-#include <endian.h>
 #include <sys/uio.h>
 #include <netinet/in.h>
 #include <stdbool.h>

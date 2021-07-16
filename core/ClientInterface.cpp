@@ -1,3 +1,4 @@
+#include "Config.h"
 #include "HostLookup.h"
 #include "NetworkUtility.h"
 #include "ClientInterface.h"
@@ -197,7 +198,10 @@ void Client::processQuest(FPQuestPtr quest, ConnectionInfoPtr connectionInfo)
 			raw = errAnswer->raw();
 		}
 
-		ClientEngine::nakedInstance()->sendData(connectionInfo->socket, connectionInfo->token, raw);
+		if (connectionInfo->isTCP())
+			ClientEngine::nakedInstance()->sendData(connectionInfo->socket, connectionInfo->token, raw);
+		else
+			ClientEngine::nakedInstance()->sendUDPData(connectionInfo->socket, connectionInfo->token, raw, 0, quest->isOneWay());
 	}
 }
 
@@ -277,10 +281,20 @@ FPAnswerPtr Client::sendQuest(FPQuestPtr quest, int timeout)
 	if (!_connected)
 	{
 		if (!_autoReconnect)
-			return FpnnErrorAnswer(quest, FPNN_EC_CORE_CONNECTION_CLOSED, "Client is not allowed auto-connected.");
+		{
+			if (quest->isTwoWay())
+				return FpnnErrorAnswer(quest, FPNN_EC_CORE_CONNECTION_CLOSED, "Client is not allowed auto-connected.");
+			else
+				return NULL;
+		}
 
 		if (!reconnect())
-			return FpnnErrorAnswer(quest, FPNN_EC_CORE_CONNECTION_CLOSED, "Reconnection failed.");
+		{
+			if (quest->isTwoWay())
+				return FpnnErrorAnswer(quest, FPNN_EC_CORE_CONNECTION_CLOSED, "Reconnection failed.");
+			else
+				return NULL;
+		}
 	}
 
 	ConnectionInfoPtr connInfo;

@@ -90,7 +90,12 @@ void UDPServerMasterProcessor::dealQuest(UDPRequestPackage * requestPackage)
 			if (requestPackage->_connectionInfo->isPrivateIP())
 				answer = (this->*(node->data))(args, quest, *(requestPackage->_connectionInfo));
 			else
-				answer = FpnnErrorAnswer(quest, FPNN_EC_CORE_FORBIDDEN, std::string("Can not call internal method from external, ") + requestPackage->_connectionInfo->str());
+			{
+				if (quest->isTwoWay())
+					answer = FpnnErrorAnswer(quest, FPNN_EC_CORE_FORBIDDEN, std::string("Can not call internal method from external, ") + requestPackage->_connectionInfo->str());
+				else
+					answer = NULL;
+			}
 		}
 	}
 
@@ -101,7 +106,16 @@ void UDPServerMasterProcessor::dealQuest(UDPRequestPackage * requestPackage)
 			answer = _questProcessor->processQuest(args, quest, *(requestPackage->_connectionInfo));
 		}
 		catch (const FpnnError& ex){
-			LOG_ERROR("processQuest() Exception:(%d)%s. %s", ex.code(), ex.what(), requestPackage->_connectionInfo->str().c_str());
+
+			if (ex.code() == FPNN_EC_PROTO_TYPE_CONVERT || ex.code() == FPNN_EC_PROTO_KEY_NOT_FOUND)
+			{
+				LOG_WARN("processQuest() Exception:(%d)%s. %s", ex.code(), ex.what(), requestPackage->_connectionInfo->str().c_str());
+			}
+			else
+			{
+				LOG_ERROR("processQuest() Exception:(%d)%s. %s", ex.code(), ex.what(), requestPackage->_connectionInfo->str().c_str());
+			}
+
 			if (quest->isTwoWay())
 			{
 				if (_questProcessor->getQuestAnsweredStatus() == false)
@@ -174,7 +188,8 @@ void UDPServerMasterProcessor::dealQuest(UDPRequestPackage * requestPackage)
 
 		Config::ServerAnswerAndSlowLog(quest, answer, requestPackage->_connectionInfo->ip, requestPackage->_connectionInfo->port);
 
-		_server->sendData(requestPackage->_connectionInfo, raw);
+		_server->sendData(requestPackage->_connectionInfo->socket,
+			requestPackage->_connectionInfo->token, raw, 0, quest->isOneWay());
 	}
 
 	delete requestPackage;
@@ -182,22 +197,69 @@ void UDPServerMasterProcessor::dealQuest(UDPRequestPackage * requestPackage)
 
 void UDPServerMasterProcessor::run(UDPRequestPackage * requestPackage)
 {
-	try
+	if (requestPackage->_type == UDPSessionEventType::Quest)
 	{
-		dealQuest(requestPackage);
-		return;
+		try
+		{
+			dealQuest(requestPackage);
+			return;
+		}
+		catch (const FpnnError& ex){
+			LOG_ERROR("Fatal error occurred when deal quest:(%d)%s. Connection will be closed by server. %s", ex.code(), ex.what(), requestPackage->_connectionInfo->str().c_str());
+		}
+		catch (const std::exception& ex)
+		{
+			LOG_ERROR("Fatal error occurred when deal quest: %s. Connection will be closed by server. %s", ex.what(), requestPackage->_connectionInfo->str().c_str());
+		}
+		catch (...)
+		{
+			LOG_ERROR("Fatal error occurred when deal quest. Connection will be closed by server. %s", requestPackage->_connectionInfo->str().c_str());
+		}
 	}
-	catch (const FpnnError& ex){
-		LOG_ERROR("Fatal error occurred when deal quest:(%d)%s. Connection will be closed by server. %s", ex.code(), ex.what(), requestPackage->_connectionInfo->str().c_str());
-	}
-	catch (const std::exception& ex)
+	else if (requestPackage->_type == UDPSessionEventType::Connected)
 	{
-		LOG_ERROR("Fatal error occurred when deal quest: %s. Connection will be closed by server. %s", ex.what(), requestPackage->_connectionInfo->str().c_str());
+		try
+		{
+			_validARQConnections++;
+			_questProcessor->connected(*(requestPackage->_connectionInfo.get()));
+		}
+		catch (const FpnnError& ex){
+			LOG_ERROR("UDP connected() error:(%d)%s. %s", ex.code(), ex.what(), requestPackage->_connectionInfo->str().c_str());
+		}
+		catch (const std::exception& ex)
+		{
+			LOG_ERROR("UDP connected() error: %s. %s", ex.what(), requestPackage->_connectionInfo->str().c_str());
+		}
+		catch (...)
+		{
+			LOG_ERROR("Unknown error when calling connected() function. %s", requestPackage->_connectionInfo->str().c_str());
+		}
+
+		_server->connectionConnectedEventCompleted(requestPackage->_connection);
 	}
-	catch (...)
+	else
 	{
-		LOG_ERROR("Fatal error occurred when deal quest. Connection will be closed by server. %s", requestPackage->_connectionInfo->str().c_str());
-	}
+		bool closeByError = (requestPackage->_type != UDPSessionEventType::Closed);
+		const char* paramDesc = closeByError ? "true" : "false";
+		try
+		{
+			_questProcessor->connectionWillClose(*(requestPackage->_connectionInfo.get()), closeByError);
+		}
+		catch (const FpnnError& ex){
+			LOG_ERROR("UDP connectionWillClose(..., %s) error:(%d)%s. %s", paramDesc, ex.code(), ex.what(), requestPackage->_connectionInfo->str().c_str());
+		}
+		catch (const std::exception& ex)
+		{
+			LOG_ERROR("UDP connectionWillClose(..., %s) error: %s. %s", paramDesc, ex.what(), requestPackage->_connectionInfo->str().c_str());
+		}
+		catch (...)
+		{
+			LOG_ERROR("Unknown error when calling connectionWillClose(..., %s) function. %s", paramDesc, requestPackage->_connectionInfo->str().c_str());
+		}
+
+		_validARQConnections--;
+		requestPackage->_connection->_refCount--;
+	}	
 
 	delete requestPackage;
 }

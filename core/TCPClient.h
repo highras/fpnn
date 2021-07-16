@@ -29,6 +29,8 @@ namespace fpnn
 		bool _sslEnabled;
 		//----------
 		int _ioChunkSize;
+		//----------
+		TCPClientKeepAliveParams* _keepAliveParams;
 
 	private:
 		int connectIPv4Address(ConnectionInfoPtr currConnInfo);
@@ -39,12 +41,17 @@ namespace fpnn
 		TCPClient(const std::string& host, int port, bool autoReconnect = true);
 
 	public:
-		virtual ~TCPClient() {}
+		virtual ~TCPClient()
+		{
+			if (_keepAliveParams)
+				delete _keepAliveParams;
+		}
 
 		/*===============================================================================
 		  Call by framwwork.
 		=============================================================================== */
 		void dealQuest(FPQuestPtr quest, ConnectionInfoPtr connectionInfo);		//-- must done in thread pool or other thread.
+		void configKeepAliveParams(const TCPClientKeepAliveParams* params);
 		/*===============================================================================
 		  Call by Developer. Configure Function.
 		=============================================================================== */
@@ -62,6 +69,10 @@ namespace fpnn
 
 		bool enableSSL(bool enable = true);
 		inline void setIOChunckSize(int ioChunkSize) { _ioChunkSize = ioChunkSize; }
+		void keepAlive();
+		void setKeepAlivePingTimeout(int seconds);
+		void setKeepAliveInterval(int seconds);
+		void setKeepAliveMaxPingRetryCount(int count);
 		/*===============================================================================
 		  Call by Developer.
 		=============================================================================== */

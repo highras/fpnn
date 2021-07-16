@@ -16,6 +16,7 @@ namespace fpnn
 		{
 			TCPServerConnectionType,
 			TCPClientConnectionType,
+			UDPServerConnectionType,
 			UDPClientConnectionType
 		};
 

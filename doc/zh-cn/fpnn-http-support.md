@@ -2,19 +2,18 @@
 
 ## 1. HTTP 支持概况
 
-FPNN 框架Server部分支持HTTP部分功能。  
-FPNN框架Client部分不支持HTTP功能。  
-FPNN框架duplex模式下，仅Server端支持接收和回应来自客户端的HTTP请求，但不支持向客户端发送HTTP请求，并接收HTTP请求回应。
+FPNN 框架 c支持 HTTP/HTTPS 1.1 常用功能；  
+FPNN 框架扩展模块 [MultipleURLEngine](APIs/extends/MultipleURLEngine.md) 支持 HTTP/HTTPS 1.1 全部功能。
 
-1. FPNN 框架目前仅支持HTTP POST & GET 请求。
+1. FPNN 框架 [TCP 服务模块](APIs/core/TCPEpollServer.md)目前仅支持HTTP POST 与 GET 请求。
 
 	POST Body 支持 Content-Length 和 chunk 两种表述。
 
-1. HTTP 支持默认关闭，需要显示配置 `FPNN.server.http.supported ＝ true` 方才接受HTTP请求。
-1. FPNN 默认支持 HTTP 和 TCP 包在同一个链接中混杂传递(FPNN持有该能力，但**强烈不建议使用**。一般情况下禁止TCP请求和HTTP请求在同一链接中混合发送)。
-1. 如果没有配置 `FPNN.server.http.closeAfterAnswered` 条目，默认**不会**在发送完 HTTP 应答后关闭当前链接，而会保持当前链接一段时间。链接保持时间 取决于配置项 `FPNN.server.idle.timeout`。默认 60 秒。
+1. HTTP 支持默认处于关闭状态，需要显示启用。启用 HTTP 支持只须在配置文件中增加 `FPNN.server.http.supported ＝ true` 条目即可。
+1. FPNN 默认支持 HTTP 和 TCP 包在同一个链接中混杂传递(FPNN持有该能力，但**强烈不建议使用**。一般情况下禁止 TCP 请求和 HTTP 请求在同一链接中混合发送)。
+1. 如果配置文件中没有配置 `FPNN.server.http.closeAfterAnswered` 条目，默认**不会**在发送完 HTTP 应答后关闭当前链接，而会保持当前链接一段时间。链接保持时间取决于配置项 `FPNN.server.idle.timeout`。默认 60 秒。
 1. 如果配置 `FPNN.server.http.closeAfterAnswered = true`， 会在收到第一个 HTTP 请求后，停止在同一链接中接收新的请求（不论是HTTP还是TCP）。并在answer发送后，关闭链接。
-1. 目前忽略 HTTP 1.1 标准中 Keep-Alive操作，是否关闭链接取决于配置项 `FPNN.server.http.closeAfterAnswered` 和 `FPNN.server.idle.timeout`。
+1. 目前忽略 HTTP 1.1 标准中 Keep-Alive 操作，是否关闭链接取决于配置项 `FPNN.server.http.closeAfterAnswered` 和 `FPNN.server.idle.timeout`。
 1. 目前不支持HTTP 1.1 标准中连续发送 HTTP 请求时，顺序回应的要求。回应的先后顺序取决于请求的完成先后。
 
 
@@ -40,20 +39,23 @@ FPNN 对 HTTPS 的支持与 HTTP 相同。
 1. **FPNN.server.idle.timeout**
 
 	链接的空置时间。空置超过该时间，链接将会被FPNN框架关闭，并进行资源回收。  
-	空置状态取决于是否有完整包的传递，而不由是否有byte传递决定。
+	空置状态取决于是否有完整包的传递，而不由是否有字节数据传递决定。
 
-1. **FPNN.server.http.cross.origin**
+1. **FPNN.server.tcp.ipv4.ssl.listening.ip**
 
-	支持HTTP跨域访问
+	TCP/IPv4 over SSL/TLS 监听地址
 
 1. **FPNN.server.tcp.ipv4.ssl.listening.port**
 
 	TCP/IPv4 over SSL/TLS 监听端口
 
+1. **FPNN.server.tcp.ipv6.ssl.listening.ip**
+
+	TCP/IPv6 over SSL/TLS 监听地址
+
 1. **FPNN.server.tcp.ipv6.ssl.listening.port**
 
 	TCP/IPv6 over SSL/TLS 监听端口
-
 
 1. **FPNN.server.security.ssl.certificate**
 
@@ -66,8 +68,8 @@ FPNN 对 HTTPS 的支持与 HTTP 相同。
 
 ## 4. 违背禁止情况可能出现的意外
 
-1. FPNN 框架不具备组装 HTTP 请求包，和解释 HTTP 应答包的功能，因此 FPNN 框架无法发送 HTTP 请求包，和接收 HTTP 应答包。
-	要发送 HTTP 请求，请使用 libCurl。
+1. FPNN 框架 [TCP 服务模块](APIs/core/TCPEpollServer.md)不具备组装 HTTP 请求包，和解释 HTTP 应答包的功能，因此 FPNN 框架 [TCP 服务模块](APIs/core/TCPEpollServer.md)只能接收 HTTP 请求包和发送 HTTP 应答包，而无法发送 HTTP 请求包，和接收 HTTP 应答包。
+	要发送 HTTP 请求包，并接收 HTTP 应答包，请使用 FPNN 框架扩展模块 [MultipleURLEngine](APIs/extends/MultipleURLEngine.md)。
 
 1. 当 `FPNN.server.http.supported` 和 `FPNN.server.http.closeAfterAnswered` 均为 true，且混合发送 TCP 和 HTTP 请求时，可能会产生如下意外：
 
@@ -81,7 +83,7 @@ FPNN 对 HTTPS 的支持与 HTTP 相同。
 
 	修改：  
 	因为正常模式下，不会在同一链接中混合发送TCP和HTTP请求。且在同一链接中混合发送TCP请求和HTTP请求属于禁止行为。只有特殊目的，才会允许。  
-	因此该意外不属于bug，而属于意料之内的情况。因此不会进行修正或者fix。
+	因此该意外不属于bug，而属于意料之内的情况。因此不会进行修正。
 
 
 ## 5. FPNN HTTP 支持原理
@@ -102,6 +104,6 @@ WebSocket over SSL/TLS (wss) 需要配置 ssl 参数。
 
 WebSocket 支持 server push。
 
-注：
+**注意**
 
-+ WebSocket 控制帧中如果包含 payload，payload 将会被忽略。
+WebSocket 控制帧中如果包含 payload，payload 将会被忽略。

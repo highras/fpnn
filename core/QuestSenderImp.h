@@ -36,6 +36,19 @@ namespace fpnn
 		{
 			return _concurrentSender->sendQuest(_socket, _token, quest, std::move(task), timeout * 1000);
 		}
+
+		virtual FPAnswerPtr sendQuestEx(FPQuestPtr quest, bool discardable, int timeoutMsec = 0)
+		{
+			return _concurrentSender->sendQuest(_socket, _token, _mutex, quest, timeoutMsec);
+		}
+		virtual bool sendQuestEx(FPQuestPtr quest, AnswerCallback* callback, bool discardable, int timeoutMsec = 0)
+		{
+			return _concurrentSender->sendQuest(_socket, _token, quest, callback, timeoutMsec);
+		}
+		virtual bool sendQuestEx(FPQuestPtr quest, std::function<void (FPAnswerPtr answer, int errorCode)> task, bool discardable, int timeoutMsec = 0)
+		{
+			return _concurrentSender->sendQuest(_socket, _token, quest, std::move(task), timeoutMsec);
+		}
 	};
 
 	class UDPQuestSender: public QuestSender
@@ -55,17 +68,46 @@ namespace fpnn
 		*/
 		virtual FPAnswerPtr sendQuest(FPQuestPtr quest, int timeout = 0)
 		{
-			return _concurrentSender->sendQuest(_connInfo, quest, timeout * 1000);
+			return sendQuestEx(quest, quest->isOneWay(), timeout * 1000);
 		}
 	
 		virtual bool sendQuest(FPQuestPtr quest, AnswerCallback* callback, int timeout = 0)
 		{
-			return _concurrentSender->sendQuest(_connInfo, quest, callback, timeout * 1000);
+			return sendQuestEx(quest, callback, quest->isOneWay(), timeout * 1000);
 		}
 	
 		virtual bool sendQuest(FPQuestPtr quest, std::function<void (FPAnswerPtr answer, int errorCode)> task, int timeout = 0)
 		{
-			return _concurrentSender->sendQuest(_connInfo, quest, std::move(task), timeout * 1000);
+			return sendQuestEx(quest, std::move(task), quest->isOneWay(), timeout * 1000);
+		}
+
+		virtual FPAnswerPtr sendQuestEx(FPQuestPtr quest, bool discardable, int timeoutMsec = 0)
+		{
+			if (_concurrentSender)
+			{
+				return _concurrentSender->sendQuest(_connInfo->socket, _connInfo->token, quest, timeoutMsec, discardable);
+			}
+			else
+				return ClientEngine::instance()->sendQuest(_connInfo->socket, _connInfo->token, _connInfo->_mutex, quest, timeoutMsec, discardable);
+		}
+		virtual bool sendQuestEx(FPQuestPtr quest, AnswerCallback* callback, bool discardable, int timeoutMsec = 0)
+		{
+			if (_concurrentSender)
+			{
+				return _concurrentSender->sendQuest(_connInfo->socket, _connInfo->token, quest, callback, timeoutMsec, discardable);
+			}
+			else
+				return ClientEngine::instance()->sendQuest(_connInfo->socket, _connInfo->token, quest, callback, timeoutMsec, discardable);
+			
+		}
+		virtual bool sendQuestEx(FPQuestPtr quest, std::function<void (FPAnswerPtr answer, int errorCode)> task, bool discardable, int timeoutMsec = 0)
+		{
+			if (_concurrentSender)
+			{
+				return _concurrentSender->sendQuest(_connInfo->socket, _connInfo->token, quest, std::move(task), timeoutMsec, discardable);
+			}
+			else
+				return ClientEngine::instance()->sendQuest(_connInfo->socket, _connInfo->token, quest, std::move(task), timeoutMsec, discardable);
 		}
 	};
 }

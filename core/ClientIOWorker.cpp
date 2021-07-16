@@ -18,6 +18,8 @@ bool TCPClientIOWorker::read(TCPClientConnection * connection)
 	if (!connection->_recvBuffer.getToken())
 		return true;
 
+	connection->updateReceivedMS();
+
 	while (true)
 	{
 		bool needNextEvent;

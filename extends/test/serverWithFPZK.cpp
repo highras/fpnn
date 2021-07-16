@@ -93,7 +93,7 @@ public:
 		//cout<<"quest data: "<<(quest->json())<<endl;
 
 		FPQuestPtr quest2 = QWriter("duplex quest", false, FPMessage::FP_PACK_MSGPACK);
-		FPAnswerPtr answer = sendQuest(ci, quest2);
+		FPAnswerPtr answer = sendQuest(quest2);
 
 		//cout<<"recv client answer: "<<(answer->json())<<endl;
 
