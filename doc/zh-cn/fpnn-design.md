@@ -46,7 +46,7 @@
 
 	首先，是框架的代码。
 
-	参考 [FPNN 服务端基础使用向导](fpnn-server-basic-tutorial.md)[“1. 服务代码框架”](fpnn-server-basic-tutorial.md#1.-服务代码框架)，将发现，无论开发 TCP 服务还是 UDP 服务，算上括号与空行，标准框架一共也才 3 个文件总共 41 行代码。其中 “DemoServer.cpp” 24 行，“DemoServer.cpp” 15 行，“DemoQuestProcessor.cpp” 2 行。而参考 [FPNN 客户端基础使用向导](fpnn-client-basic-tutorial.md) 就会发现，算上括号与空行，客户端完整框架一共就 8 行代码，而以下 17 行代码（算上括号、空行、注释）已经能直接运行，并向服务器发送请求，并接收应答：
+	参考 [FPNN 服务端基础使用向导](fpnn-server-basic-tutorial.md)[“1. 服务代码框架”](fpnn-server-basic-tutorial.md#1-服务代码框架)，将发现，无论开发 TCP 服务还是 UDP 服务，算上括号与空行，标准框架一共也才 3 个文件总共 41 行代码。其中 “DemoServer.cpp” 24 行，“DemoServer.cpp” 15 行，“DemoQuestProcessor.cpp” 2 行。而参考 [FPNN 客户端基础使用向导](fpnn-client-basic-tutorial.md) 就会发现，算上括号与空行，客户端完整框架一共就 8 行代码，而以下 17 行代码（算上括号、空行、注释）已经能直接运行，并向服务器发送请求，并接收应答：
 
 		#include <iostream>
 		#include "TCPClient.h"
