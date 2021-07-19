@@ -33,7 +33,7 @@ FPNN 对 HTTPS 的支持与 HTTP 相同。
 1. **FPNN.server.http.closeAfterAnswered**
 
 	当允许接收 HTTP 请求时，是否在收到任一 HTTP 请求后，停止接收请求，并在 HTTP 应答发送后，关闭链接。  
-	如果该配置项为 true，则意味着进入传统 HTTP 1.0 一问一答模式。且一个链接只能发送并处理一次 HTTP 请求（同一链接中的TCP请求不受限制，但禁止在这种情况下，混合发送TCP和HTTP请求）。  
+	如果该配置项为 true，则意味着进入传统 HTTP 1.0 一问一答模式。且一个链接只能发送并处理一次 HTTP 请求（同一链接中的 TCP 请求不受限制，但禁止在这种情况下，混合发送 TCP 和 HTTP 请求）。  
 	当该配置项为 false 时，允许在一个链接中同时发送多个 HTTP 和 TCP 请求，且 HTTP 请求和 TCP 请求可以混合发送。
 
 1. **FPNN.server.idle.timeout**
