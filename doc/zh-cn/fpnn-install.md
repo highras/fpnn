@@ -46,7 +46,7 @@ FPNN 默认启动 亚马逊 AWS 支持。若非 亚马逊 AWS 平台，请修改
 
 ## 4. 编译 FPNN 框架
 
-在 [FPNN 源代码根目录](../../) 内执行 `make` 即可。
+在 [FPNN 源代码根目录](https://github.com/highras/fpnn) 内执行 `make` 即可。
 
 
 ## 5. 项目开发
