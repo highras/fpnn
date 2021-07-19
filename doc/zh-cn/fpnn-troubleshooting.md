@@ -24,7 +24,7 @@
 		**高级操作**
 
 		* 若因以上项目未配置，而导致 FPNN 服务无法响应 Ctrl + C 中断，可使用 pstack 命令查看服务进程主线程，看是否因为 curl 访问 AWS/GCP/Azure 的服务而导致 FPNN 服务挂起。  
-		若是，则在主线程堆栈中查找对应的 ServerInfo 类调用，然后在 [/base/serverInfo.cpp](../../base/serverInfo.cpp) 中查找对应的接口实现，以便确认需要配置以上哪项参数。
+		若是，则在主线程堆栈中查找对应的 ServerInfo 类调用，然后在 [/base/serverInfo.cpp](../../base/ServerInfo.cpp) 中查找对应的接口实现，以便确认需要配置以上哪项参数。
 
 			*pstack 可通过 yum install gdb 安装*
 
@@ -33,7 +33,7 @@
 
 1. FPNN 服务无响应
 
-	请使用 [/core/tools/cmd](APIs/core/tools.md#cmd) 或 [/core/tools/cmdinfos](APIs/core/tools.md#cmdinfos) 访问 FPNN 服务，查看是否有响应。
+	请使用 [/core/tools/cmd](fpnn-tools.md#cmd) 或 [/core/tools/cmdinfos](fpnn-tools.md#cmdinfos) 访问 FPNN 服务，查看是否有响应。
 
 	* 若无响应，请依此检查以下项目：
 
