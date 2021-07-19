@@ -2,10 +2,10 @@
 
 ## 1. HTTP 支持概况
 
-FPNN 框架 c支持 HTTP/HTTPS 1.1 常用功能；  
+FPNN 框架 [TCP 服务组件](APIs/core/TCPEpollServer.md)支持 HTTP/HTTPS 1.1 常用功能；  
 FPNN 框架扩展模块 [MultipleURLEngine](APIs/extends/MultipleURLEngine.md) 支持 HTTP/HTTPS 1.1 全部功能。
 
-1. FPNN 框架 [TCP 服务模块](APIs/core/TCPEpollServer.md)目前仅支持HTTP POST 与 GET 请求。
+1. FPNN 框架 [TCP 服务组件](APIs/core/TCPEpollServer.md)目前仅支持HTTP POST 与 GET 请求。
 
 	POST Body 支持 Content-Length 和 chunk 两种表述。
 
