@@ -220,7 +220,7 @@ TCP 异步压力测试客户端。
 
 	Usage: ./shortConnectionTesting ip port threadNum sendCount [encryptConfigFile]
 
-+ encryptConfigFile 模版请参见 [clientEncrypt.conf](../core/test/tcp-test/clientEncrypt.conf)。
++ encryptConfigFile 模版请参见 [clientEncrypt.conf](../../core/test/tcp-test/clientEncrypt.conf)。
 + 默认测试目标服务器请参见 [serverTest](#serverTest)。
 
 
