@@ -35,7 +35,7 @@ FPNN 框架可以支持 HTTP/HTTPS 协议访问，如需开启 HTTP/HTTPS 支持
 
 **注意**
 
-HTTPS 还需要配置 SSL/TLS 支持。SSL/TLS 支持请参见 [SSL/TLS 支持](#SSL/TLS-支持)。
+HTTPS 还需要配置 SSL/TLS 支持。SSL/TLS 支持请参见 [SSL/TLS 支持](#SSLTLS-支持)。
 
 
 
@@ -51,7 +51,7 @@ WebSocket 支持 server push。
 
 **注意**
 
-+ 对 wss 协议，还需要配置 SSL/TLS 支持。SSL/TLS 支持请参见 [SSL/TLS 支持](#SSL/TLS-支持)。
++ 对 wss 协议，还需要配置 SSL/TLS 支持。SSL/TLS 支持请参见 [SSL/TLS 支持](#SSLTLS-支持)。
 + WebSocket 控制帧中如果包含 payload，payload 将会被忽略。
 
 
