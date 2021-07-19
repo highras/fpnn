@@ -271,7 +271,7 @@ FPNN 框架内置的 `*tune` 接口可以动态调节服务框架的各种动态
 
 	IAsyncAnswerPtr genAsyncAnswer();
 
-具体可参见 [genAsyncAnswer](APIs/IQuestProcessor.md#genAsyncAnswer)。
+具体可参见 [genAsyncAnswer](APIs/core/IQuestProcessor.md#genAsyncAnswer)。
 
 **注意**
 
