@@ -52,6 +52,8 @@
 
 1. [FPNN 错误代码](fpnn-error-code.md)
 
+1. [FPNN 术语表](fpnn-glossary.md)
+
 ### 3. FPNN 最佳实践
 
 1. [FPNN 最佳实践](fpnn-best-practice.md)
