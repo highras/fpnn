@@ -4,7 +4,7 @@
 
 1. IDL 框架与 无IDL/IDL-less 框架的选择
 
-FPNN 框架是无 IDL 框架，或者说，是 IDL-less 框架。IDL 框架，和 FPNN 无 IDL 框架在选择和使用上的区别，可参见 [“FPNN 设计理念”的“无 IDL & IDL-less”一节](fpnn-design.md)。
+FPNN 框架是无 IDL 框架，或者说，是 IDL-less 框架。IDL 框架，和 FPNN 无 IDL 框架在选择和使用上的区别，可参见 “[FPNN 设计理念](fpnn-design.md)”的“无 IDL & IDL-less”一节。
 
 1. 接口协议中的结构体和 tuple	
 
