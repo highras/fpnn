@@ -40,6 +40,8 @@
 
     1. [FPNN 内置接口](fpnn-build-in-methods.md)
 
+    1. [FPNN 框架可动态调节参数列表](fpnn-tune-items.md)
+
     1. [FPNN 内置调试模块介绍](fpnn-build-in-debug-modules.md)
 
 1. [FPNN 内置工具](fpnn-tools.md)
