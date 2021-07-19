@@ -72,11 +72,11 @@
 
 	1. FPNN 框架内置接口访问限制
 
-		FPNN 框架内置接口，除秘钥交换接口和TCP保活接口外，其余仅允许内网访问。外网访问将被自动阻止。
+		FPNN 框架[内置接口](fpnn-build-in-methods.md)，除[秘钥交换接口](fpnn-build-in-methods.md#key)和[TCP保活接口](fpnn-build-in-methods.md#ping)外，其余仅允许内网访问。外网访问将被自动阻止。
 
 	1. 用户接口访问限制
 
-		用户可以指定业务自定义接口的安全等级，是必须加密链接才能访问，还是内网才能访问，还是两者兼具。
+		用户可以指定业务自定义接口的[安全等级](APIs/core/IQuestProcessor.md#MethodAttribute)，是必须加密链接才能访问，还是内网才能访问，还是两者兼具。
 
 	1. IP/IP段白名单
 
