@@ -778,7 +778,7 @@ FPNN 采用 ECC(椭圆曲线算法)进行秘钥协商，AES 算法的 CFB 模式
 
 * 选择性加密
 
-	在注册接口时，[registerMethod](APIs/core/IQuestProcessor.md#registerMethod) 方法的 attributes 参数指定 [EncryptOnly](IQuestProcessor.md#MethodAttribute) 即可。
+	在注册接口时，[registerMethod](APIs/core/IQuestProcessor.md#registerMethod) 方法的 attributes 参数指定 [EncryptOnly](APIs/core/IQuestProcessor.md#MethodAttribute) 即可。
 
 
 
