@@ -150,7 +150,7 @@ Server Push 需要处理服务端发送的请求，并根据请求类型进行�
 
 	开发中用实际接口对应的函数名称替换 method_name 即可。
 
-	oneway 类型的接口/请求须返回 `nullptr`，twoway 类型的接口/请求，在没有使用[提前返回](#ServerPush-中的提前返回)或者[异步返回](#ServerPush-中的异步返回)时，须返回有效的 [FPAnswerPtr](APIs/proto/FPAnswer.md)，在使用[提前返回](#ServerPush-中的提前返回)或者[异步返回](#ServerPush-中的异步返回)后，须返回 `nullptr`。
+	oneway 类型的接口/请求须返回 `nullptr`，twoway 类型的接口/请求，在没有使用[提前返回](#Server-Push-中的提前返回)或者[异步返回](#Server-Push-中的异步返回)时，须返回有效的 [FPAnswerPtr](APIs/proto/FPAnswer.md)，在使用[提前返回](#Server-Push-中的提前返回)或者[异步返回](#Server-Push-中的异步返回)后，须返回 `nullptr`。
 
 
 2. 向 [IQuestProcessor][] 注册 Server Push 的请求处理接口：
@@ -209,7 +209,7 @@ Server Push 需要处理服务端发送的请求，并根据请求类型进行�
 + 调用该函数后，调用的请求处理函数必须返回 `nullptr`，否则会触发多次应答的异常日志。
 + 该函数必须在请求处理函数内(或请求处理函数返回前，同一线程上，被请求处理函数调用的其他函数中)被调用，否则无效。
 + 在请求处理函数内，该函数只能调用一次，后续调用无效。
-+ 提前返回后继续执行的任务会继续占用 FPNN 客户端侧的 Server Push 请求处理线程。如果业务 Server Push 相对频繁，可能需要根据具体情况，调整 [ClientEngine 全局请求处理线程池](APIs/core/ClientEngine.md#configQuestProcessThreadPool)的大小，或者 [Client 私有请求处理线程池](APIs/core/Client.md#enableQuestProcessThreadPool)的大小。或者改为使用[异步返回](#ServerPush-中的异步返回)。
++ 提前返回后继续执行的任务会继续占用 FPNN 客户端侧的 Server Push 请求处理线程。如果业务 Server Push 相对频繁，可能需要根据具体情况，调整 [ClientEngine 全局请求处理线程池](APIs/core/ClientEngine.md#configQuestProcessThreadPool)的大小，或者 [Client 私有请求处理线程池](APIs/core/Client.md#enableQuestProcessThreadPool)的大小。或者改为使用[异步返回](#Server-Push-中的异步返回)。
 
 **返回值说明**
 
