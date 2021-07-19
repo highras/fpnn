@@ -232,7 +232,7 @@
 1. **IPv4、IPv6、TCP/IPv4 over SSL/TLS、TCP/IPv6 over SSL/TLS 四端口监听**
 
 	目前 IPv4 网络还是主流。但业务上可能需要提供 IPv6 支持。因此很多情况下，IPv4 和 IPv6 运行着相同的业务。  
-	为了能有效平衡 IPv4 和 IPv6 的业务负载，同时减少对系统资源的消耗，如果选择开启 IPv6 端口，则同一 FPNN 服务进程将进行 IPv4 和 IPv6 双端口监听，而不是启动两个独立进程，分别监听 IPv4 和 IPv6。
+	为了能有效平衡 IPv4 和 IPv6 的业务负载，同时减少对系统资源的消耗，如果选择开启 IPv6 端口，则同一 FPNN 服务进程将进行 IPv4 和 IPv6 双端口监听，而不是启动两个独立的服务实例，分别监听 IPv4 和 IPv6。
 
 	另外，因为 IP 协议栈位于操作系统内核，所以 FPNN 目前不能在同一个端口上同时监听 IPv4 和 IPv6。
 
@@ -243,7 +243,7 @@
 
 	**注意**
 
-	IPv6、TCP/IPv4 over SSL/TLS、TCP/IPv6 over SSL/TLS 均可单独开启。具体请参见 [FPNN 标准配置模版](../conf.template)
+	IPv6、TCP/IPv4 over SSL/TLS、TCP/IPv6 over SSL/TLS 均可单独开启。具体请参见 [FPNN 标准配置模版](../conf.template) “安全相关”一节。
 
 
 1. **不支持 HTTP 1.1 Keep-Alive**
@@ -418,7 +418,7 @@
 
 	FPNN 暂不提供该类客户端实现。
 
-* 第二类为大量客户端协作版本，适用于进程中可能存在大量客户端（0～100,000）的情况。（包含不连接的客户端。链接中的客户端受系统最大可用端口数的限制(理论上最大65535)。）
+* 第二类为大量客户端协作版本，适用于进程中可能存在大量客户端（0～100,000）的情况。（包含未连接的客户端。链接中的客户端受系统最大可用端口数的限制(理论上最大65535)。）
 
 	该类客户端针对大量并存的客户端，整合并优化了客户端的收发逻辑，使众多客户端在各有不同变现的情况下，共享底层的收发处理逻辑，和相关的系统资源。在收发效率不受明显影响的情况下，极大地减少了系统线程的数量和其他资源的开销。
 
@@ -431,7 +431,7 @@
 	
 	[ClientEngine](APIs/core/ClientEngine.md) 为客户端的核心，为全部的 [Client](APIs/core/Client.md) 所共享，执行具体的数据收发、编解码、应答回调执行，服务器Push请求处理等操作。
 
-[ClientEngine](APIs/core/ClientEngine.md) 与 [Client](APIs/core/Client.md) 的关系如下图：
+[ClientEngine](APIs/core/ClientEngine.md) 与 [Client](APIs/core/Client.md) 的结构如下图：
 
 	+------------------+ +-----------------+ +-----------------+               +-------------------+
 	|      Client      | |      Client     | |     Client      |  ... ... ...  |       Client      |
