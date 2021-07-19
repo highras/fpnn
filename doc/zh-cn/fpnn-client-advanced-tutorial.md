@@ -227,7 +227,7 @@ Server Push 需要处理服务端发送的请求，并根据请求类型进行�
 
 	IAsyncAnswerPtr genAsyncAnswer();
 
-具体可参见 [genAsyncAnswer](APIs/IQuestProcessor.md#genAsyncAnswer)。
+具体可参见 [genAsyncAnswer](APIs/core/IQuestProcessor.md#genAsyncAnswer)。
 
 **注意**
 
