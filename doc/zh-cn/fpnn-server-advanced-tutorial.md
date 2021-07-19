@@ -394,7 +394,7 @@ UDPEpollServer 的 `closeConnection` 接口：
 
 		两个派生类须包含原始的对象实例。在进行完相应的 hook 操作后，向原始对象转发数据。
 
-	1. 第二层的 IQuestProcessor 派生类定义 [sendAnswer](APIs/core/IQuestProcessor.md#sendAnswer)、[genAsyncAnswer](APIs/core/IQuestProcessor.md#genAsyncAnswer)、[genQuestSender](APIs/core/IQuestProcessor.md#、genQuestSender)、[sendQuest](APIs/core/IQuestProcessor.md#sendQuest)、[sendQuestEx](APIs/core/IQuestProcessor.md#sendQuestEx) 系列函数，覆盖父类同名函数。
+	1. 第二层的 IQuestProcessor 派生类定义 [sendAnswer](APIs/core/IQuestProcessor.md#sendAnswer)、[genAsyncAnswer](APIs/core/IQuestProcessor.md#genAsyncAnswer)、[genQuestSender](APIs/core/IQuestProcessor.md#genQuestSender)、[sendQuest](APIs/core/IQuestProcessor.md#sendQuest)、[sendQuestEx](APIs/core/IQuestProcessor.md#sendQuestEx) 系列函数，覆盖父类同名函数。
 
 		在派生类的函数中，进行完相应的 hook 操作后，需要向父类被覆盖的接口转发数据。
 
