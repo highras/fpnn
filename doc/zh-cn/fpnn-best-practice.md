@@ -40,7 +40,7 @@ FPNN 框架是无 IDL 框架，或者说，是 IDL-less 框架。IDL 框架，�
 
 1. 使用 FPNN 标准异常应答，简化开发
 
-	FPNN 标准异常应答（ErrorAnswer）包含两个成员，一个是错误代码 code 成员，另外一个是错误描述 ex 成员。
+	FPNN 标准异常应答（ErrorAnswer）包含两个成员，一个是错误代码 `code` 成员，另外一个是错误描述 `ex` 成员。
 
 	FPNN 框架与相关 SDK，对异常和错误的应答，均依赖于 FPNN 标准异常应答。
 
