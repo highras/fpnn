@@ -30,7 +30,7 @@ RPC框架也一样。
 * 支持 WebSocket
 * 支持 SSL/TLS
 * 支持 msgpack 编码
-* 支持 json 格式
+* 支持 Json 格式
 * 支持 可选参数
 * 支持 不定类型参数
 * 支持 不定长度不定类型参数
