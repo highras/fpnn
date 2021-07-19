@@ -1,6 +1,0 @@
-#ifndef FPNN_Massive_Connections_Common_Constant_h
-#define FPNN_Massive_Connections_Common_Constant_h
-
-#define FPNN_Massive_Connections_Actor_Name "FPNNMassiveConnectionsActor"
-
-#endif
