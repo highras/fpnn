@@ -276,7 +276,7 @@ TCP & UDP 单链接对比测试服务。
 
 ### 5. 分布式自动化测试工具
 
-**注意**：分布式自动化测试工具需要在**DATS (Distributed Automated Testing Suite)**下使用。
+**注意**：分布式自动化测试工具需要在**DATS** (Distributed Automated Testing Suite)下使用。
 
 位置：[/core/test/AutoDistributedTest/](../../core/test/AutoDistributedTest/)
 
