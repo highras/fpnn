@@ -9,8 +9,8 @@ FPNN 框架扩展模块 [MultipleURLEngine](APIs/extends/MultipleURLEngine.md) �
 
 	POST Body 支持 Content-Length 和 chunk 两种表述。
 
-1. HTTP 支持默认处于关闭状态，需要显示启用。启用 HTTP 支持只须在配置文件中增加 `FPNN.server.http.supported ＝ true` 条目即可。
-1. FPNN 默认支持 HTTP 和 TCP 包在同一个链接中混杂传递(FPNN持有该能力，但**强烈不建议使用**。一般情况下禁止 TCP 请求和 HTTP 请求在同一链接中混合发送)。
+1. HTTP 支持默认处于关闭状态，需要显式启用。启用 HTTP 支持只须在配置文件中增加 `FPNN.server.http.supported ＝ true` 条目即可。
+1. FPNN 默认支持 HTTP 和 TCP 包在同一个链接中混杂传递( FPNN 持有该能力，但**强烈不建议使用**。一般情况下禁止 TCP 请求和 HTTP 请求在同一链接中混合发送)。
 1. 如果配置文件中没有配置 `FPNN.server.http.closeAfterAnswered` 条目，默认**不会**在发送完 HTTP 应答后关闭当前链接，而会保持当前链接一段时间。链接保持时间取决于配置项 `FPNN.server.idle.timeout`。默认 60 秒。
 1. 如果配置 `FPNN.server.http.closeAfterAnswered = true`， 会在收到第一个 HTTP 请求后，停止在同一链接中接收新的请求（不论是HTTP还是TCP）。并在answer发送后，关闭链接。
 1. 目前忽略 HTTP 1.1 标准中 Keep-Alive 操作，是否关闭链接取决于配置项 `FPNN.server.http.closeAfterAnswered` 和 `FPNN.server.idle.timeout`。
@@ -21,7 +21,7 @@ FPNN 框架扩展模块 [MultipleURLEngine](APIs/extends/MultipleURLEngine.md) �
 
 FPNN 对 HTTPS 的支持与 HTTP 相同。
 
-启用 HTTP 支持后，配置相关的 ssl 参数，即可启用 HTTPS 功能。
+启用 HTTP 支持后，配置相关的 SSL/TLS 参数，即可启用 HTTPS 功能。
 
 
 ## 3. 相关配置
@@ -34,11 +34,11 @@ FPNN 对 HTTPS 的支持与 HTTP 相同。
 
 	当允许接收 HTTP 请求时，是否在收到任一 HTTP 请求后，停止接收请求，并在 HTTP 应答发送后，关闭链接。  
 	如果该配置项为 true，则意味着进入传统 HTTP 1.0 一问一答模式。且一个链接只能发送并处理一次 HTTP 请求（同一链接中的TCP请求不受限制，但禁止在这种情况下，混合发送TCP和HTTP请求）。  
-	当该配置项为 false 时，允许在一个链接中同时发送多个HTTP和TCP请求，且 HTTP 请求和TCP请求可以混合发送。
+	当该配置项为 false 时，允许在一个链接中同时发送多个 HTTP 和 TCP 请求，且 HTTP 请求和 TCP 请求可以混合发送。
 
 1. **FPNN.server.idle.timeout**
 
-	链接的空置时间。空置超过该时间，链接将会被FPNN框架关闭，并进行资源回收。  
+	链接的空置时间。空置超过该时间，链接将会被 FPNN 框架关闭，并进行资源回收。  
 	空置状态取决于是否有完整包的传递，而不由是否有字节数据传递决定。
 
 1. **FPNN.server.tcp.ipv4.ssl.listening.ip**
