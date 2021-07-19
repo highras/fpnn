@@ -103,7 +103,7 @@
 
 * **数据库路由代理服务**
 
-	对于 MySQL DBProxy 提供以下额外的安全策略：
+	对于 [MySQL DBProxy](https://github.com/highras/dbproxy) 提供以下额外的安全策略：
 
 	+ 对业务屏蔽所有的 MySQL 网络拓扑，和分库分表逻辑
 
