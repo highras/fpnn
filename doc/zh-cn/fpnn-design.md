@@ -431,7 +431,7 @@
 	
 	[ClientEngine](APIs/core/ClientEngine.md) 为客户端的核心，为全部的 [Client](APIs/core/Client.md) 所共享，执行具体的数据收发、编解码、应答回调执行，服务器Push请求处理等操作。
 
-[ClientEngine](APIs/core/ClientEngine.md) [Client](APIs/core/Client.md) 和 [ClientEngine](APIs/core/ClientEngine.md) 关系如下图：
+[ClientEngine](APIs/core/ClientEngine.md) 与 [Client](APIs/core/Client.md) 的关系如下图：
 
 	+------------------+ +-----------------+ +-----------------+               +-------------------+
 	|      Client      | |      Client     | |     Client      |  ... ... ...  |       Client      |
