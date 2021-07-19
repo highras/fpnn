@@ -26,9 +26,9 @@ FPNN 框架是无 IDL 框架，或者说，是 IDL-less 框架。IDL 框架，�
 
 ## 3. 服务接口
 
-1. QuestProcessor 的共享与独享
+1. [QuestProcessor][] 的共享与独享
 
-	QuestProcessor 可以在多个对象中共享。比如 TCPEpollServer 和 UDPEpollServer 可以共享同一个 QuestProcessor实例，而多个 TCPClient 或 UDPClient 之间也可以共享同一个 QuestProcessor。Server 和 Client 之间也可以共享同一个 QuestProcessor。QuestProcessor 每一个接口都包含有 [ConnectionInfo](APIs/core/ConnectionInfo.md) 对象，通过该对象，可以知道当前请求或者事件，是属于哪一个链接（[链接全剧唯一ID](APIs/core/ConnectionInfo.md#uniqueId)），是客户端还是服务端链接（[isServerConnection 方法](APIs/core/ConnectionInfo.md#isServerConnection)），是 TCP 还是 UDP 链接（[isTCP](APIs/core/ConnectionInfo.md#isTCP) 与 [isUDP](APIs/core/ConnectionInfo.md#isUDP)），是加密还是未加密链接（[isEncrypted 方法](APIs/core/ConnectionInfo.md#isEncrypted)），是来自内网，还是来自公网（[isPrivateIP 方法](APIs/core/ConnectionInfo.md#isPrivateIP)）。
+	[QuestProcessor][] 可以在多个对象中共享。比如 [TCPEpollServer](APIs/core/TCPEpollServer.md) 和 [UDPEpollServer](APIs/core/UDPEpollServer.md) 可以共享同一个 [QuestProcessor][] 实例，而多个 [TCPClient](APIs/core/TCPClient.md) 或 [UDPClient](APIs/core/UDPClient.md) 之间也可以共享同一个 [QuestProcessor][]。Server 和 Client 之间也可以共享同一个 [QuestProcessor][]。[QuestProcessor][] 每一个请求接口和事件接口都包含有 [ConnectionInfo](APIs/core/ConnectionInfo.md) 对象，通过该对象，可以知道当前请求或者事件，是属于哪一个链接（[链接全剧唯一ID](APIs/core/ConnectionInfo.md#uniqueId)），是客户端还是服务端链接（[isServerConnection 方法](APIs/core/ConnectionInfo.md#isServerConnection)），是 TCP 还是 UDP 链接（[isTCP](APIs/core/ConnectionInfo.md#isTCP) 与 [isUDP](APIs/core/ConnectionInfo.md#isUDP)），是加密还是未加密链接（[isEncrypted 方法](APIs/core/ConnectionInfo.md#isEncrypted)），是来自内网，还是来自公网（[isPrivateIP 方法](APIs/core/ConnectionInfo.md#isPrivateIP)）。
 
 1. 接口命名
 
@@ -68,3 +68,5 @@ FPNN 框架是无 IDL 框架，或者说，是 IDL-less 框架。IDL 框架，�
 1. 在线不提供服务
 
 	部分业务可能需要服务实例在线，但暂不对外提供服务。此时对于 FPZK 管理的服务，仅需通过 FPZKClient 将自身 online 状态设置为 false，即可达到服务实例在线，但 proxy 默认不会访问的状态。
+
+[QuestProcessor]: APIs/core/IQuestProcessor.md
