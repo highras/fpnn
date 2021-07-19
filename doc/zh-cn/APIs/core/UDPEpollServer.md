@@ -319,7 +319,7 @@ UDPEpollServer 需要 Linux 内核 3.9 及以上，方能有性能测试中的�
 
 将指定 IP 地址从白名单中删除。
 
-#### 
+#### closeConnection
 
 	void closeConnection(int socket, bool force = false);
 
