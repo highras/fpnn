@@ -401,7 +401,7 @@ logAgent 采用默认配置时，`FPNN.server.log.endpoint` 可配置为
 
 1. 编译 FPNN 框架
 
-	在 [FPNN 源代码根目录](../../) 内执行 `make` 即可。
+	在 [FPNN 源代码根目录](https://github.com/highras/fpnn) 内执行 `make` 即可。
 
 
 1. 编译服务器程序
