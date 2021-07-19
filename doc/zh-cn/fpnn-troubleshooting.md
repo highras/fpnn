@@ -51,7 +51,7 @@
 
 	* 若 FPNN 服务返回错误，请根据具体错误信息，或错误代码进行检查
 
-	* 若 FPNN 服务正确响应，请分析返回结果的 `FPNN.status/server/thread/tcp` 节点，查看 `workThreadStatus/ioThreadStatus/duplexThreadStatus` 三个节点对象的以下域：
+	* 若 FPNN 服务正确响应，请分析返回结果的 `FPNN.status/server/thread/tcp` 节点，查看 `workThreadStatus`、`ioThreadStatus`、`duplexThreadStatus` 三个节点对象的以下域：
 
 		+ taskSize
 
