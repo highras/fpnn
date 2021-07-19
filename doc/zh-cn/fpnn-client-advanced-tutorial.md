@@ -140,7 +140,7 @@ Server Push 需要处理服务端发送的请求，并根据请求类型进行�
 
 1. 实现 Server Push 的请求处理接口：
 
-	实现 Server Push 的请求处理接口与服务端侧实现服务接口的方法完全一致，因此详细内容可以参考 [“FPNN 服务端基础使用向导” - “2. 添加接口方法”](fpnn-server-basic-tutorial.md#2.-添加接口方法)。
+	实现 Server Push 的请求处理接口与服务端侧实现服务接口的方法完全一致，因此详细内容可以参考 [“FPNN 服务端基础使用向导” - “2. 添加接口方法”](fpnn-server-basic-tutorial.md#2-添加接口方法)。
 
 	以下为简要介绍：
 
@@ -155,7 +155,7 @@ Server Push 需要处理服务端发送的请求，并根据请求类型进行�
 
 2. 向 [IQuestProcessor][] 注册 Server Push 的请求处理接口：
 
-	注册 Server Push 的请求处理接口与服务端侧注册服务接口的方法完全一致，因此详细内容可以参考 [“FPNN 服务端基础使用向导” - “2.4. 接口注册”](fpnn-server-basic-tutorial.md#2.-添加接口方法)。
+	注册 Server Push 的请求处理接口与服务端侧注册服务接口的方法完全一致，因此详细内容可以参考 [“FPNN 服务端基础使用向导” - “2.4. 接口注册”](fpnn-server-basic-tutorial.md#2-添加接口方法)。
 
 	以下为简要介绍：
 
