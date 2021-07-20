@@ -50,3 +50,5 @@ TCPFPZKProxyCore 为与 FPZK 服务联动的 TCP Proxy 的核心基类，是 [TC
 	const std::string& serviceName() const;
 
 返回集群全称。
+
+**注意**：集群全称：对于一级集群，即集群名称；对于二级集群，即“集群名称@分组名称”。
