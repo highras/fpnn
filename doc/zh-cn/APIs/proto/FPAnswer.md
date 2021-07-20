@@ -14,29 +14,29 @@ FPAnswer 为 FPNN 协议的应答数据对象类型。为 [FPMessage](FPMessage.
 ### 关键定义
 
 	class FPAnswer: public FPMessage {
-		public:
-			enum {
-				FP_ST_OK				= 0,  
-				FP_ST_ERROR				= 1,  
-				FP_ST_HTTP_OK			= 200,  
-				FP_ST_HTTP_ERROR		= 500,  
-			};
-		public:
-			//called by FPWriter
-			FPAnswer(const FPQuestPtr quest);
-			FPAnswer(uint16_t status, const FPQuestPtr quest);
+	public:
+		enum {
+			FP_ST_OK				= 0,  
+			FP_ST_ERROR				= 1,  
+			FP_ST_HTTP_OK			= 200,  
+			FP_ST_HTTP_ERROR		= 500,  
+		};
+	public:
+		//called by FPWriter
+		FPAnswer(const FPQuestPtr quest);
+		FPAnswer(uint16_t status, const FPQuestPtr quest);
 
-			//create from raw data
-			FPAnswer(const Header& hdr, uint32_t seq, const std::string& payload);
-			FPAnswer(const char* data, size_t len);
-			FPAnswer(const std::string& data);
-			virtual ~FPAnswer();
+		//create from raw data
+		FPAnswer(const Header& hdr, uint32_t seq, const std::string& payload);
+		FPAnswer(const char* data, size_t len);
+		FPAnswer(const std::string& data);
+		virtual ~FPAnswer();
 
-			void setStatus(uint16_t status);
-			uint16_t status() const;
+		void setStatus(uint16_t status);
+		uint16_t status() const;
 
-			std::string* raw();
-			std::string info();
+		std::string* raw();
+		std::string info();
 	};
 
 	typedef std::shared_ptr<FPAnswer> FPAnswerPtr;
