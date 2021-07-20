@@ -382,7 +382,7 @@ FPNN 内置接口 `*infos` 被调用时，将调用该接口，并将该接口�
 
 * **`const FPReaderPtr args`**
 
-	非法请求所含数据的读取器。参见 [FPQReader](../proto/FPReader.me#FPQReader)。
+	非法请求所含数据的读取器。参见 [FPQReader](../proto/FPReader.md#FPQReader)。
 
 * **`const FPQuestPtr quest`**
 
@@ -442,7 +442,7 @@ FPNN 内置接口 `*infos` 被调用时，将调用该接口，并将该接口�
 
 * **`const FPReaderPtr`**
 
-	Server Push 请求所含数据的读取器。参见 [FPQReader](../proto/FPReader.me#FPQReader)。
+	Server Push 请求所含数据的读取器。参见 [FPQReader](../proto/FPReader.md#FPQReader)。
 
 * **`const FPQuestPtr`**
 
