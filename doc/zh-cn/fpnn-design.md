@@ -179,7 +179,7 @@
 
 1. **取消 service 层次**
 
-	某些 RPC 框架，在一个服务进层中，可能会出现一个 service 层次。service 下面的 servant 再提供接口实现。
+	某些 RPC 框架，在一个服务进程中，可能会出现一个 service 层次。service 下面的 servant 再提供接口实现。
 
 	好比：
 
