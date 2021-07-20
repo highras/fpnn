@@ -431,10 +431,10 @@ FPReader 为 FPQReader 和 FPAReader 的基类。提供随机读取 FPNN 协议�
 
 **返回值**
 
-	| 返回值 | 含义 |
-	|-------|-----|
-	| true | 提取 & 转换成功 |
-	| false | 提取 & 转换失败（实际不会发生，而是抛出[FPNN 异常][FPNNError]） |
+| 返回值 | 含义 |
+|-------|-----|
+| true | 提取 & 转换成功 |
+| false | 提取 & 转换失败（实际不会发生，而是抛出[FPNN 异常][FPNNError]） |
 
 ##### convert
 
