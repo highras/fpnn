@@ -526,7 +526,7 @@ HTTP 访问结果。
 
 **注意**
 
-+ 批量提交分为两步，在 addToBatch（批量添加异步 HTTP 访问请求）后，需要提交批量请求（commitBatch），请参见 [commitBatch](#commitBatch)。
++ 批量提交分为两步，在 [addToBatch](#addToBatch)（批量添加异步 HTTP 访问请求）后，才能调用该接口，提交批量请求。
 + 批量提交不能跨线程操作。
 
 ##### status
