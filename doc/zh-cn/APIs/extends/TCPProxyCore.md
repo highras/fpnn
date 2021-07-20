@@ -4,7 +4,7 @@
 
 Proxy 为服务集群的代理对象，内部包含一组 [Client](../core/Client.md)，对应着该集群内部具体的服务进程。
 
-TCPProxyCore 为 TCP Proxy 的核心基类，内部含有的 Client 为 [TCPClient](../CORE/TCPClient.md)。
+TCPProxyCore 为 TCP Proxy 的核心基类，内部含有的 Client 为 [TCPClient](../core/TCPClient.md)。
 
 ### 命名空间
 
