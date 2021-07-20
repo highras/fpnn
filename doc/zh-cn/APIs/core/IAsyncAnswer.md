@@ -33,7 +33,7 @@
 
 ### 构造函数
 
-IAsyncAnswer 的实现被隐藏，因此无法直接创建 IAsyncAnswer 实例，必须通过 [IQuestProcessor](IQuestProcessor.md#genAsyncAnswer) 的 [genAsyncAnswer](IQuestProcessor.md#genAsyncAnswer) 接口生成。
+IAsyncAnswer 的实现被隐藏，因此无法直接创建 IAsyncAnswer 实例，必须通过 [IQuestProcessor](IQuestProcessor.md) 的 [genAsyncAnswer](IQuestProcessor.md#genAsyncAnswer) 接口生成。
 
 ### 成员函数
 
