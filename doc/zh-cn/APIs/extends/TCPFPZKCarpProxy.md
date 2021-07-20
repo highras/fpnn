@@ -82,7 +82,7 @@ TCPCarpProxy 是以一致性哈希为访问方式，与 FPZK 服务联动的 TCP
 	TCPClientPtr getClient(int64_t key, bool connect);
 	TCPClientPtr getClient(const std::string& key, bool connect);
 
-获取特定的 [TCPClient](../CORE/TCPClient.md)。
+获取特定的 [TCPClient][]。
 
 **参数说明**
 
@@ -96,7 +96,7 @@ TCPCarpProxy 是以一致性哈希为访问方式，与 FPZK 服务联动的 TCP
 
 * **`bool connect`**
 
-	返回的 [TCPClient](../CORE/TCPClient.md) 是否必须是处于已连接的状态。
+	返回的 [TCPClient][] 是否必须是处于已连接的状态。
 
 ##### getClients
 
@@ -107,7 +107,7 @@ TCPCarpProxy 是以一致性哈希为访问方式，与 FPZK 服务联动的 TCP
 	bool getClients(const std::vector<int64_t>& keys, bool connect, std::map<TCPClientPtr, std::set<int64_t>>& result);
 	bool getClients(const std::vector<std::string>& keys, bool connect, std::map<TCPClientPtr, std::set<std::string>>& result);
 
-获取指定特征的服务对应的 [TCPClient](../CORE/TCPClient.md)。
+获取指定特征的服务对应的 [TCPClient][]。
 
 **参数说明**
 
@@ -117,11 +117,11 @@ TCPCarpProxy 是以一致性哈希为访问方式，与 FPZK 服务联动的 TCP
 
 * **`bool connect`**
 
-	返回的 [TCPClient](../CORE/TCPClient.md) 是否必须是处于已连接的状态。
+	返回的 [TCPClient][] 是否必须是处于已连接的状态。
 
 * **`std::map<TCPClientPtr, std::set<int64_t>>& result`**&**`std::map<TCPClientPtr, std::vector<int64_t>>& result`**
 
-	获取到的 [TCPClient](../CORE/TCPClient.md) 和其对应的哈希特征集合。
+	获取到的 [TCPClient][] 和其对应的哈希特征集合。
 
 **返值**
 
@@ -131,7 +131,7 @@ true 表示成功，false 表示空集，或者无数据。
 
 	bool connectAll();
 
-使集群所有服务对应的 [TCPClient](../CORE/TCPClient.md) 进入已连接状态。
+使集群所有服务对应的 [TCPClient][] 进入已连接状态。
 
 ##### SendQuest
 
@@ -205,20 +205,22 @@ true 表示成功，false 表示空集，或者无数据。
 
 	std::map<std::string, TCPClientPtr> getAllClients();
 
-获取当前**已创建**的有效的 [TCPClient](../CORE/TCPClient.md) 集合。
+获取当前**已创建**的有效的 [TCPClient][] 集合。
 
 **注意**
 
 + 该接口为特定目的使用。
-+ 此时获取到的 [TCPClient](../CORE/TCPClient.md) 仅为被访问过的服务对应的 [TCPClient](../CORE/TCPClient.md) 的集合，而**非全部**服务实例对应的 [TCPClient](../CORE/TCPClient.md) 的集合。若须获取全部服务实例对应的 [TCPClient](../CORE/TCPClient.md) 的集合，须前置调用 [connectAll](#connectAll) 方法，强制初始化所有服务实例对应的 [TCPClient](../CORE/TCPClient.md)。
++ 此时获取到的 [TCPClient][] 仅为被访问过的服务对应的 [TCPClient][] 的集合，而**非全部**服务实例对应的 [TCPClient][] 的集合。若须获取全部服务实例对应的 [TCPClient][] 的集合，须前置调用 [connectAll](#connectAll) 方法，强制初始化所有服务实例对应的 [TCPClient][。
 
 ##### count
 
 	size_t count();
 
-获取当前**已创建**的有效的 [TCPClient](../CORE/TCPClient.md) 的数量。
+获取当前**已创建**的有效的 [TCPClient][] 的数量。
 
 **注意**
 
 + 该接口为特定目的使用。
 + 该接口等价于获取已访问过的服务实例的数量，而非全部服务实例的数量。
+
+[TCPClient]: ../core/TCPClient.md

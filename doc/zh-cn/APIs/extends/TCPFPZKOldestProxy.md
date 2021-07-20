@@ -77,13 +77,13 @@ TCPFPZKOldestProxy 是与 FPZK 服务联动的，以仅能访问在 FPZK 系统�
 
 	TCPClientPtr getClient(bool connect);
 
-获取在 FPZK 系统中，注册时间最久的服务实例的 [TCPClient](../CORE/TCPClient.md)。
+获取在 FPZK 系统中，注册时间最久的服务实例的 [TCPClient](../core/TCPClient.md)。
 
 **参数说明**
 
 * **`bool connect`**
 
-	返回的 [TCPClient](../CORE/TCPClient.md) 是否必须是处于已连接的状态。
+	返回的 [TCPClient](../core/TCPClient.md) 是否必须是处于已连接的状态。
 
 ##### sendQuest
 

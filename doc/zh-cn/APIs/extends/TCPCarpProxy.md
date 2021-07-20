@@ -59,7 +59,7 @@ TCPCarpProxy 是以一致性哈希为访问方式的 TCP 集群代理对象，�
 	TCPClientPtr getClient(int64_t key, bool connect);
 	TCPClientPtr getClient(const std::string& key, bool connect);
 
-获取特定的 [TCPClient](../CORE/TCPClient.md)。
+获取特定的 [TCPClient](../core/TCPClient.md)。
 
 **参数说明**
 
@@ -73,7 +73,7 @@ TCPCarpProxy 是以一致性哈希为访问方式的 TCP 集群代理对象，�
 
 * **`bool connect`**
 
-	返回的 [TCPClient](../CORE/TCPClient.md) 是否必须是处于已连接的状态。
+	返回的 [TCPClient](../core/TCPClient.md) 是否必须是处于已连接的状态。
 
 ##### sendQuest
 

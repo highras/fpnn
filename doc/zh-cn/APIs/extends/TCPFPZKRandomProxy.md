@@ -61,13 +61,13 @@ TCPFPZKRandomProxy 是以随机访问为访问方式，与 FPZK 服务联动的 
 
 	TCPClientPtr getClient(bool connect);
 
-随机选择集群中的一个服务实例，并获取其对应的 [TCPClient](../CORE/TCPClient.md)。
+随机选择集群中的一个服务实例，并获取其对应的 [TCPClient](../core/TCPClient.md)。
 
 **参数说明**
 
 * **`bool connect`**
 
-	返回的 [TCPClient](../CORE/TCPClient.md) 是否必须是处于已连接的状态。
+	返回的 [TCPClient](../core/TCPClient.md) 是否必须是处于已连接的状态。
 
 ##### sendQuest
 

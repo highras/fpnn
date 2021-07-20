@@ -61,13 +61,13 @@ TCPFPZKRotatoryProxy 是以轮询为访问方式，与 FPZK 服务联动的 TCP 
 
 	TCPClientPtr getClient(bool connect);
 
-获取特定的 [TCPClient](../CORE/TCPClient.md)。
+获取特定的 [TCPClient](../core/TCPClient.md)。
 
 **参数说明**
 
 * **`bool connect`**
 
-	返回的 [TCPClient](../CORE/TCPClient.md) 是否必须是处于已连接的状态。
+	返回的 [TCPClient](../core/TCPClient.md) 是否必须是处于已连接的状态。
 
 ##### sendQuest
 

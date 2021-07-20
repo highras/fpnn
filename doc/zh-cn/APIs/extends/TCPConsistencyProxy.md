@@ -86,7 +86,7 @@ TCPConsistencyProxy 默认所有服务实例对同一请求的正常响应完全
 
 	TCPClientPtr getClient(const std::string& endpoint, bool connect);
 
-获取集群中指定 endpint 对应的 [TCPClient](../CORE/TCPClient.md)。
+获取集群中指定 endpint 对应的 [TCPClient](../core/TCPClient.md)。
 
 **参数说明**
 
@@ -96,7 +96,7 @@ TCPConsistencyProxy 默认所有服务实例对同一请求的正常响应完全
 
 * **`bool connect`**
 
-	返回的 [TCPClient](../CORE/TCPClient.md) 是否必须是处于已连接的状态。
+	返回的 [TCPClient](../core/TCPClient.md) 是否必须是处于已连接的状态。
 
 ##### sendQuest
 
