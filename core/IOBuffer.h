@@ -117,7 +117,7 @@ namespace fpnn
 			if (_encryptor)
 				delete _encryptor;
 		}
-
+		
 		inline void setMutex(std::mutex* mutex) { _mutex = mutex; }
 
 		/** returned INT: id 0, success, else, is errno. */
