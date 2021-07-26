@@ -157,7 +157,7 @@ public:
 
 	bool operator() (const int& a, const int&b) const
 	{
-		if (a & 0x11 == b & 0x11)
+		if ((a & 0x11) == (b & 0x11))
 		return false;
 
 		return a < b;
