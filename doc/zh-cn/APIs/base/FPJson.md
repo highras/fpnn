@@ -842,7 +842,7 @@ want 系列，如果目标节点不存在，或者类型不匹配，则抛出 [F
 		template <class T, class Hash = std::hash<std::string>, class Pred = std::equal_to<std::string>, class Alloc = std::allocator<std::pair<const std::string, T> > >
 		std::unordered_map<std::string, T, Hash, Pred, Alloc> getUnorderedDict(const std::string& path, const std::unordered_map<std::string, T, Hash, Pred, Alloc>& dft = std::unordered_map<std::string, T, Hash, Pred, Alloc>(), const std::string& delim = "./");
 
-**参数说明**
+	**参数说明**
 
 	* **`bool compatibleMode`**
 
