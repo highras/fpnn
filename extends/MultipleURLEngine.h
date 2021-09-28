@@ -257,9 +257,15 @@ private:
 	class Executor
 	{
 	private:
+#ifdef __APPLE__
+		int _kqueue_fd;
+		int _max_events;
+		struct kevent* _kqueueEvents;
+#else
 		int _epoll_fd;
 		int _max_events;
 		struct epoll_event* _epollEvents;
+#endif
 		int _eventNotifyFds[2];
 		int _waitMilliseconds;
 		int _concurrentCount;
@@ -283,8 +289,13 @@ private:
 
 	private:
 		void execute_thread();
+#ifdef __APPLE__
+		bool initKqueue();
+		void stopKqueue();
+#else
 		bool initEpoll();
 		void stopEpoll();
+#endif
 		bool start();
 		void clean();
 		void cleanTaskQueue();
@@ -301,7 +312,11 @@ private:
 		static size_t writeCallback(char *ptr, size_t size, size_t nmemb, void *userdata);
 
 		Executor(int concurrentCount, TaskThreadPool* taskPool):
+#ifdef __APPLE__
+			_kqueue_fd(0), _max_events(1000), _kqueueEvents(0), _waitMilliseconds(500),
+#else
 			_epoll_fd(0), _max_events(1000), _epollEvents(0), _waitMilliseconds(500),
+#endif
 			_concurrentCount(concurrentCount), _immediateCall(false), _load(0), _queueSize(0),
 			_running(false), _busy(false), _multi(0), _taskPool(taskPool)
 		{

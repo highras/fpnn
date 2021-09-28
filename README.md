@@ -157,6 +157,7 @@ RPC框架也一样。
 	| CentOS 7 | GCC/G++ 4.8.5 |
 	| CentOS 8 | GCC/G++ 8 |
 	| Ubuntu 20 | GCC/G++ 9 |
+	| MacOS 11.5 | XCode/Apple clang 12 |
 
 1. 第三方库依赖
 

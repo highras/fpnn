@@ -53,12 +53,14 @@ namespace fpnn
 
 	class UDPQuestSender: public QuestSender
 	{
-		ConnectionInfoPtr _connInfo;
+		int _socket;
+		uint64_t _token;
+		std::mutex* _mutex;
 		IConcurrentUDPSender* _concurrentSender;
 
 	public:
-		UDPQuestSender(IConcurrentUDPSender* concurrentSender, ConnectionInfoPtr ci):
-			_connInfo(ci), _concurrentSender(concurrentSender) {}
+		UDPQuestSender(IConcurrentUDPSender* concurrentSender, const ConnectionInfo& ci, std::mutex* mutex):
+			_socket(ci.socket), _token(ci.token), _mutex(mutex), _concurrentSender(concurrentSender) {}
 
 		virtual ~UDPQuestSender() {}
 		/**
@@ -85,29 +87,29 @@ namespace fpnn
 		{
 			if (_concurrentSender)
 			{
-				return _concurrentSender->sendQuest(_connInfo->socket, _connInfo->token, quest, timeoutMsec, discardable);
+				return _concurrentSender->sendQuest(_socket, _token, quest, timeoutMsec, discardable);
 			}
 			else
-				return ClientEngine::instance()->sendQuest(_connInfo->socket, _connInfo->token, _connInfo->_mutex, quest, timeoutMsec, discardable);
+				return ClientEngine::instance()->sendQuest(_socket, _token, _mutex, quest, timeoutMsec, discardable);
 		}
 		virtual bool sendQuestEx(FPQuestPtr quest, AnswerCallback* callback, bool discardable, int timeoutMsec = 0)
 		{
 			if (_concurrentSender)
 			{
-				return _concurrentSender->sendQuest(_connInfo->socket, _connInfo->token, quest, callback, timeoutMsec, discardable);
+				return _concurrentSender->sendQuest(_socket, _token, quest, callback, timeoutMsec, discardable);
 			}
 			else
-				return ClientEngine::instance()->sendQuest(_connInfo->socket, _connInfo->token, quest, callback, timeoutMsec, discardable);
+				return ClientEngine::instance()->sendQuest(_socket, _token, quest, callback, timeoutMsec, discardable);
 			
 		}
 		virtual bool sendQuestEx(FPQuestPtr quest, std::function<void (FPAnswerPtr answer, int errorCode)> task, bool discardable, int timeoutMsec = 0)
 		{
 			if (_concurrentSender)
 			{
-				return _concurrentSender->sendQuest(_connInfo->socket, _connInfo->token, quest, std::move(task), timeoutMsec, discardable);
+				return _concurrentSender->sendQuest(_socket, _token, quest, std::move(task), timeoutMsec, discardable);
 			}
 			else
-				return ClientEngine::instance()->sendQuest(_connInfo->socket, _connInfo->token, quest, std::move(task), timeoutMsec, discardable);
+				return ClientEngine::instance()->sendQuest(_socket, _token, quest, std::move(task), timeoutMsec, discardable);
 		}
 	};
 }

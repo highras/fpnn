@@ -413,8 +413,6 @@ RETURN VALUE:
 ===========================================================================*/
 void MemoryPool::clean()
 {
-	std::lock_guard<std::mutex> lck (_mutex);
-
 	MemoryData*		node = NULL;
 	while (_recycleLink)
 	{
@@ -567,7 +565,7 @@ PARAMETERS:
 RETURN VALUE:
    None
 ===========================================================================*/
-inline void MemoryPool::status(MemoryPoolStatus& mps)
+void MemoryPool::status(MemoryPoolStatus& mps)
 {
 	if (_inited)
 	{

@@ -9,7 +9,7 @@ namespace ErrorInfo
 {
 	const int errorBase = 20000 * 10;
 
-	const int UnknownError = errorBase + 0;
+	//const int UnknownError = errorBase + 0;
 	const int ActionMethodNotFound = errorBase + 1;
 	const int InvalidParameters = errorBase + 2;
 }

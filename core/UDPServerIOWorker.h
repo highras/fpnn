@@ -78,7 +78,11 @@ namespace fpnn
 		std::list<FPQuestPtr> _questCache;
 
 	public:
+#ifdef __APPLE__
+		int kqueuefd;
+#else
 		int epollfd;
+#endif
 		int64_t sendingTurn;					//-- Only operated by UDPServerConnectionMap.
 		volatile bool firstSchedule;
 		volatile bool connectedEventCalled;
@@ -121,8 +125,10 @@ namespace fpnn
 
 		inline void markActiveCloseSignal() { _ioBuffer.markActiveCloseSignal(); }
 		inline void requireClose() { _requireClose = true; }
-		inline bool isRequireClose() { return (_ioBuffer.isRequireClose() || _requireClose); }
-		inline bool invalid() { return _ioBuffer.isTransmissionStopped() ? true : _ioBuffer.invalidSession(); }
+		inline bool isRequireClose()
+		{
+			return ((_ioBuffer.isRequireClose() || _requireClose) ? true : _ioBuffer.isTransmissionStopped());
+		}
 
 		void extractTimeoutedCallback(int64_t now, std::unordered_map<uint32_t, BasicAnswerCallback*>& timeoutedCallbacks);
 		inline void swapCallbackMap(std::unordered_map<uint32_t, BasicAnswerCallback*>& callbackMap)
@@ -180,7 +186,11 @@ namespace fpnn
 		// void insert(int socket, UDPServerConnection* conn);
 		void insert(const std::unordered_map<std::string, UDPServerConnection*>& cache);
 		UDPServerConnection* remove(int socket);
+#ifdef __APPLE__
+		UDPServerConnection* signConnection(int socket, uint16_t filter);
+#else
 		UDPServerConnection* signConnection(int socket, uint32_t events);
+#endif
 		void markAllConnectionsActiveCloseSignal();
 		bool markConnectionActiveCloseSignal(int socket);
 		void removeAllConnections(std::list<UDPServerConnection*>& connections);

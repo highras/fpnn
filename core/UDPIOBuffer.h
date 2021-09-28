@@ -311,7 +311,7 @@ namespace fpnn
 	private:
 
 		int _resentCount;
-		int _unaIncludeIndex;
+		//int _unaIncludeIndex;
 		int64_t _lastUrgentMsec;
 
 		uint8_t genChecksum(uint32_t udpSeqBE);
@@ -324,7 +324,7 @@ namespace fpnn
 		void prepareUNASection();
 		void prepareAcksSection();
 		void prepareSingleDataSection(size_t availableSpace);
-		void prepareFirstSegmentedDataSection(size_t availableSpace);
+		bool prepareFirstSegmentedDataSection(size_t availableSpace);
 		bool prepareSegmentedDataSection(int sectionCount);
 		bool prepareDataSection(int sectionCount);
 		bool prepareResentPackage_normalMode();
@@ -358,7 +358,6 @@ namespace fpnn
 		inline std::list<FPAnswerPtr>& getReceivedAnswerList() { return _parseResult.answerList; }
 
 		inline bool isRequireClose() { return _requireClose || _arqParser.invalidSession(); }
-		inline bool invalidSession() { return _arqParser.invalidSession(); }
 		bool isTransmissionStopped();
 		void enableKeepAlive();
 		void setUntransmittedSeconds(int untransmittedSeconds);

@@ -42,7 +42,7 @@ class UDPTestProcessor: public IQuestProcessor
 
 	void startX(const FPReaderPtr args, int64_t taskId);
 
-	FPAnswerPtr start(const FPReaderPtr args, const FPQuestPtr quest, const ConnectionInfo& ci);
+	FPAnswerPtr startTest(const FPReaderPtr args, const FPQuestPtr quest, const ConnectionInfo& ci);
 	FPAnswerPtr test(const FPReaderPtr args, const FPQuestPtr quest, const ConnectionInfo& ci);
 	FPAnswerPtr query(const FPReaderPtr args, const FPQuestPtr quest, const ConnectionInfo& ci);
 
@@ -50,7 +50,7 @@ public:
 
 	UDPTestProcessor()
 	{
-		registerMethod("start", &UDPTestProcessor::start);
+		registerMethod("start", &UDPTestProcessor::startTest);
 		registerMethod("test", &UDPTestProcessor::test);
 		registerMethod("query", &UDPTestProcessor::query);
 	}

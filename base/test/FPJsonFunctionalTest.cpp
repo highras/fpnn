@@ -16,7 +16,9 @@ void assignSignleElement()
 		b.setBool(200);   cout<<"Json must be true: ["<<b<<"]\n";
 		b.setBool(-1);   cout<<"Json must be true: ["<<b<<"]\n";
 		b.setBool(0);   cout<<"Json must be false: ["<<b<<"]\n";
+#ifndef __APPLE__
 		b.setBool(NULL);   cout<<"Json must be false: ["<<b<<"]\n";
+#endif
 
 		i.setInt(232);   cout<<"Json must be 232: ["<<i<<"]\n";
 		i.setInt(0);   cout<<"Json must be 0: ["<<i<<"]\n";

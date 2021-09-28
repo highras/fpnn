@@ -1,4 +1,8 @@
-#include <sys/sysinfo.h>
+#ifdef __APPLE__
+	#include <unistd.h>
+#else
+	#include <sys/sysinfo.h>
+#endif
 #include "GlobalIOPool.h"
 
 using namespace fpnn;
@@ -38,7 +42,12 @@ GlobalIOPoolPtr GlobalIOPool::instance()
 
 GlobalIOPool::GlobalIOPool()
 {
+#ifdef __APPLE__
+	int cpuCount = (int)sysconf(_SC_NPROCESSORS_ONLN);
+#else
 	int cpuCount = get_nprocs();
+#endif
+	
 	if (cpuCount < 2)
 		cpuCount = 2;
 

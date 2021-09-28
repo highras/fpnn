@@ -561,7 +561,7 @@ strMPS [in] - The memory blocks counters unit.
 RETURN VALUE:
 None
 ===========================================================================*/
-inline void UnlockedMemoryPool::status(MemoryPoolStatus& mps)
+void UnlockedMemoryPool::status(MemoryPoolStatus& mps)
 {
 	if (_inited)
 	{

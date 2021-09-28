@@ -25,7 +25,7 @@ namespace fpnn
 
 	class ConnectionReclaimer
 	{
-		static std::mutex _mutex;
+		std::mutex _mutex;
 		std::condition_variable _condition;
 		std::thread _reclaimer;
 		std::atomic<bool> _running;

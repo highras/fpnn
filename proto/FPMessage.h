@@ -9,7 +9,11 @@
 #include <memory>
 #include <atomic>
 #include <msgpack.hpp>
-#include <endian.h>
+#ifdef __APPLE__
+	#include "Endian.h"
+#else
+	#include <endian.h>
+#endif
 #include "FpnnError.h"
 #include "FPLog.h"
 #include "msec.h"

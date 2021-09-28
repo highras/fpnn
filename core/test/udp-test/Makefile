@@ -11,5 +11,6 @@ all: $(EXES_STRESS)
 
 clean:
 	$(RM) *.o $(EXES_STRESS)
+	-$(RM) -rf *.dSYM
 
 include ../../../def.mk

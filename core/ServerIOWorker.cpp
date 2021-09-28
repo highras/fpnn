@@ -1,3 +1,8 @@
+#ifdef __APPLE__
+	#include <sys/types.h>
+	#include <sys/event.h>
+	#include <sys/time.h>
+#endif
 #include <errno.h>
 #include "FPLog.h"
 #include "Config.h"
@@ -9,6 +14,68 @@
 
 using namespace fpnn;
 
+#ifdef __APPLE__
+bool TCPServerConnection::joinEpoll()
+{
+	if (_joined)
+		return true;
+
+	struct kevent ev;
+	EV_SET(&ev, _connectionInfo->socket, EVFILT_READ, EV_ADD | EV_CLEAR | EV_ONESHOT, 0, 0, NULL);
+
+	if (kevent(_kqueue_fd, &ev, 1, NULL, 0, NULL) == -1)
+	{
+		LOG_INFO("Socket join event failed. Socket: %d, address: %s, errno: %d", _connectionInfo->socket, NetworkUtil::getPeerName(_connectionInfo->socket).c_str(), errno);
+		return false;
+	}
+	
+	_joined = true;
+	return true;
+}
+
+bool TCPServerConnection::waitForAllEvents()
+{
+	int16_t filter = (_disposable == false) ? (EVFILT_READ | EVFILT_WRITE) : EVFILT_WRITE;
+
+	struct kevent ev;
+	EV_SET(&ev, _connectionInfo->socket, filter, EV_ADD | EV_CLEAR | EV_ONESHOT, 0, 0, NULL);
+
+	if (kevent(_kqueue_fd, &ev, 1, NULL, 0, NULL) == -1)
+	{
+		LOG_INFO("Server wait socket event failed. Socket: %d, address: %s, errno: %d", _connectionInfo->socket, NetworkUtil::getPeerName(_connectionInfo->socket).c_str(), errno);
+		return false;
+	}
+	else
+		return true;
+}
+bool TCPServerConnection::waitForRecvEvent()
+{
+	int16_t filter = (_disposable == false) ? EVFILT_READ : EVFILT_WRITE;
+
+	struct kevent ev;
+	EV_SET(&ev, _connectionInfo->socket, filter, EV_ADD | EV_CLEAR | EV_ONESHOT, 0, 0, NULL);
+
+	if (kevent(_kqueue_fd, &ev, 1, NULL, 0, NULL) == -1)
+	{
+		LOG_INFO("Server wait socket event failed. Socket: %d, address: %s, errno: %d", _connectionInfo->socket, NetworkUtil::getPeerName(_connectionInfo->socket).c_str(), errno);
+		return false;
+	}
+	else
+		return true;
+}
+
+void TCPServerConnection::exitEpoll()
+{
+	if (!_joined)
+		return;
+
+	struct kevent ev;
+	EV_SET(&ev, _connectionInfo->socket, EVFILT_READ | EVFILT_WRITE, EV_DELETE, 0, 0, NULL);
+
+	kevent(_kqueue_fd, &ev, 1, NULL, 0, NULL);
+	_joined = false;
+}
+#else
 bool TCPServerConnection::joinEpoll()
 {
 	if (_joined)
@@ -25,7 +92,6 @@ bool TCPServerConnection::joinEpoll()
 	_joined = true;
 	return true;
 }
-
 
 bool TCPServerConnection::waitForAllEvents()
 {
@@ -77,6 +143,7 @@ void TCPServerConnection::exitEpoll()
 	epoll_ctl(_epoll_fd, EPOLL_CTL_DEL, _connectionInfo->socket, &ev);
 	_joined = false;
 }
+#endif
 
 bool TCPServerIOWorker::read(TCPServerConnection * connection, bool& additionalSend)
 {

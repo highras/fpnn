@@ -1,4 +1,8 @@
-#include <endian.h>
+#ifdef __APPLE__
+	#include "Endian.h"
+#else
+	#include <endian.h>
+#endif
 #include "FPLog.h"
 #include "Config.h"
 #include "Decoder.h"

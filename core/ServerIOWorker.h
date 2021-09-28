@@ -2,7 +2,9 @@
 #define FPNN_Server_IO_Worker_H
 
 #include <unistd.h>
-#include <sys/epoll.h>
+#ifndef __APPLE__
+	#include <sys/epoll.h>
+#endif
 #include <atomic>
 #include <string>
 #include <queue>
@@ -30,7 +32,11 @@ namespace fpnn
 	class TCPServerConnection: public TCPBasicConnection
 	{
 	private:
+#ifdef __APPLE__
+		int _kqueue_fd;
+#else
 		int _epoll_fd;
+#endif
 		bool _joined;
 
 	public:
@@ -65,9 +71,13 @@ namespace fpnn
 			_sendBuffer.stopAppendData();
 			send(needWaitSendEvent);
 		}
-
+#ifdef __APPLE__
+		TCPServerConnection(int kqueuefd, std::mutex* mutex, int ioChunkSize, ConnectionInfoPtr connectionInfo):
+			TCPBasicConnection(mutex, ioChunkSize, connectionInfo), _kqueue_fd(kqueuefd), _joined(false), _disposable(false), _requireClose(false)
+#else
 		TCPServerConnection(int epollfd, std::mutex* mutex, int ioChunkSize, ConnectionInfoPtr connectionInfo):
 			TCPBasicConnection(mutex, ioChunkSize, connectionInfo), _epoll_fd(epollfd), _joined(false), _disposable(false), _requireClose(false)
+#endif
 		{
 			_connectionInfo->token = (uint64_t)this; //-- if using Virtual Derive, must do this. Else, this is just redo the action in base class.
 		}

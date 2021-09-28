@@ -36,8 +36,7 @@ namespace fpnn
 		inline IQuestProcessorPtr questProcessor() { return _questProcessor; }
 
 		inline void enableKeepAlive() { _ioBuffer.enableKeepAlive(); }
-		inline bool isRequireClose() { return _ioBuffer.isRequireClose(); }
-		inline bool invalid() { return _ioBuffer.isTransmissionStopped() ? true : _ioBuffer.invalidSession(); }
+		inline bool isRequireClose() { return (_ioBuffer.isRequireClose() ? true : _ioBuffer.isTransmissionStopped()); }
 		inline void setUntransmittedSeconds(int untransmittedSeconds) { _ioBuffer.setUntransmittedSeconds(untransmittedSeconds); }
 		void sendCachedData(bool& needWaitSendEvent, bool socketReady = false);
 		void sendData(bool& needWaitSendEvent, std::string* data, int64_t expiredMS, bool discardable);

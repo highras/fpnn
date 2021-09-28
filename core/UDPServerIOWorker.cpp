@@ -99,12 +99,19 @@ bool UDPServerReceiver::recvIPv6(int socket)
 //=================================================================//
 bool UDPServerConnection::waitForAllEvents()
 {
+#ifdef __APPLE__
+	struct kevent ev;
+	EV_SET(&ev, _connectionInfo->socket, EVFILT_READ | EVFILT_WRITE, EV_ADD | EV_CLEAR | EV_ONESHOT, 0, 0, NULL);
+
+	if (kevent(kqueuefd, &ev, 1, NULL, 0, NULL) == -1)
+#else
 	struct epoll_event	ev;
 
 	ev.data.fd = _connectionInfo->socket;
 	ev.events = EPOLLIN | EPOLLOUT | EPOLLERR | EPOLLHUP | EPOLLET | EPOLLRDHUP | EPOLLONESHOT;
 
 	if (epoll_ctl(epollfd, EPOLL_CTL_MOD, _connectionInfo->socket, &ev) != 0)
+#endif
 	{
 		if (errno == ENOENT)
 			return false;
@@ -378,6 +385,25 @@ UDPServerConnection* UDPServerConnectionMap::remove(int socket)
 		return NULL;
 }
 
+#ifdef __APPLE__
+UDPServerConnection* UDPServerConnectionMap::signConnection(int socket, uint16_t filter)
+{
+	std::unique_lock<std::mutex> lck(_mutex);
+	auto it = _connections.find(socket);
+	if (it != _connections.end())
+	{
+		if (filter & EVFILT_READ)
+			it->second->setNeedRecvFlag();
+		if (filter & EVFILT_WRITE)
+			it->second->setNeedSendFlag();
+
+		it->second->_refCount++;
+		return it->second;
+	}
+	else
+		return NULL;
+}
+#else
 UDPServerConnection* UDPServerConnectionMap::signConnection(int socket, uint32_t events)
 {
 	std::unique_lock<std::mutex> lck(_mutex);
@@ -395,6 +421,7 @@ UDPServerConnection* UDPServerConnectionMap::signConnection(int socket, uint32_t
 	else
 		return NULL;
 }
+#endif
 
 void UDPServerConnectionMap::markAllConnectionsActiveCloseSignal()
 {
@@ -457,7 +484,7 @@ void UDPServerConnectionMap::extractInvalidConnectionsAndCallbcks(std::list<UDPS
 
 	for (auto& pp: _connections)
 	{
-		if (pp.second->invalid() || pp.second->isRequireClose())
+		if (pp.second->isRequireClose())
 		{
 			invalidSockets.push_back(pp.first);
 			invalidConns.push_back(pp.second);

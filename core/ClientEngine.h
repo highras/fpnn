@@ -26,13 +26,21 @@ namespace fpnn
 	class ClientEngine: virtual public IConcurrentSender
 	{
 	private:
+#ifdef __APPLE__
+		int _kqueue_fd;
+#else
 		int _epoll_fd;
+#endif
 		static std::mutex _mutex;
 		std::atomic<bool> _running;
 		bool _started;		//-- void Client Engine restart. Client Engine only startup once.
 
 		int _max_events;
+#ifdef __APPLE__
+		struct kevent* _kqueueEvents;
+#else
 		struct epoll_event* _epollEvents;
+#endif
 
 		size_t _ioBufferChunkSize;
 		int _closeNotifyFds[2];
@@ -72,7 +80,11 @@ namespace fpnn
 		void stop();
 		void loopThread();
 
+#ifdef __APPLE__
+		void processEvent(struct kevent & event);
+#else
 		void processEvent(struct epoll_event & event);
+#endif
 		void sendCloseEvent();
 		void clean();
 
@@ -231,10 +243,17 @@ namespace fpnn
 		}
 
 		bool joinEpoll(BasicConnection* connection);
+#ifdef __APPLE__
+		bool waitForEvents(int16_t filter, const BasicConnection* connection);
+#else
 		bool waitForEvents(uint32_t baseEvent, const BasicConnection* connection);
+#endif
 		bool waitForRecvEvent(const BasicConnection* connection);
 		bool waitForAllEvents(const BasicConnection* connection);
 		void exitEpoll(const BasicConnection* connection);
+
+		inline bool joinKqueue(BasicConnection* connection) { return joinEpoll(connection); }
+		inline void exitKqueue(BasicConnection* connection) { exitEpoll(connection); }
 
 		inline static bool wakeUpQuestProcessThreadPool(std::shared_ptr<ITaskThreadPool::ITask> task)
 		{

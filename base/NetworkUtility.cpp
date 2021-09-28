@@ -118,25 +118,43 @@ bool fpnn::getIPAddress(const std::string& hostname, std::string& IPAddress, End
 	hints.ai_socktype = SOCK_STREAM;
 	hints.ai_protocol = IPPROTO_TCP;
 
+	bool checkIPv6 = false;
 	int errcode = getaddrinfo(hostname.c_str(), NULL, &hints, &res);
 	if (errcode == 0)
 	{
-		struct sockaddr_in *addr = (struct sockaddr_in *)res->ai_addr;
-		IPAddress = inet_ntoa(addr->sin_addr);
-		freeaddrinfo(res);
-		eType = ENDPOINT_TYPE_IP4;
-		return true;
+		if (res)
+		{
+			struct sockaddr_in *addr = (struct sockaddr_in *)res->ai_addr;
+			if (addr)
+			{
+				char buf[INET_ADDRSTRLEN];
+				const char *rev = inet_ntop(AF_INET, &(addr->sin_addr), buf, sizeof(buf));
+				if (rev)
+				{
+					IPAddress = buf;
+					freeaddrinfo(res);
+					eType = ENDPOINT_TYPE_IP4;
+					return true;
+				}
+			}
+			else
+				checkIPv6 = true;
+		}
+		else
+			checkIPv6 = true;
 	}
 
 	if (errcode == EAI_ADDRFAMILY || errcode == EAI_FAMILY || errcode == EAI_NODATA)
+		checkIPv6 = true;
+
+	if (res)
 	{
-		//-- Do nothing.
+		freeaddrinfo(res);
+		res = NULL;
 	}
-	else
-	{
-		if (res) freeaddrinfo(res);
+
+	if (!checkIPv6)
 		return false;
-	}
 
 	//-- IPv6 process
 
@@ -146,16 +164,21 @@ bool fpnn::getIPAddress(const std::string& hostname, std::string& IPAddress, End
 	errcode = getaddrinfo(hostname.c_str(), NULL, &hints, &res);
 	if (errcode == 0)
 	{
-		struct sockaddr_in6 *addr6 = (struct sockaddr_in6 *)res->ai_addr;
-
-		char buf[INET6_ADDRSTRLEN + 4];
-		const char *rev = inet_ntop(AF_INET6, &(addr6->sin6_addr), buf, sizeof(buf));
-		if (rev)
+		if (res)
 		{
-			IPAddress = buf;
-			freeaddrinfo(res);
-			eType = ENDPOINT_TYPE_IP6;
-			return true;
+			struct sockaddr_in6 *addr6 = (struct sockaddr_in6 *)res->ai_addr;
+			if (addr6)
+			{
+				char buf[INET6_ADDRSTRLEN + 4];
+				const char *rev = inet_ntop(AF_INET6, &(addr6->sin6_addr), buf, sizeof(buf));
+				if (rev)
+				{
+					IPAddress = buf;
+					freeaddrinfo(res);
+					eType = ENDPOINT_TYPE_IP6;
+					return true;
+				}
+			}
 		}
 	}
 

@@ -3,6 +3,11 @@
 
 #include <atomic>
 #include <string>
+#ifdef __APPLE__
+	#include <sys/types.h>
+	#include <sys/event.h>
+	#include <sys/time.h>
+#endif
 #include "Config.h"
 #include "ParamTemplateThreadPoolArray.h"
 #include "TaskThreadPoolArray.h"
@@ -49,10 +54,18 @@ namespace fpnn
 
 		int _socket;
 		int _socket6;
+#ifdef __APPLE__
+		int _kqueue_fd;
+#else
 		int _epoll_fd;
+#endif
 
 		const int _max_events;
+#ifdef __APPLE__
+		struct kevent* _kqueueEvents;
+#else
 		struct epoll_event* _epollEvents;
+#endif
 
 		std::atomic<bool> _running;
 		volatile bool _stopping;
@@ -88,7 +101,11 @@ namespace fpnn
 		bool init();
 		bool initIPv4();
 		bool initIPv6();
+#ifdef __APPLE__
+		bool initKqueue();
+#else
 		bool initEpoll();
+#endif
 		void exitEpoll(int socket);
 		const char* createSocket(int socketDomain, const struct sockaddr *addr, socklen_t addrlen, int& newSocket);
 		void initFailClean(const char* fail_info);
@@ -97,7 +114,11 @@ namespace fpnn
 		bool checkSourceAddress();
 		void newConnection(int newSocket, bool isIPv4);
 		void scheduleNewConnections();
+#ifdef __APPLE__
+		void processEvent(struct kevent & event);
+#else
 		void processEvent(struct epoll_event & event);
+#endif
 		void returnServerStoppingAnswer(UDPServerConnection* conn, FPQuestPtr quest);
 		void reclaimeConnection(UDPServerConnection* conn);
 		void clearConnectionQuestCallbacks(UDPServerConnection* conn, int errorCode);
@@ -108,8 +129,13 @@ namespace fpnn
 		bool sendQuestWithBasicAnswerCallback(int socket, uint64_t token, FPQuestPtr quest, BasicAnswerCallback* callback, int timeout, bool discardable);
 
 	private:
+#ifdef __APPLE__
+		UDPEpollServer(): _port(0), _port6(0), _socket(0), _socket6(0), _kqueue_fd(0), _max_events(16),
+			_kqueueEvents(NULL), _running(false), _stopping(false), _stopSignalNotified(false),
+#else
 		UDPEpollServer(): _port(0), _port6(0), _socket(0), _socket6(0), _epoll_fd(0), _max_events(16),
 			_epollEvents(NULL), _running(false), _stopping(false), _stopSignalNotified(false),
+#endif
 			_maxWorkerPoolQueueLength(FPNN_DEFAULT_UDP_WORK_POOL_QUEUE_SIZE),
 			_timeoutQuest(FPNN_DEFAULT_QUEST_TIMEOUT * 1000),
 			_serverMasterProcessor(new UDPServerMasterProcessor()), _enableIPWhiteList(false)
@@ -138,6 +164,10 @@ namespace fpnn
 		bool joinEpoll(int socket);
 		bool waitForAllEvents(int socket);
 		bool waitForRecvEvent(int socket);
+
+#ifdef __APPLE__
+		inline bool joinKqueue(int socket) { return joinEpoll(socket); }
+#endif
 
 	public:
 		virtual ~UDPEpollServer()

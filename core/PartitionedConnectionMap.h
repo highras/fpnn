@@ -5,7 +5,13 @@
 #include <set>
 #include <mutex>
 #include <vector>
-#include <sys/epoll.h>
+#ifdef __APPLE__
+	#include <sys/types.h>
+	#include <sys/event.h>
+	#include <sys/time.h>
+#else
+	#include <sys/epoll.h>
+#endif
 #include "HashMap.h"
 #include "FPMessage.h"
 #include "FPWriter.h"
@@ -152,7 +158,11 @@ namespace fpnn
 			_connections.remove(fd);
 		}
 
+#ifdef __APPLE__
+		BasicConnection* signConnection(int fd, uint16_t filter)
+#else
 		BasicConnection* signConnection(int fd, uint32_t events)
+#endif
 		{
 			BasicConnection* connection = NULL;
 			std::unique_lock<std::mutex> lck(_mutex);
@@ -161,10 +171,17 @@ namespace fpnn
 			{
 				connection = node->data;
 
+#ifdef __APPLE__
+				if (filter & EVFILT_READ)
+					connection->setNeedRecvFlag();
+				if (filter & EVFILT_WRITE)
+					connection->setNeedSendFlag();
+#else
 				if (events & EPOLLIN)
 					connection->setNeedRecvFlag();
 				if (events & EPOLLOUT)
 					connection->setNeedSendFlag();
+#endif
 
 				connection->_refCount++;
 			}
@@ -280,7 +297,7 @@ namespace fpnn
 					if (connection->connectionType() == BasicConnection::UDPClientConnectionType)
 					{
 						UDPClientConnection* conn = (UDPClientConnection*)connection;
-						if (conn->invalid() == false)
+						if (conn->isRequireClose() == false)
 						{
 							conn->_refCount++;
 							udpConnections.insert(conn);
@@ -385,11 +402,19 @@ namespace fpnn
 			_array[idx]->remove(fd);
 		}
 
+#ifdef __APPLE__
+		BasicConnection* signConnection(int fd, uint16_t filter)
+		{
+			int idx = fd % _count;
+			return _array[idx]->signConnection(fd, filter);
+		}
+#else
 		BasicConnection* signConnection(int fd, uint32_t events)
 		{
 			int idx = fd % _count;
 			return _array[idx]->signConnection(fd, events);
 		}
+#endif
 
 		void waitForEmpty()
 		{

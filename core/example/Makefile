@@ -17,4 +17,5 @@ all: $(EXES_TEST) $(EXES_TEST2) $(EXES_TEST3) $(EXES_CLIENT3)
 
 clean:
 	$(RM) *.o $(EXES_TEST) $(EXES_TEST2) $(EXES_TEST3) $(EXES_CLIENT3)
+	-$(RM) -rf *.dSYM
 include ../../def.mk

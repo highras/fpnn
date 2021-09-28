@@ -5,7 +5,7 @@
 
 using namespace fpnn;
 
-FPAnswerPtr UDPTestProcessor::start(const FPReaderPtr args, const FPQuestPtr quest, const ConnectionInfo& ci)
+FPAnswerPtr UDPTestProcessor::startTest(const FPReaderPtr args, const FPQuestPtr quest, const ConnectionInfo& ci)
 {
 	if (ci.isUDP())
 		return FpnnErrorAnswer(quest, 500000, "Muust called by TCP protocol.");

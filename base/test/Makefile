@@ -36,14 +36,21 @@ all:
 	g++ --std=c++11 -I.. -o $(EXE_HashSpeedTest) hashSpeedTest.cpp $(EXE_LIBS)
 	g++ --std=c++11 -I.. -o $(EXE_TwoTimeHashTest) twoTimeHashTest.cpp $(EXE_LIBS)
 	g++ --std=c++11 -I.. -o $(EXE_RijndaelDemo) rijndaelDemo.cpp $(EXE_LIBS)
+	
 	g++ -O2 -o queueListPerformanceTest_O2 queueListPerformanceTest.cpp $(EXE_LIBS)
+ifdef $(LINKARGS)
 	g++ -O2 -ltcmalloc -o queueListPerformanceTest_O2_tcmalloc queueListPerformanceTest.cpp $(EXE_LIBS)
+endif
 
 	g++ --std=c++11 -O2 -I.. -o ThreadPoolPerformanceTest_O2 ThreadPoolPerformanceTest.cpp $(EXE_LIBS)
+ifdef $(LINKARGS)
 	g++ --std=c++11 -O2 -ltcmalloc -I.. -o ThreadPoolPerformanceTest_O2_tcmalloc ThreadPoolPerformanceTest.cpp $(EXE_LIBS)
+endif
 
 	g++ --std=c++11 -O2 -o heapPerformanceTest_O2 heapPerformanceTest.cpp
+ifdef $(LINKARGS)
 	g++ --std=c++11 -O2 -ltcmalloc -o heapPerformanceTest_O2_tcmalloc heapPerformanceTest.cpp
+endif
 
 	g++ --std=c++11 -I.. -o $(EXES_JSONTEST) FPJsonParseTest.cpp -L.. -lfpbase
 	g++ --std=c++11 -I.. -o $(EXES_JSONFUNCTIONALTEST) FPJsonFunctionalTest.cpp -L.. -lfpbase

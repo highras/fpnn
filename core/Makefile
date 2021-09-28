@@ -20,6 +20,13 @@ CFLAGS +=
 CXXFLAGS +=
 CPPFLAGS += -I../base -I../proto -I../proto/msgpack -I../proto/rapidjson
 
+# For MacOS
+UNAME := $(shell uname -s)
+ifeq ($(UNAME), Darwin)
+	LIBFPNN_S_SO = 
+	LIBFPNN_X_SO = 
+endif
+
 all: $(LIBFPNN_A) $(LIBFPNN_S_SO) $(LIBFPNN_X_SO)
 
 test:

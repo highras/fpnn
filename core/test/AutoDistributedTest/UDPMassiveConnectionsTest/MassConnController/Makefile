@@ -17,5 +17,6 @@ all: $(EXES_SERVER) $(EXES_CLIENT)
 
 clean:
 	$(RM) $(EXES_SERVER) $(EXES_CLIENT) *.o
+	-$(RM) -rf *.dSYM
 
 include $(FPNN_DIR)/def.mk

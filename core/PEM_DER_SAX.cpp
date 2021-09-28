@@ -43,7 +43,7 @@ bool X690SAX::readLength(const char* buf, int len, int &valueOffset, ASN1Len& as
 	asn1Len.remainLenBlock = 0;
 	asn1Len.unknownLen = false;
 
-	if (buf[0] == 0x80)
+	if ((uint8_t)(buf[0]) == 0x80)
 	{
 		asn1Len.length = 0;
 		asn1Len.unknownLen = true;

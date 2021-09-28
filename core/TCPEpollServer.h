@@ -56,10 +56,18 @@ namespace fpnn
 		struct SocketInfo _sslIPv4;
 		struct SocketInfo _sslIPv6;
 		int _backlog;
+#ifdef __APPLE__
+		int _kqueue_fd;
+#else
 		int _epoll_fd;
+#endif
 
 		int _max_events;
+#ifdef __APPLE__
+		struct kevent* _kqueueEvents;
+#else
 		struct epoll_event* _epollEvents;
+#endif
 
 		std::atomic<bool> _running;
 		volatile bool _stopping;
@@ -101,11 +109,19 @@ namespace fpnn
 		bool							init();
 		bool							initIPv4(struct SocketInfo& info);
 		bool							initIPv6(struct SocketInfo& info);
+#ifdef __APPLE__
+		bool							initKqueue();
+#else
 		bool							initEpoll();
+#endif
 		void							acceptIPv4Connection(int socket, bool ssl);
 		void							acceptIPv6Connection(int socket, bool ssl);
 		void							newConnection(int newSocket, ConnectionInfoPtr ci);
+#ifdef __APPLE__
+		void							processEvent(struct kevent & event);
+#else
 		void							processEvent(struct epoll_event & event);
+#endif
 		void							cleanForNewConnectionError(TCPServerConnection*, RequestPackage*, const char* log_info, bool connectionInCache);
 		void							cleanForExistConnectionError(TCPServerConnection*, RequestPackage*, const char* log_info);
 		void							initFailClean(const char* fail_info);
@@ -115,9 +131,15 @@ namespace fpnn
 
 	private:
 		TCPEpollServer()
+#ifdef __APPLE__
+			: _backlog(FPNN_DEFAULT_SOCKET_BACKLOG), _kqueue_fd(0), 
+			_max_events(FPNN_DEFAULT_MAX_EVENT), 
+			_kqueueEvents(NULL), _running(false), _stopping(false), _stopSignalNotified(false), _connectionCount(0),
+#else
 			: _backlog(FPNN_DEFAULT_SOCKET_BACKLOG), _epoll_fd(0), 
 			_max_events(FPNN_DEFAULT_MAX_EVENT), 
 			_epollEvents(NULL), _running(false), _stopping(false), _stopSignalNotified(false), _connectionCount(0),
+#endif
 			_ioBufferChunkSize(FPNN_DEFAULT_IO_BUFFER_CHUNK_SIZE),
 			_maxWorkerPoolQueueLength(FPNN_DEFAULT_WORK_POOL_QUEUE_SIZE),
 			_maxConnections(FPNN_DEFAULT_MAX_CONNECTION), _checkQuestTimeout(false),

@@ -21,6 +21,7 @@ all: $(EXES_CLIENT2) $(EXES_CMD) $(EXES_CLIENT) $(EXES_CMD_INFOS) $(EXES_CMD_STA
 
 clean:
 	$(RM) *.o $(EXES_CLIENT2) $(EXES_CMD) $(EXES_CLIENT) $(EXES_CMD_INFOS) $(EXES_CMD_STATUS) $(EXES_CMD_TUNE)
+	-$(RM) -rf *.dSYM
 
 cleankey:
 	$(RM) *.key *.pem *.der

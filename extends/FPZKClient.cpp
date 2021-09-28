@@ -1,4 +1,6 @@
-#include <sys/sysinfo.h>
+#ifndef __APPLE__
+	#include <sys/sysinfo.h>
+#endif
 #include <sys/types.h>
 #include <sys/time.h>
 #include <unistd.h>
@@ -288,7 +290,11 @@ public:
 	CPUUsage()
 	{
 		_hertz = sysconf(_SC_CLK_TCK);
+#ifdef __APPLE__
+		_ncpu = (int)sysconf(_SC_NPROCESSORS_ONLN);
+#else
 		_ncpu = get_nprocs();
+#endif
 		_pid = getpid();
 		gettimeofday(&_oldtv, NULL);
 		_oldtics = getTics(_pid);
@@ -423,7 +429,11 @@ bool FPZKClient::syncSelfStatus(float perCPUUsage)
 
 	if (_syncPerformanceInfo)
 	{
+#ifdef __APPLE__
+		int cpuCount = (int)sysconf(_SC_NPROCESSORS_ONLN);
+#else
 		int cpuCount = get_nprocs();
+#endif
 		connNum = MachineStatus::getConnectionCount();
 		perCPULoad = MachineStatus::getCPULoad()/cpuCount;
 	}

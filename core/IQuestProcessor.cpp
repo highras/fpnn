@@ -96,15 +96,7 @@ QuestSenderPtr IQuestProcessor::genQuestSender(const ConnectionInfo& connectionI
 	if (connectionInfo.isTCP())
 		return std::make_shared<TCPQuestSender>(_concurrentSender, connectionInfo, connectionInfo._mutex);
 	else
-	{
-		if (gtl_answerStatus)
-			return std::make_shared<UDPQuestSender>(_concurrentUDPSender, gtl_answerStatus->_connInfo);
-
-		LOG_ERROR("!!!! cannot be triggered here in func IQuestProcessor::genQuestSender. If you see this message, please tell swxlion to fix the rotune.");
-
-		ConnectionInfoPtr ci(new ConnectionInfo(connectionInfo));
-		return std::make_shared<UDPQuestSender>(_concurrentUDPSender, ci);
-	}
+		return std::make_shared<UDPQuestSender>(_concurrentUDPSender, connectionInfo, connectionInfo._mutex);
 }
 
 FPAnswerPtr IQuestProcessor::sendQuest(FPQuestPtr quest, int timeout)

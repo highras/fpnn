@@ -15,5 +15,6 @@ all: $(EXES_SERVER) $(EXES_STRESS) $(EXES_SINGLE_CLIENT_CONCURRENT_TEST)
 
 clean:
 	$(RM) *.o $(EXES_SERVER) $(EXES_STRESS) $(EXES_SINGLE_CLIENT_CONCURRENT_TEST)
+	-$(RM) -rf *.dSYM
 
 include ../../../../def.mk

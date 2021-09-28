@@ -76,9 +76,13 @@ namespace fpnn {
 		};
 
 	private:
+#ifdef __APPLE__
+		int _kqueue_fd;
+#else
 		int _epoll_fd;
 		int _max_events;
 		struct epoll_event* _epollEvents;
+#endif
 		int _eventNotifyFds[2];
 
 		std::mutex _mutex;
@@ -96,8 +100,13 @@ namespace fpnn {
 
 		void eventThread();
 		int checkTasks();
+#ifdef __APPLE__
+		bool initKqueue();
+		void stopKqueue();
+#else
 		bool initEpoll();
 		void stopEpoll();
+#endif
 		void stop();
 		void clean();
 		void cleanTaskQueue();
@@ -110,7 +119,11 @@ namespace fpnn {
 		void reschedule(TimerTaskPtr task);
 		void rescheduleWithoutLocker(TimerTaskPtr task);
 
+#ifdef __APPLE__
+		Timer(): _kqueue_fd(0), _running(false), _idGen(1)
+#else
 		Timer(): _epoll_fd(0), _max_events(4), _epollEvents(NULL), _running(false), _idGen(1)
+#endif
 		{
 			_eventNotifyFds[0] = 0;
 			_eventNotifyFds[1] = 0;

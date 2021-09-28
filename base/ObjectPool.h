@@ -657,7 +657,7 @@ RETURN VALUE:
 None
 ===========================================================================*/
 	template <typename K>
-inline void ObjectPool<K>::status(MemoryPoolStatus& mps)
+void ObjectPool<K>::status(MemoryPoolStatus& mps)
 {
 	if (_inited)
 	{
