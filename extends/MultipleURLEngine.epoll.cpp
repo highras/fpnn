@@ -1234,6 +1234,13 @@ bool MultipleURLEngine::prepareEasyHandle(CURL *curl, BaiscResultCallbackPtr cal
 			return false;
 		if (curl_easy_setopt(curl, CURLOPT_WRITEDATA, buf) != CURLE_OK)
 			return false;
+
+		buf = new ChainBuffer();
+		callback->_headBuffer = buf;
+		//if (curl_easy_setopt(curl, CURLOPT_HEADERFUNCTION, Executor::writeCallback) != CURLE_OK)
+		//	return false;
+		if (curl_easy_setopt(curl, CURLOPT_HEADERDATA, buf) != CURLE_OK)
+			return false;
 	}
 
 	if (postBody.length())

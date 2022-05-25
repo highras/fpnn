@@ -38,6 +38,7 @@ namespace fpnn
 				FPNN.server.security.ecdh.privateKey = 
 		*/
 		bool init();
+		bool init(const char* proto);
 		bool init(const std::string& curve, const std::string& privateKey);
 		/*
 			key: OUT. Key buffer length is equal to keylen.

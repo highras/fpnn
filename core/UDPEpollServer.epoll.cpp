@@ -18,22 +18,6 @@ using namespace fpnn;
 
 UDPServerPtr UDPEpollServer::_server = nullptr;
 
-static void adjustThreadPoolParams(int &minThread, int &maxThread, int constMin, int constMax)
-{
-	if (minThread < constMin)
-		minThread = constMin;
-	else if (minThread > constMax)
-		minThread = constMax;
-
-	if (maxThread < constMin)
-		maxThread = constMin;
-	else if (maxThread > constMax)
-		maxThread = constMax;
-
-	if (minThread > maxThread)
-		minThread = maxThread;
-}
-
 int UDPEpollServer::getCPUCount()
 {
 	int cpuCount = get_nprocs();
@@ -91,9 +75,26 @@ bool UDPEpollServer::initServerVaribles()
 		"FPNN.server.udp.work.queue.max.size",
 		"FPNN.server.work.queue.max.size"}, FPNN_DEFAULT_UDP_WORK_POOL_QUEUE_SIZE);
 
+	//-- ECC-AES encryption
+	_encryptEnabled = Setting::getBool(std::vector<std::string>{
+		"FPNN.server.udp.security.ecdh.enable",
+		"FPNN.server.security.ecdh.enable"}, false);
+	if (_encryptEnabled)
+	{
+		if (_keyExchanger.init("udp") == false)
+		{
+			throw FPNN_ERROR_CODE_FMT(FpnnCoreError, FPNN_EC_CORE_UNKNOWN_ERROR, "Auto config ECC-AES for UDP server failed.");
+		}
+	}
+
 	_heldLogger = FPLog::instance();
 
 	return true;
+}
+
+void UDPEpollServer::enableForceEncryption()
+{
+	Config::UDP::_server_user_methods_force_encrypted = true;
 }
 
 bool UDPEpollServer::prepare()
@@ -115,7 +116,7 @@ bool UDPEpollServer::prepare()
 		int workThreadMax = Setting::getInt(std::vector<std::string>{
 			"FPNN.server.udp.work.thread.max.size", "FPNN.server.work.thread.max.size"}, cpuCount);
 
-		adjustThreadPoolParams(workThreadMin, workThreadMax, 2, 256);
+		ServerUtils::adjustThreadPoolParams(workThreadMin, workThreadMax, 2, 256);
 		configWorkerThreadPool(workThreadMin, 1, workThreadMin, workThreadMax, _maxWorkerPoolQueueLength);
 	}
 
@@ -138,7 +139,7 @@ bool UDPEpollServer::prepare()
 			int ioThreadMin = Setting::getInt("FPNN.global.io.thread.min.size", cpuCount);
 			int ioThreadMax = Setting::getInt("FPNN.global.io.thread.max.size", cpuCount);
 
-			adjustThreadPoolParams(ioThreadMin, ioThreadMax, 2, 256);
+			ServerUtils::adjustThreadPoolParams(ioThreadMin, ioThreadMax, 2, 256);
 			_ioPool->init(ioThreadMin, 1, ioThreadMin, ioThreadMax);
 		}
 
@@ -158,16 +159,18 @@ bool UDPEpollServer::prepare()
 
 		if (_answerCallbackPool == nullptr)
 		{
-			if (duplexThreadMin > 0 && duplexThreadMax > 0)
+			int perfectThreadCount = duplexThreadMin;
+
+			if (duplexThreadMax <= 0)
+				duplexThreadMax = getCPUCount();
+
+			if (duplexThreadMin <= 0)
 			{
-				adjustThreadPoolParams(duplexThreadMin, duplexThreadMax, 1, 256);
-				enableAnswerCallbackThreadPool(duplexThreadMin, 1, duplexThreadMin, duplexThreadMax);
+				duplexThreadMin = 0;
+				perfectThreadCount = duplexThreadMax;
 			}
-			else
-			{
-				int cpuCount = getCPUCount();
-				enableAnswerCallbackThreadPool(0, 1, cpuCount, cpuCount);
-			}
+
+			enableAnswerCallbackThreadPool(duplexThreadMin, 1, perfectThreadCount, duplexThreadMax);
 		}
 	}
 
@@ -418,25 +421,26 @@ void UDPEpollServer::run()
 		{
 			if (_epollEvents[i].data.fd == _socket)
 			{
-				createConnections();
+				createConnections(_socket);
 			}
 			else if (_epollEvents[i].data.fd == _socket6)
 			{
-				createConnections6();
+				createConnections6(_socket6);
 			}
 			else
 				processEvent(_epollEvents[i]);
 		}
 
+		recheckNewSockets();
 		scheduleNewConnections();
 	}
 }
 
-void UDPEpollServer::createConnections()
+void UDPEpollServer::createConnections(int socket)
 {
 	while (true)
 	{
-		if (_receiver.recvIPv4(_socket) == false)
+		if (_receiver.recvIPv4(socket) == false)
 			return;
 
 		if (_receiver.udpRawData == NULL)
@@ -469,14 +473,15 @@ void UDPEpollServer::createConnections()
 		}
 
 		newConnection(newSocket, true);
+		_newSockets.insert(newSocket);
 	}
 }
 
-void UDPEpollServer::createConnections6()
+void UDPEpollServer::createConnections6(int socket6)
 {
 	while (true)
 	{
-		if (_receiver.recvIPv6(_socket6) == false)
+		if (_receiver.recvIPv6(socket6) == false)
 			return;
 
 		if (_receiver.udpRawData == NULL)
@@ -509,6 +514,7 @@ void UDPEpollServer::createConnections6()
 		}
 
 		newConnection(newSocket, false);
+		_newSockets6.insert(newSocket);
 	}
 }
 
@@ -532,9 +538,41 @@ void UDPEpollServer::newConnection(int newSocket, bool isIPv4)
 	UDPServerConnection* connection = new UDPServerConnection(connInfo, mtu);
 	connection->epollfd = _epoll_fd;
 
+	if (_encryptEnabled)
+		connection->setKeyExchanger(&_keyExchanger);
+
 	_connectionCache.insert(_receiver, connection);
 	connection->appendRawData(_receiver.udpRawData);
 	connection->_refCount++;
+}
+
+void UDPEpollServer::recheckNewSockets()
+{
+	std::set<int> sockets;
+
+	while (_newSockets.size())
+	{
+		sockets.swap(_newSockets);
+
+		for (auto socket: sockets)
+		{
+			createConnections(socket);
+
+		}
+		sockets.clear();
+	}
+
+	while (_newSockets6.size())
+	{
+		sockets.swap(_newSockets6);
+
+		for (auto socket: sockets)
+		{
+			createConnections6(socket);
+
+		}
+		sockets.clear();
+	}
 }
 
 void UDPEpollServer::scheduleNewConnections()
@@ -572,6 +610,17 @@ void UDPEpollServer::processEvent(struct epoll_event & event)
 void UDPEpollServer::connectionConnectedEventCompleted(UDPServerConnection* conn)
 {
 	bool noTerminationCalled = conn->connectedEventCompleted();
+
+	if (noTerminationCalled && conn->isEncrypted())
+	{
+		bool needWaitSendEvent = false;
+		conn->sendCachedData(needWaitSendEvent, true);
+		if (needWaitSendEvent)
+			noTerminationCalled = waitForAllEvents(conn->socket());
+
+		if (conn->isRequireClose())
+			noTerminationCalled = false;
+	}
 
 	if (!noTerminationCalled)
 	{
@@ -691,7 +740,18 @@ void UDPEpollServer::deliverQuest(UDPServerConnection* conn, FPQuestPtr quest)
 
 	bool wakeUpResult;
 	if (!prior)
+	{
+		if (Config::UDP::_server_user_methods_force_encrypted && !conn->isEncrypted())
+		{
+			LOG_WARN("All user methods reuiqre encrypted. Unencrypted connection will visit %s. Connection will be closed by server. %s",
+				questMethod.c_str(), conn->_connectionInfo->str().c_str());
+
+			delete requestPackage;
+			return;
+		}
+
 		wakeUpResult = _workerPool->wakeUp(requestPackage);
+	}
 	else
 		wakeUpResult = _workerPool->priorWakeUp(requestPackage);
 

@@ -187,6 +187,7 @@ bool Timer::initKqueue()
 	}
 
 	nonblockedFd(_eventNotifyFds[0]);
+	nonblockedFd(_eventNotifyFds[1]);
 
 	struct kevent ev;
 	EV_SET(&ev, _eventNotifyFds[0], EVFILT_READ, EV_ADD | EV_CLEAR, 0, 0, NULL);
@@ -277,6 +278,9 @@ int Timer::checkTasks()
 		std::unique_lock<std::mutex> lck(_mutex);
 		while (_priorityQueue.size())
 		{
+			char buf[4];
+			read(_eventNotifyFds[0], buf, 4);
+
 			TimerTaskPtr task = _priorityQueue.top();
 			if (task->_removed)
 			{

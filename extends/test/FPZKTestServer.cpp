@@ -10,15 +10,33 @@ class ServicesAlteredCallback: public FPZKClient::ServicesAlteredCallback
 {
 public:
 	virtual ~ServicesAlteredCallback() {}
-	virtual void serviceAltered(std::map<std::string, FPZKClient::ServiceInfosPtr>& serviceInfos)
+	virtual void serviceAltered(const std::map<std::string, FPZKClient::ServiceInfosPtr>& serviceInfos,
+		const std::vector<std::string>& invalidServices)
 	{
-		cout<<"[Object Callabck] following services altered."<<endl;
+		cout<<"[Service Altered Object Callabck] "<<serviceInfos.size()<<" updated, "<<invalidServices.size()<<" invalid."<<endl;
 		for (auto& pp: serviceInfos)
 		{
-			cout<<"  service: "<<pp.first<<", revision: "<<pp.second->revision<<", current count: "<<pp.second->nodeMap.size()<<endl;
+			cout<<"[Updated Service]: "<<pp.first<<", revision: "<<pp.second->revision<<", current count: "<<pp.second->nodeMap.size()<<endl;
 			for (auto& pp2: pp.second->nodeMap)
 				cout<<"    ep: "<<pp2.first<<endl;
 		}
+
+		for (auto& serviceName: invalidServices)
+			cout<<"[invalid Service]: "<<serviceName<<endl;
+	}
+};
+
+class ExtraCommitCallback: public FPZKClient::ExtraDataCommitCallback
+{
+public:
+	virtual ~ExtraCommitCallback() {}
+	virtual std::shared_ptr<std::string> extraDataCommit()
+	{
+		std::shared_ptr<std::string> extra(new std::string("Current Timestamp: "));
+
+		extra->append(std::to_string(slack_real_sec()));
+
+		return extra;
 	}
 };
 
@@ -44,12 +62,26 @@ public:
 		{
 			std::list<std::string> &infoList = infos[nodePair.first];
 			infoList.push_back(std::string("online:").append(nodePair.second.online?"online":"offline"));
-			infoList.push_back(std::string("connCount:").append(std::to_string(nodePair.second.connCount)));
+			infoList.push_back(std::string("tcpCount:").append(std::to_string(nodePair.second.tcpCount)));
+			infoList.push_back(std::string("udpCount:").append(std::to_string(nodePair.second.udpCount)));
 			infoList.push_back(std::string("CPULoad:").append(std::to_string(nodePair.second.CPULoad)));
 			infoList.push_back(std::string("loadAvg:").append(std::to_string(nodePair.second.loadAvg)));
 			infoList.push_back(std::string("activedTime:").append(std::to_string(nodePair.second.activedTime)));
 			infoList.push_back(std::string("registerTime:").append(std::to_string(nodePair.second.registerTime)));
 			infoList.push_back(std::string("version:").append(nodePair.second.version));
+			
+			if (nodePair.second.GPUStatus)
+			{
+				for (auto& pp: *(nodePair.second.GPUStatus))
+					infoList.push_back(std::string("[GPU] idx: ").append(std::to_string(pp.index)).
+						append(", usage: ").append(std::to_string(pp.usage)).append("%, memory: ").
+						append(std::to_string(pp.memory.usage)).append("%, ").
+						append(std::to_string(pp.memory.used)).append("/").
+						append(std::to_string(pp.memory.total)));
+			}
+
+			if (nodePair.second.extra)
+				infoList.push_back(std::string("extra:[").append(*(nodePair.second.extra)).append("]"));
 		}
 
 		return FPAWriter(5, quest)("revision", sip->revision)("onlineCount", sip->onlineCount)
@@ -68,20 +100,42 @@ public:
 
 		if (Setting::getBool("FPZK.clinet.serviceAlteredCallback.functional", false))
 		{
-			_fpzk->setServiceAlteredCallback([](std::map<std::string, FPZKClient::ServiceInfosPtr>& serviceInfos){
-				cout<<"[Functional Callabck] following services altered."<<endl;
-				for (auto& pp: serviceInfos)
-				{
-					cout<<"  service: "<<pp.first<<", revision: "<<pp.second->revision<<", current count: "<<pp.second->nodeMap.size()<<endl;
-					for (auto& pp2: pp.second->nodeMap)
-						cout<<"    ep: "<<pp2.first<<endl;
-				}
+			_fpzk->setServiceAlteredCallback([](const std::map<std::string, FPZKClient::ServiceInfosPtr>& serviceInfos,
+				const std::vector<std::string>& invalidServices){
+
+					cout<<"[Service Altered Functional Callabck] "<<serviceInfos.size()<<" updated, "<<invalidServices.size()<<" invalid."<<endl;
+					for (auto& pp: serviceInfos)
+					{
+						cout<<"[Updated Service]: "<<pp.first<<", revision: "<<pp.second->revision<<", current count: "<<pp.second->nodeMap.size()<<endl;
+						for (auto& pp2: pp.second->nodeMap)
+							cout<<"    ep: "<<pp2.first<<endl;
+					}
+
+					for (auto& serviceName: invalidServices)
+						cout<<"[invalid Service]: "<<serviceName<<endl;
 			});
 		}
 		if (Setting::getBool("FPZK.clinet.serviceAlteredCallback.object", false))
 		{
 			FPZKClient::ServicesAlteredCallbackPtr cb = std::make_shared<ServicesAlteredCallback>();
 			_fpzk->setServiceAlteredCallback(cb);
+		}
+
+		if (Setting::getBool("FPZK.clinet.extraCommitCallback.functional", false))
+		{
+			_fpzk->setExtraDataCommitCallback([]()->std::shared_ptr<std::string>{
+				std::shared_ptr<std::string> extra(new std::string("Current Timestamp: "));
+
+				extra->append(std::to_string(slack_real_sec()));
+
+				return extra;
+			});
+		}
+
+		if (Setting::getBool("FPZK.clinet.extraCommitCallback.object", false))
+		{
+			FPZKClient::ExtraDataCommitCallbackPtr cb = std::make_shared<ExtraCommitCallback>();
+			_fpzk->setExtraDataCommitCallback(cb);
 		}
 		
 	}
@@ -92,6 +146,10 @@ public:
 
 	QuestProcessorClassBasicPublicFuncs
 };
+
+#ifdef SUPPORT_CUDA
+#include "nvml.h"
+#endif
 
 int main(int argc, char* argv[])
 {
@@ -104,9 +162,18 @@ int main(int argc, char* argv[])
 		return 1;
 	}
 
+#ifdef SUPPORT_CUDA
+	nvmlInit();
+#endif
+
 	ServerPtr server = TCPEpollServer::create();
 	server->setQuestProcessor(std::make_shared<QuestProcessor>());
 	server->startup();
 	server->run();
+
+#ifdef SUPPORT_CUDA
+	nvmlShutdown();
+#endif
+
 	return 0;
 }

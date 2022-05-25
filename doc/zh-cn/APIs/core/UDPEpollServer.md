@@ -56,6 +56,10 @@ UDPEpollServer 需要 Linux 内核 3.9 及以上，方能有性能测试中的�
 		virtual std::string workerPoolStatus();
 		virtual std::string answerCallbackPoolStatus();
 
+		static void enableForceEncryption();
+		inline bool encrpytionEnabled();
+		inline bool enableEncryptor(const std::string& curve, const std::string& privateKey);
+
 		inline bool ipWhiteListEnabled();
 		inline void enableIPWhiteList(bool enable = true);
 		inline bool addIPToWhiteList(const std::string& ip);
@@ -278,6 +282,46 @@ UDPEpollServer 需要 Linux 内核 3.9 及以上，方能有性能测试中的�
 	virtual std::string answerCallbackPoolStatus();
 
 返回 UDPEpollServer 处理 Server Push 应答的线程池状态。Json 格式。
+
+#### encrpytionEnabled
+
+	inline bool encrpytionEnabled();
+
+判断 TCP 服务器是否启动了加密。
+
+#### enableEncryptor
+
+	inline bool enableEncryptor(const std::string& curve, const std::string& privateKey);
+
+启用链接加密。
+
+**参数说明**
+
+* **`const std::string& curve`**
+
+	ECDH (椭圆曲线密钥交换) 所用曲线名称。
+
+	可用值：
+
+	+ "secp256k1"
+	+ "secp256r1"
+	+ "secp224r1"
+	+ "secp192r1"
+
+* **`const std::string& privateKey`**
+
+	服务器私钥（二进制数据）。
+
+	**注意**
+
+	该私钥为裸密钥，由 FPNN 框架内置工具 [eccKeyMaker](../../fpnn-tools.md#eccKeyMaker) 生成。
+
+#### enableForceEncryption
+
+	static void enableForceEncryption();
+
+强制所有接口必须加密访问。
+
 
 #### ipWhiteListEnabled
 

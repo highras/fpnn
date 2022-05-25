@@ -42,6 +42,9 @@ namespace fpnn
 		std::vector<std::string> getFilesInDirectory(const char* directoryPath, bool excludeSubDirectories = true);
 		std::vector<std::string> getFilesInDirectory(const std::string& directoryPath, bool excludeSubDirectories = true);
 
+		std::vector<std::string> getSubDirectories(const char* directoryPath);
+		std::vector<std::string> getSubDirectories(const std::string& directoryPath);
+
 		//get all file in this directory and all sub directories
 		std::vector<std::string> getFilesInDirectories(const char* directoryPath);
 		std::vector<std::string> getFilesInDirectories(const std::string directoryPath);

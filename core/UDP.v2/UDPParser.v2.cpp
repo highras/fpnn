@@ -1,11 +1,8 @@
-#include <stdlib.h>
-#include <string.h>
-#include <limits>
+//#include <limits>
 #include "FPLog.h"
 #include "msec.h"
-#include "Config.h"
-#include "Decoder.h"
-#include "UDPARQProtocolParser.h"
+#include "../Decoder.h"
+#include "UDPParser.v2.h"
 
 using namespace fpnn;
 
@@ -26,41 +23,37 @@ bool SessionInvalidChecker::isInvalid()
 	return false;
 }
 
-ARQChecksum::ARQChecksum(uint32_t firstSeqBE, uint8_t factor): _factor(factor)
+void ARQParser::configPackageEncryptor(uint8_t *key, size_t key_len, uint8_t *iv)
 {
-	uint8_t* fseqBE = (uint8_t*)&firstSeqBE;
-	fseqBE[1] ^= factor;
-	fseqBE[3] ^= factor;
+	if (!_decryptedBuffer)
+		_decryptedBuffer = (uint8_t*)malloc(_decryptedBufferLen);
 
-	uint8_t cyc = factor % 32;
-	_preprossedFirstSeq = (*fseqBE >> cyc) | (*fseqBE << (32 - cyc));
+	if (!_encryptor)
+		_encryptor = new UDPEncryptor();
+
+	_encryptor->configPackageEncryptor(key, key_len, iv);
+}
+void ARQParser::configDataEncryptor(uint8_t *key, size_t key_len, uint8_t *iv)
+{
+	if (!_decryptedBuffer)
+		_decryptedBuffer = (uint8_t*)malloc(_decryptedBufferLen);
+
+	if (!_encryptor)
+		_encryptor = new UDPEncryptor();
+
+	_encryptor->configDataEncryptor(key, key_len, iv);
+
+	_enableDataEnhanceEncrypt = true;
+	_unorderedParse = false;
+
+	if (!_decryptedDataBuffer)
+		_decryptedDataBuffer = (uint8_t*)malloc(_decryptedBufferLen);
 }
 
-bool ARQChecksum::check(uint32_t udpSeqBE, uint8_t checksum)
+void ARQParser::configUnorderedParse(bool enable)
 {
-	return genChecksum(udpSeqBE) == checksum;
-}
-
-uint8_t ARQChecksum::genChecksum(uint32_t udpSeqBE)
-{
-	uint8_t rfactor = ~_factor;
-	uint8_t* cseqBE = (uint8_t*)&udpSeqBE;
-
-	cseqBE[0] ^= rfactor;
-	cseqBE[2] ^= rfactor;
-
-	uint8_t cyc = rfactor % 32;
-	uint32_t newC = (*cseqBE << cyc) | (*cseqBE >> (32 - cyc));
-	uint32_t res = _preprossedFirstSeq ^ newC;
-	uint8_t* resByte = (uint8_t*)&res;
-
-	uint8_t value = resByte[0] + resByte[1] + resByte[2] + resByte[3];
-	return value;
-}
-
-bool ARQChecksum::isSame(uint8_t factor)
-{
-	return _factor == factor;
+	if (_enableDataEnhanceEncrypt == false && _arqChecksum == NULL)
+		_unorderedParse = enable;
 }
 
 bool ARQParser::parse(uint8_t* buffer, int len, struct ParseResult* result)
@@ -71,22 +64,52 @@ bool ARQParser::parse(uint8_t* buffer, int len, struct ParseResult* result)
 	_bufferLength = len;
 	_bufferOffset = 0;
 
-	if (len < 8)
+	if (len < ARQConstant::PackageMimimumLength)
 	{
 		LOG_ERROR("Received short UDP ARQ data. len: %d. socket: %d, endpoint: %s", _bufferLength, _socket, _endpoint);
 		return false;
 	}
 
-	//-- version checking
-	if (*buffer != 1)
+	if (_encryptor)
 	{
-		uint8_t version = *buffer;
-		LOG_ERROR("Received unsupported UDP data version: %d, len: %d. socket: %d, endpoint: %s", (int)version, _bufferLength, _socket, _endpoint);
-		return false;
+		//-- prevent the resent ecdh package disturbs the parsing process.
+		if (_ecdhCopy == NULL) ;
+		else
+		{
+			if (ecdhCopyExpiredTMS <= slack_real_msec())
+			{
+				delete _ecdhCopy;
+				_ecdhCopy = NULL;
+			}
+			else
+			{
+				if ((int)(_ecdhCopy->len) == len && memcmp(_ecdhCopy->data, _buffer, len) == 0)
+					return true;
+			}
+		}
+
+		_encryptor->packageDecrypt(_decryptedBuffer, buffer, len);
+		_buffer = _decryptedBuffer;
 	}
 
-	uint8_t type = *(buffer + 1);
-	uint8_t flag = *(buffer + 2);
+	//-- version checking
+	if (*_buffer != _parseResult->protocolVersion)
+	{
+		if (*_buffer <= ARQConstant::Version)
+			_parseResult->protocolVersion = *_buffer;
+		else
+		{
+			uint8_t version = *_buffer;
+			LOG_ERROR("Received unsupported UDP data version: %d, len: %d. socket: %d, endpoint: %s", (int)version, _bufferLength, _socket, _endpoint);
+			return false;
+		}
+	}
+
+	uint8_t type = *(_buffer + 1);
+	uint8_t flag = *(_buffer + 2);
+
+	if (type == (uint8_t)ARQType::ARQ_ASSEMBLED)
+		return processAssembledPackage();
 
 	bool discardable = flag & ARQFlag::ARQ_Discardable;
 	bool monitored = flag & ARQFlag::ARQ_Monitored;
@@ -98,9 +121,198 @@ bool ARQParser::parse(uint8_t* buffer, int len, struct ParseResult* result)
 		return processPackage(type, flag);
 }
 
+bool ARQParser::processAssembledPackage()
+{
+	int remainedBufferLength = _bufferLength - ARQConstant::AssembledPackageHeaderSize;
+	uint8_t* includedPackageBufferHeader = _buffer + ARQConstant::AssembledPackageHeaderSize;
+
+	while (remainedBufferLength > 0)
+	{
+		uint16_t packageLength = be16toh(*((uint16_t*)includedPackageBufferHeader));
+
+		_buffer = includedPackageBufferHeader + ARQConstant::AssembledPackageLengthFieldSize - 1;	//-- -1: Version field size.
+		_bufferLength = packageLength + 1;	//-- +1: Version field size.
+		_bufferOffset = 0;
+
+		uint8_t type = *(_buffer + 1);
+		uint8_t flag = *(_buffer + 2);
+
+		bool discardable = flag & ARQFlag::ARQ_Discardable;
+		bool monitored = flag & ARQFlag::ARQ_Monitored;
+
+		bool rev;
+		bool packageIsDiscardable = discardable && !monitored;
+		if (packageIsDiscardable == false)
+			rev = processReliableAndMonitoredPackage(type, flag);
+		else
+			rev = processPackage(type, flag);
+		
+		if (!rev)
+			return false;
+
+		//-- Next include package.
+		int includedDataLength = ARQConstant::AssembledPackageLengthFieldSize + packageLength;
+		includedPackageBufferHeader += includedDataLength;
+		remainedBufferLength -= includedDataLength;
+	}
+	return true;
+}
+
+bool ARQParser::processReliableAndMonitoredPackage(uint8_t type, uint8_t flag)
+{
+	uint8_t sign = *(_buffer + 3);
+	uint32_t packageSeqBE = *((uint32_t*)(_buffer + 4));
+
+	uint32_t packageSeq = be32toh(packageSeqBE);
+
+	if (_arqChecksum)
+	{
+		/*
+		 对于前置UDP代理，或者网关的情况，如果在收到 close 包，或者 idle 之前，代理/网关的端口被重用了，会导致
+		 完全相同的四元组 (src.ip, src.port, dest.ip, dest.port) 产生，也就是 src 的 endpoint 相同。
+		 如果这个 case 发生了，在这里开辟新的分支处理，判断如果设置有 ARQFlag::ARQ_FirstPackage
+		 则替换当前 session，改为新的 arq check sum，并重新清理当前的cache，然后通知 UDP IO Buffer
+		 及更上层的状态转换。
+		 因为涉及到的操作和协同非常复杂，在这里仅作简单处理：关闭当前链接，等待对端重发 flag 为
+		 ARQFlag::ARQ_FirstPackage 的 UDP 数据包。
+
+		 完备的复杂处理请联系： wangxing.shi@ilivedata.com, 或者 swxlion@hotmail.com。
+
+		 注意：对于公网，若允许在四元组冲突时重建连接，则 UDP ARQ 链接极易被恶意的 ARQFlag::ARQ_FirstPackage
+		 UDP 包打断。因此不建议在非安全环境，或者公网，打开重建连接的选项。
+		*/
+		if (_replaceConnectionWhenConnectionReentry && (flag & ARQFlag::ARQ_FirstPackage) && _firstPackageUDPSeq != packageSeq)
+		{
+			requireClose = true;
+			return false;
+		}
+
+		if (packageSeq == lastUDPSeq)
+		{
+			_parseResult->receivedPriorSeqs = true;
+			
+			if (_disorderedCache.size() > 0)
+				_invalidChecker.updateInvalidPackageCount();
+
+			return false;
+		}
+
+		{
+			uint32_t a = packageSeq - lastUDPSeq;
+			uint32_t b = lastUDPSeq - packageSeq;
+
+			if (b <= a)
+			{
+				_parseResult->receivedPriorSeqs = true;
+
+				if (_disorderedCache.size() > 0)
+					_invalidChecker.updateInvalidPackageCount();
+
+				return false;
+			}
+		}
+
+		if (_arqChecksum->check(packageSeqBE, sign) == false)
+		{
+			_invalidChecker.updateInvalidPackageCount();
+
+			LOG_WARN("Received faked UDP data seq: %u, type: %d, flag: %d, len: %d. socket: %d, endpoint: %s",
+				packageSeq, (int)type, (int)flag, _bufferLength, _socket, _endpoint);
+
+			return false;
+		}
+
+		if (packageSeq == lastUDPSeq + 1)
+		{
+			_invalidChecker.updateValidStatus();
+
+			processPackage(type, flag);
+
+			lastUDPSeq = packageSeq;
+			
+			if (_unorderedParse)
+				checkLastUDPSeq();
+			else
+				processCachedPackageFromSeq();
+
+			_parseResult->canbeFeedbackUNA = true;
+			return true;
+		}
+
+		_invalidChecker.updateInvalidPackageCount();
+
+		if (_unorderedParse)
+			return aheadProcessReliableAndMonitoredPackage(type, flag, packageSeq);
+		else
+		{
+			cacheCurrentUDPPackage(packageSeq);
+			return true;
+		}
+	}
+	else if (flag & ARQFlag::ARQ_FirstPackage)
+	{
+		_arqChecksum = new ARQChecksum(packageSeqBE, sign);
+		lastUDPSeq = packageSeq;
+		_firstPackageUDPSeq = packageSeq;
+
+		_invalidChecker.firstPackageReceived();
+		_invalidChecker.updateValidStatus();
+
+		processPackage(type, flag);
+
+		if (_unorderedParse)
+			verifyAndProcessCachedPackages();
+		else
+		{
+			verifyCachedPackage(packageSeq);
+			processCachedPackageFromSeq();
+		}
+		
+		_parseResult->canbeFeedbackUNA = true;
+		return true;
+	}
+	else
+	{
+		_invalidChecker.startCheck();
+		cacheCurrentUDPPackage(packageSeq);
+		return true;
+	}
+}
+
+bool ARQParser::aheadProcessReliableAndMonitoredPackage(uint8_t type, uint8_t flag, uint32_t packageSeq)
+{
+	if (unprocessedReceivedSeqs.find(packageSeq) != unprocessedReceivedSeqs.end())
+		return true;
+	
+	uint32_t tolerance = lastUDPSeq + Config::UDP::_disordered_seq_tolerance;
+	if (lastUDPSeq < tolerance)
+	{
+		if (packageSeq > tolerance)
+		{
+			LOG_WARN("Received future or expired UDP data seq: %u, type: %d, flag: %d, len: %d. Current last seq: %u. socket: %d, endpoint: %s",
+				packageSeq, (int)type, (int)flag, _bufferLength, lastUDPSeq, _socket, _endpoint);
+
+			return true;
+		}
+	}
+	else
+	{
+		if (packageSeq > tolerance && packageSeq < lastUDPSeq)
+		{
+			LOG_WARN("Received future or expired UDP data seq: %u, type: %d, flag: %d, len: %d. Current last seq: %u. socket: %d, endpoint: %s",
+				packageSeq, (int)type, (int)flag, _bufferLength, lastUDPSeq, _socket, _endpoint);
+
+			return true;
+		}
+	}
+
+	unprocessedReceivedSeqs.insert(packageSeq);
+	return processPackage(type, flag);
+}
+
 bool ARQParser::processPackage(uint8_t type, uint8_t flag)
 {
-	if (type & (uint8_t)ARQType::ARQ_COMBINED)
+	if (type == (uint8_t)ARQType::ARQ_COMBINED)
 		return parseCOMBINED();
 
 	if (type == (uint8_t)ARQType::ARQ_DATA)
@@ -139,16 +351,16 @@ void ARQParser::verifyCachedPackage(uint32_t baseUDPSeq)
 
 	for (auto& pp: _disorderedCache)
 	{
-		uint8_t factor = *(pp.second->data + 3);
+		uint8_t sign = *(pp.second->data + 3);
 		uint32_t packageSeqBE = *((uint32_t*)(pp.second->data + 4));
 
-		if (_arqChecksum->check(packageSeqBE, factor) == false)
+		if (_arqChecksum->check(packageSeqBE, sign) == false)
 		{
 			delete pp.second;
 			fakedPackageSeqs.insert(pp.first);
 		}
 		else
-			receivedSeqs.insert(pp.first);
+			unprocessedReceivedSeqs.insert(pp.first);
 	}
 
 	for (auto seq: fakedPackageSeqs)
@@ -160,6 +372,8 @@ void ARQParser::verifyCachedPackage(uint32_t baseUDPSeq)
 		LOG_WARN("Clear %u cached fake UDP packages. socket: %d, endpoint: %s",
 			fakedPackageSeqs.size(), _socket, _endpoint);
 	}
+
+	unprocessedReceivedSeqs.erase(lastUDPSeq);
 }
 
 void ARQParser::cacheCurrentUDPPackage(uint32_t packageSeq)
@@ -226,121 +440,11 @@ void ARQParser::cacheCurrentUDPPackage(uint32_t packageSeq)
 	_disorderedCache[packageSeq] = cb;
 
 	if (_arqChecksum)
-		receivedSeqs.insert(packageSeq);
-}
-
-void ARQParser::EndpointQuaternionConflictError(uint8_t factor, uint8_t type, uint8_t flag)
-{
-	if (!_arqChecksum->isSame(factor) && (flag & ARQFlag::ARQ_FirstPackageMask))
-	{
-		requireClose = true;
-
-		LOG_ERROR("Endpoint Quaternion Conflict. type: %d, flag: %d, endpoint: %s. If this error occurs in large numbers, "
-			"please refering wangxing.shi@ilivedata.com or swxlion@hotmail.com to tell you server & business architecture, "
-			"add a patch for the rare case.",
-				(int)type, (int)flag, _endpoint);
-	}
-}
-
-bool ARQParser::processReliableAndMonitoredPackage(uint8_t type, uint8_t flag)
-{
-	uint8_t factor = *(_buffer + 3);
-	uint32_t packageSeqBE = *((uint32_t*)(_buffer + 4));
-
-	uint32_t packageSeq = be32toh(packageSeqBE);
-
-	if (_arqChecksum)
-	{
-		/*
-		 * 对于前置UDP代理的情况，如果在 idle 之前，代理的端口被重用了，会导致完全相同的四元组
-		 (src.ip, src.port, dest.ip, dest.port) 产生，也就是 src 的 endpoint 相同。
-		 如果这个 case 发生了，在这里开辟新的分支处理，判断如果设置有 ARQFlag::ARQ_FirstPackageMask，
-		 则替换当前 session，改为新的 arq check sum，并重新清理当前的cache，然后通知 UDP IO Buffer
-		 及更上层的状态转换。
-		 具体请联系： wangxing.shi@ilivedata.com, 或者 swxlion@hotmail.com。
-		*/
-
-		if (packageSeq == lastUDPSeq)
-		{
-			_parseResult->receivedPriorSeqs = true;
-			
-			if (_disorderedCache.size() > 0)
-				_invalidChecker.updateInvalidPackageCount();
-
-			EndpointQuaternionConflictError(factor, type, flag);
-			return false;
-		}
-
-		{
-			uint32_t a = packageSeq - lastUDPSeq;
-			uint32_t b = lastUDPSeq - packageSeq;
-
-			if (b <= a)
-			{
-				_parseResult->receivedPriorSeqs = true;
-
-				if (_disorderedCache.size() > 0)
-					_invalidChecker.updateInvalidPackageCount();
-
-				EndpointQuaternionConflictError(factor, type, flag);
-				return false;
-			}
-		}
-
-		if (_arqChecksum->check(packageSeqBE, factor) == false)
-		{
-			_invalidChecker.updateInvalidPackageCount();
-
-			LOG_WARN("Received faked UDP data seq: %u, type: %d, flag: %d, len: %d. socket: %d, endpoint: %s",
-				packageSeq, (int)type, (int)flag, _bufferLength, _socket, _endpoint);
-
-			EndpointQuaternionConflictError(factor, type, flag);
-			return false;
-		}
-
-		if (packageSeq == lastUDPSeq + 1)
-		{
-			_invalidChecker.updateValidStatus();
-
-			processPackage(type, flag);
-
-			lastUDPSeq = packageSeq;
-			processCachedPackageFromSeq();
-			_parseResult->canbeFeedbackUNA = true;
-			return true;
-		}
-
-		_invalidChecker.updateInvalidPackageCount();
-		cacheCurrentUDPPackage(packageSeq);
-		return true;
-	}
-	else if (flag & ARQFlag::ARQ_FirstPackageMask)
-	{
-		_arqChecksum = new ARQChecksum(packageSeqBE, factor);
-		lastUDPSeq = packageSeq;
-
-		_invalidChecker.firstPackageReceived();
-		_invalidChecker.updateValidStatus();
-
-		processPackage(type, flag);
-
-		verifyCachedPackage(packageSeq);
-		processCachedPackageFromSeq();
-		_parseResult->canbeFeedbackUNA = true;
-		return true;
-	}
-	else
-	{
-		_invalidChecker.startCheck();
-		cacheCurrentUDPPackage(packageSeq);
-		return true;
-	}
+		unprocessedReceivedSeqs.insert(packageSeq);
 }
 
 void ARQParser::processCachedPackageFromSeq()
 {
-	receivedSeqs.erase(lastUDPSeq);
-
 	while (true)
 	{
 		auto it = _disorderedCache.find(lastUDPSeq + 1);
@@ -361,14 +465,69 @@ void ARQParser::processCachedPackageFromSeq()
 		_disorderedCache.erase(it);
 		delete cb;
 
-		receivedSeqs.erase(lastUDPSeq);
+		unprocessedReceivedSeqs.erase(lastUDPSeq);
 		_parseResult->canbeFeedbackUNA = true;
+	}
+}
+
+void ARQParser::verifyAndProcessCachedPackages()
+{
+	int fakedSeqCount = 0;
+
+	for (auto& pp: _disorderedCache)
+	{
+		uint8_t sign = *(pp.second->data + 3);
+		uint32_t packageSeqBE = *((uint32_t*)(pp.second->data + 4));
+
+		if (_arqChecksum->check(packageSeqBE, sign) == true)
+		{
+			unprocessedReceivedSeqs.insert(pp.first);
+
+			ClonedBuffer* cb = pp.second;
+			_buffer = cb->data;
+			_bufferLength = cb->len;
+			_bufferOffset = 0;
+
+			uint8_t type = *(_buffer + 1);
+			uint8_t flag = *(_buffer + 2);
+
+			processPackage(type, flag);
+		}
+		else
+			fakedSeqCount += 1;
+		
+		delete pp.second;
+	}
+
+	_disorderedCache.clear();
+
+
+	if (fakedSeqCount != 0)
+	{
+		LOG_WARN("Clear %d cached fake UDP packages. socket: %d, endpoint: %s",
+			fakedSeqCount, _socket, _endpoint);
+	}
+
+	unprocessedReceivedSeqs.erase(lastUDPSeq);
+	while (unprocessedReceivedSeqs.find(lastUDPSeq + 1) != unprocessedReceivedSeqs.end())
+	{
+		lastUDPSeq += 1;
+		unprocessedReceivedSeqs.erase(lastUDPSeq);
+	}
+}
+
+void ARQParser::checkLastUDPSeq()
+{
+	while (unprocessedReceivedSeqs.find(lastUDPSeq + 1) != unprocessedReceivedSeqs.end())
+	{
+		lastUDPSeq += 1;
+		unprocessedReceivedSeqs.erase(lastUDPSeq);
 	}
 }
 
 bool ARQParser::parseCOMBINED()
 {
-	if (_bufferLength < 16)
+	if (_bufferLength < ARQConstant::CombinedPackageMimimumLength)
 	{
 		LOG_ERROR("Received short Combined UDP ARQ data. len: %d. socket: %d, endpoint: %s", _bufferLength, _socket, _endpoint);
 		return false;
@@ -529,18 +688,39 @@ bool ARQParser::parseDATA()
 		pos = _buffer + _bufferOffset + 4;
 	}
 
+	bool discardable = flag & ARQFlag::ARQ_Discardable;
 	uint8_t segmentFlag = flag & ARQFlag::ARQ_SegmentedMask;
 	if (segmentFlag == 0)
 	{
-		return decodeBuffer(pos, bytes);
+		if (flag & ARQFlag::ARQ_CancelledPackage)
+			return true;
+		
+		if (_enableDataEnhanceEncrypt == false || discardable)
+			return decodeBuffer(pos, bytes);
+		else
+		{
+			_encryptor->dataDecrypt(_decryptedDataBuffer, pos, bytes);
+			return decodeBuffer(_decryptedDataBuffer, bytes);
+		}
 	}
 	else
 	{
-		bool isLastSegment = flag & ARQFlag::ARQ_LastSegmentMask;
+		bool isLastSegment = flag & ARQFlag::ARQ_LastSegmentData;
 		uint16_t packageId = be16toh(*((uint16_t*)pos));
 		uint32_t index;
 		pos += 2;
 		bytes -= 2;
+
+		if (flag & ARQFlag::ARQ_CancelledPackage)
+		{
+			auto it = _uncompletedPackages.find(packageId);
+			if (it != _uncompletedPackages.end())
+			{
+				delete it->second;
+				_uncompletedPackages.erase(it);
+			}
+			return true;
+		}
 
 		if (segmentFlag == 0x04)
 		{
@@ -564,7 +744,6 @@ bool ARQParser::parseDATA()
 		if ((int)(_uncompletedPackages.size()) >= Config::UDP::_max_cached_uncompleted_segment_package_count)
 			dropExpiredCache(slack_real_sec() + Config::UDP::_max_cached_uncompleted_segment_seconds);
 
-		bool discardable = flag & ARQFlag::ARQ_Discardable;
 		if ((int)(_uncompletedPackages.size()) >= Config::UDP::_max_cached_uncompleted_segment_package_count)
 		{
 			if (discardable)
@@ -586,11 +765,18 @@ bool ARQParser::parseDATA()
 		if (it == _uncompletedPackages.end())
 		{
 			UDPUncompletedPackage* up = new UDPUncompletedPackage();
-			up->createSeconds = slack_real_sec();
-			up->cachedSegmentSize = bytes;
-			up->count = isLastSegment ? index : 0;
+			
+			if (_enableDataEnhanceEncrypt == false || discardable)
+				up->cacheClone(index, pos, bytes);
+			else
+			{
+				_encryptor->dataDecrypt(_decryptedDataBuffer, pos, bytes);
+				up->cacheClone(index, _decryptedDataBuffer, bytes);
+			}
+			
 			up->discardable = discardable;
-			up->cache[index] = new ClonedBuffer(pos, bytes);
+			if (isLastSegment)
+				up->count = index;
 
 			_uncompletedPackages[packageId] = up;
 			uncompletedPackageSegmentCount += 1;
@@ -634,8 +820,14 @@ bool ARQParser::parseDATA()
 		if (up->count == 0 && isLastSegment)
 			up->count = index;
 
-		up->cache[index] = new ClonedBuffer(pos, bytes);
-		up->cachedSegmentSize += bytes;
+		if (_enableDataEnhanceEncrypt == false || discardable)
+			up->cacheClone(index, pos, bytes);
+		else
+		{
+			_encryptor->dataDecrypt(_decryptedDataBuffer, pos, bytes);
+			up->cacheClone(index, _decryptedDataBuffer, bytes);
+		}
+
 		uncompletedPackageSegmentCount += 1;
 
 		if (up->count == (uint32_t)(up->cache.size()))
@@ -707,11 +899,106 @@ bool ARQParser::parseForceSync()
 
 bool ARQParser::parseECDH()
 {
-	//-- TODO in next version.
-	LOG_ERROR("Received UDP ECDH data! Current this version hasn't supported the encrypted communication."
-		" Please tell swxlion to add the supporting functions. Package len: %d. socket: %d, endpoint: %s",
-		_bufferLength, _socket, _endpoint);
-	return false;
+	uint16_t bytes = 0;
+	uint8_t* pos;
+
+	//----- 01. General Info ------//
+
+	if (_bufferOffset == 0)
+	{
+		bytes = (uint16_t)(_bufferLength - 8);
+		pos = _buffer + 8;
+	}
+	else	//-- Combined data.
+	{
+		bytes = be16toh(*((uint16_t*)(_buffer + _bufferOffset + 2)));
+		pos = _buffer + _bufferOffset + 4;
+	}
+
+	//----- Config Checking ------//
+
+	if (_parseResult->keyExchanger == NULL)
+	{
+		LOG_ERROR("Received UDP ECDH package, but key exchanger is NOT configurated. Package len: %d, "
+			"included %d bytes ECDH data. Socket: %d, endpoint: %s",
+			_bufferLength, (int)bytes, _socket, _endpoint);
+		return false;
+	}
+
+	if (_encryptor)
+	{
+		LOG_ERROR("Received UDP ECDH data, but UDPParser encryptor has inited. socket: %d, endpoint: %s",
+			_socket, _endpoint);
+		return false;
+	}
+
+	//----- 02. Package Public Key ------//
+
+	uint8_t param = *pos;
+	bool reinforcePackage = ((param & 0x80) == 0x80);
+	uint8_t pubKeyLen = param & 0x7f;
+
+	if (bytes < 1 + pubKeyLen)
+	{
+		LOG_ERROR("Received invalid UDP ECDH data. whole package len: %d, included %d bytes ECDH data."
+			" Package public Key len is %d. socket: %d, endpoint: %s",
+			_bufferLength, (int)bytes, (int)pubKeyLen, _socket, _endpoint);
+		return false;
+	}
+
+	pos += 1;
+	std::string packagePublicKey((char*)pos, pubKeyLen);
+	pos += pubKeyLen;
+
+	UDPEncryptor::EncryptorPair encryptors;
+
+	//----- 03. Data Public Key ------//
+
+	if (bytes > 1 + pubKeyLen)
+	{
+		param = *pos;
+		bool reinforceData = ((param & 0x80) == 0x80);
+		uint8_t dataPubKeyLen = param & 0x7f;
+
+		if (bytes != 1 + pubKeyLen + 1 + dataPubKeyLen)
+		{
+			LOG_ERROR("Received invalid UDP ECDH data. whole package len: %d, included %d bytes ECDH data."
+				" Package public Key len is %d, data public Key len is %d. socket: %d, endpoint: %s",
+				_bufferLength, (int)bytes, (int)pubKeyLen, (int)dataPubKeyLen, _socket, _endpoint);
+			return false;
+		}
+
+		pos += 1;
+		std::string dataPublicKey((char*)pos, pubKeyLen);
+		pos += pubKeyLen;
+
+		encryptors = UDPEncryptor::createPair(_parseResult->keyExchanger, packagePublicKey,
+			reinforcePackage, dataPublicKey, reinforceData);
+
+		_unorderedParse = false;
+		_enableDataEnhanceEncrypt = true;
+		_parseResult->enableDataEncryption = true;
+
+		if (!_decryptedDataBuffer)
+			_decryptedDataBuffer = (uint8_t*)malloc(_decryptedBufferLen);
+	}
+	else
+	{
+		encryptors = UDPEncryptor::createPair(_parseResult->keyExchanger, packagePublicKey, reinforcePackage);
+	}
+
+	//----- 04. Process encryptors ------//
+
+	_encryptor = encryptors.receiver;
+	_parseResult->sendingEncryptor = encryptors.sender;
+
+	if (!_decryptedBuffer)
+		_decryptedBuffer = (uint8_t*)malloc(_decryptedBufferLen);
+
+	_ecdhCopy = new ClonedBuffer(_buffer, _bufferLength);
+	ecdhCopyExpiredTMS = slack_real_msec() + Config::UDP::_ecdh_copy_retained_milliseconds;
+	
+	return true;
 }
 
 bool ARQParser::parseHEARTBEAT()

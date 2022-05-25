@@ -59,6 +59,7 @@ curl unique_ptr 指针。函数为 curl 对应的销毁函数。
 			enum VisitStateCode visitState;
 			char* errorInfo;
 			std::shared_ptr<ChainBuffer> responseBuffer;
+			std::shared_ptr<ChainBuffer> responseHeaderBuffer;
 
 			Result();
 			~Result();
@@ -100,7 +101,11 @@ HTTP 访问结果。
 
 * **`std::shared_ptr<ChainBuffer> responseBuffer`**
 
-	返回的数据。ChainBuffer 请参见 [ChainBuffer](../base/ChainBuffer.md)。
+	返回的 HTTP body 数据。ChainBuffer 请参见 [ChainBuffer](../base/ChainBuffer.md)。
+
+* **`std::shared_ptr<ChainBuffer> responseHeaderBuffer`**
+
+	返回的 HTTP header 数据。ChainBuffer 请参见 [ChainBuffer](../base/ChainBuffer.md)。
 
 ### ResultCallback
 

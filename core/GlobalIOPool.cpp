@@ -3,6 +3,7 @@
 #else
 	#include <sys/sysinfo.h>
 #endif
+#include "Setting.h"
 #include "GlobalIOPool.h"
 
 using namespace fpnn;
@@ -51,8 +52,12 @@ GlobalIOPool::GlobalIOPool()
 	if (cpuCount < 2)
 		cpuCount = 2;
 
+	int arraySize = Setting::getInt("FPNN.global.io.thread.min.size", cpuCount);
+	if (arraySize <= 0 || cpuCount < arraySize)
+		arraySize = cpuCount;
+
 	_ioWorker.reset(new TCPEpollIOWorker);
-	_ioPool.config(cpuCount);
+	_ioPool.config(arraySize);
 	_ioPool.setProcessor(_ioWorker);
 }
 

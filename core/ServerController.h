@@ -8,6 +8,12 @@
 
 namespace fpnn
 {
+	class ServerUtils
+	{
+	public:
+		static void adjustThreadPoolParams(int &minThread, int &maxThread, int constMin, int constMax);
+	};
+
 	class ServerController
 	{
 		static std::mutex _mutex;

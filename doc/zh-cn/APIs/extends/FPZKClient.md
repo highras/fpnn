@@ -33,12 +33,18 @@ FPZKClient 向 FPZKServer 汇报的信息包括：
 	+ 服务绑定的 IP v6 地址（如果有）
 	+ 服务绑定的 SSL/TLS IP v4 端口（如果有）
 	+ 服务绑定的 SSL/TLS IP v6 端口（如果有）
+	+ 自定义数据（如果有）
 
 + 性能信息（可选）
 
 	+ 当前服务器 TCP 链接数量
 	+ 当前服务器按 CPU 核心数平均后的负载
 	+ 当前服务器 CPU 的平均利用率
+	+ GPU 索引号
+	+ GPU 百分比使用率（须开启 CUDA 支持）
+	+ 显存百分比使用率（须开启 CUDA 支持）
+	+ 显存已用字节数（须开启 CUDA 支持）
+	+ 显存字节总数（须开启 CUDA 支持）
 
 文件配置可参见 [conf.template](../../../conf.template) 相关条目，或 [FPZKCLient.h](../../../../extends/FPZKClient.h) 的头部注释。
 
@@ -54,7 +60,8 @@ FPZKClient 向 FPZKServer 汇报的信息包括：
 		struct ServiceNode
 		{
 			bool online;
-			int connCount;
+			int tcpCount;
+			int udpCount;
 			float CPULoad;
 			float loadAvg;  //-- per CPU Usage
 			int64_t registerTime;	//-- in seconds
@@ -72,6 +79,9 @@ FPZKClient 向 FPZKServer 汇报的信息包括：
 			std::string ipv4;
 			std::string ipv6;
 
+			std::shared_ptr<std::vector<MachineStatus::GPUCardInfo>> GPUStatus;
+			std::shared_ptr<std::string> extra;
+
 			ServiceNode();
 		};
 	};
@@ -84,9 +94,13 @@ FPZKClient 向 FPZKServer 汇报的信息包括：
 
 	节点是否可提供服务（服务是否在线）。
 
-+ **`int connCount`**
++ **`int tcpCount`**
 
-	节点机器层面的 TCP 链接数量。
+	节点机器层面，使用中的 TCP Socket 数量。
+
++ **`int udpCount`**
+
+	节点机器层面，使用中的 UDP Socket 数量。
 
 + **`float CPULoad`**
 
@@ -98,11 +112,11 @@ FPZKClient 向 FPZKServer 汇报的信息包括：
 
 + **`int64_t registerTime`**
 
-	节点在 FPZKServer 集群中的注册时间。
+	节点在 FPZKServer 集群中的注册的 UTC 时间，单位：秒。
 
 + **`int64_t activedTime`**
 
-	节点上次状态同步时间。
+	节点上次状态同步的 UTC 时间，单位：秒。
 
 + **`std::string version`**
 
@@ -111,6 +125,39 @@ FPZKClient 向 FPZKServer 汇报的信息包括：
 + **`std::string region`**
 
 	节点所在区域。
+
++ **`int port`**
+
+	TCP IP v4 端口。
+
++ **`int port6`**
+
+	TCP IP v6 端口。
+
++ **`int sslport`**
+
+	TCP SSL/TLS IP v4 端口。
+
++ **`int sslport6`**
+
+	TCP SSL/TLS IP v6 端口。
+
++ **`int uport`**
+
+	UDP IP v4 端口。
+
++ **`int uport6`**
+
+	UDP IP v6 端口。
+
++ **`std::shared_ptr<std::vector<MachineStatus::GPUCardInfo>> GPUStatus`**
+
+	GPU (CUDA) 信息。可参考：[MachineStatus::GPUCardInfo](../base/MachineStatus.md#GPUInfo)。
+
++ **`std::shared_ptr<std::string> extra`**
+
+	业务自定义数据。
+
 
 ### ServiceInfos
 
@@ -144,11 +191,11 @@ FPZKClient 向 FPZKServer 汇报的信息包括：
 
 + **`int64_t updateMsec`**
 
-	集群信息更新时间。
+	集群信息更新时间，单位：毫秒。
 
 + **`int64_t clusterAlteredMsec`**
 
-	集群上次变动的时间。
+	集群上次变动的时间，单位：毫秒。
 
 + **`std::map<std::string, ServiceNode> nodeMap`**
 
@@ -163,7 +210,7 @@ FPZKClient 向 FPZKServer 汇报的信息包括：
 		{
 		public:
 			virtual ~ServicesAlteredCallback() {}
-			virtual void serviceAltered(std::map<std::string, ServiceInfosPtr>& serviceInfos) = 0;
+			virtual void serviceAltered(const std::map<std::string, ServiceInfosPtr>& serviceInfos, const std::vector<std::string>& invalidServices) = 0;
 		};
 		typedef std::shared_ptr<ServicesAlteredCallback> ServicesAlteredCallbackPtr;
 	};
@@ -172,9 +219,36 @@ FPZKClient 向 FPZKServer 汇报的信息包括：
 
 **参数说明**
 
-* **`std::map<std::string, ServiceInfosPtr>& serviceInfos`**
+* **`const std::map<std::string, ServiceInfosPtr>& serviceInfos`**
 
 	发生变动的集群全名（格式：服务名 或 服务名@分组名）和服务信息 [ServiceInfos](#ServiceInfos) 组成的字典。
+
+* **`const std::vector<std::string>& invalidServices`**
+
+	已经无效的集群全名（格式：服务名 或 服务名@分组名）。
+
+### ExtraDataCommitCallback
+
+	class FPZKClient
+	{
+	public:
+		class ExtraDataCommitCallback
+		{
+		public:
+			virtual ~ExtraDataCommitCallback() {}
+			virtual std::shared_ptr<std::string> extraDataCommit() = 0;
+		};
+		typedef std::shared_ptr<ExtraDataCommitCallback> ExtraDataCommitCallbackPtr;
+	};
+
+自定义扩展数据提交事件。
+
+**返回值**
+
+* **`std::shared_ptr<std::string>`**
+
+	出现在关注者 [ServiceInfos](#ServiceInfos) `extra` 字段的业务自定义数据。
+
 
 ### FPZKClient
 
@@ -203,8 +277,10 @@ FPZKClient 向 FPZKServer 汇报的信息包括：
 		inline void setKeepAliveMaxPingRetryCount(int count);
 
 		inline void setServiceAlteredCallback(ServicesAlteredCallbackPtr callback);
+		inline void setServiceAlteredCallback(std::function<void (const std::map<std::string, ServiceInfosPtr>& serviceInfos, const std::vector<std::string>& invalidServices)> function);
 
-		inline void setServiceAlteredCallback(std::function<void (std::map<std::string, ServiceInfosPtr>& serviceInfos)> function);
+		inline void setExtraDataCommitCallback(ExtraDataCommitCallbackPtr callback);
+		inline void setExtraDataCommitCallback(std::function<std::shared_ptr<std::string>()> function);
 
 		inline void setOnline(bool online);
 		inline void monitorDetail(bool monitor);
@@ -524,8 +600,9 @@ FPZKServer 客户端。服务发现客户端。
 #### setServiceAlteredCallback
 
 	inline void setServiceAlteredCallback(ServicesAlteredCallbackPtr callback);
+	inline void setServiceAlteredCallback(std::function<void (const std::map<std::string, ServiceInfosPtr>& serviceInfos, const std::vector<std::string>& invalidServices)> function);
 
-设置集群变动事件通知的回调对象。
+设置集群变动事件通知的回调。
 
 **参数说明**
 
@@ -533,17 +610,27 @@ FPZKServer 客户端。服务发现客户端。
 
 	集群变动事件，通知回调对象 [ServicesAlteredCallback](#ServicesAlteredCallback)。
 
-#### setServiceAlteredCallback
-
-	inline void setServiceAlteredCallback(std::function<void (std::map<std::string, ServiceInfosPtr>& serviceInfos)> function);
-
-设置集群变动事件通知的回调。
-
-**参数说明**
-
 * **`std::map<std::string, ServiceInfosPtr>& serviceInfos`**
 
 	发生变动的集群全名（格式：服务名 或 服务名@分组名）和服务信息 [ServiceInfos](#ServiceInfos) 组成的字典。
+
+* **`const std::vector<std::string>& invalidServices`**
+
+	已经无效的集群全名（格式：服务名 或 服务名@分组名）。
+
+#### setExtraDataCommitCallback
+
+	inline void setExtraDataCommitCallback(ExtraDataCommitCallbackPtr callback);
+	inline void setExtraDataCommitCallback(std::function<std::shared_ptr<std::string>()> function);
+
+设置自定义数据的提交前事件回调。
+
+**参数说明**
+
+* **`ExtraDataCommitCallbackPtr callback`**
+
+	集群变动事件，通知回调对象 [ExtraDataCommitCallback](#ExtraDataCommitCallback)。
+
 
 #### setOnline
 

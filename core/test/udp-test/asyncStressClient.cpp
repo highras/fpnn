@@ -46,6 +46,14 @@ FPQuestPtr QWriter(const char* method, bool oneway, FPMessage::FP_Pack_Type def_
 	return qw.take();
 }
 
+struct EncryptInfo
+{
+	std::string publicKeyPath;
+	bool packageReinforce;
+	bool dataReinforce;
+	bool dataEnhance;
+};
+
 class Tester
 {
 	std::string _ip;
@@ -60,6 +68,7 @@ class Tester
 	std::atomic<int64_t> _timecost;
 
 	std::vector<std::thread> _threads;
+	EncryptInfo* _encryptInfo;
 
 	void test_worker(int qps);
 
@@ -67,11 +76,28 @@ public:
 	Tester(const char* ip, int port, int thread_num, int qps): _ip(ip), _port(port), _thread_num(thread_num), _qps(qps),
 		_send(0), _recv(0), _sendError(0), _recvError(0), _timecost(0)
 	{
+		_encryptInfo = new EncryptInfo;
+		_encryptInfo->publicKeyPath = Setting::getString("FPNN.client.security.serverPublicKey.path");
+
+		if (_encryptInfo->publicKeyPath.empty())
+		{
+			delete _encryptInfo;
+			_encryptInfo = NULL;
+		}
+		else
+		{
+			_encryptInfo->packageReinforce = Setting::getBool("FPNN.client.security.packageReinforce", false);
+			_encryptInfo->dataReinforce = Setting::getBool("FPNN.client.security.dataReinforce", false);
+			_encryptInfo->dataEnhance = Setting::getBool("FPNN.client.security.dataEnhance", false);
+		}
 	}
 
 	~Tester()
 	{
 		stop();
+
+		if (_encryptInfo)
+			delete _encryptInfo;
 	}
 
 	inline void incRecv() { _recv++; }
@@ -171,7 +197,15 @@ void Tester::test_worker(int qps)
 
 	UDPClientPtr client = UDPClient::createClient(_ip, _port);
 	client->setQuestProcessor(std::make_shared<QuestProcessor>());
-	client->setMTU(1500);
+
+	if (_encryptInfo)
+	{
+		bool ss = client->enableEncryptorByPemFile(_encryptInfo->publicKeyPath.c_str(), _encryptInfo->packageReinforce,
+			_encryptInfo->dataEnhance, _encryptInfo->dataReinforce);
+		if (!ss)
+			cout<<"Enable encryption failed."<<endl;
+	}
+	//client->setMTU(1500);
 	//client->connect();
 
 	while (true)
@@ -212,6 +246,15 @@ void Tester::test_worker(int qps)
 	}
 	//client->close();
 }
+
+/*
+	Extera Config Item:
+
+	FPNN.client.security.serverPublicKey.path = 
+	FPNN.client.security.packageReinforce = 
+	FPNN.client.security.dataReinforce = 
+	FPNN.client.security.dataEnhance = 
+*/
 
 int main(int argc, char* argv[])
 {

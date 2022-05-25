@@ -14,12 +14,13 @@
 #include "ServerController.h"
 #include "ServerInterface.h"
 #include "RecordIPList.h"
-#include "UDPIOBuffer.h"
+#include "UDP.v2/UDPIOBuffer.v2.h"
 #include "GlobalIOPool.h"
 #include "UDPServerIOWorker.h"
 #include "ConnectionReclaimer.h"
 #include "UDPServerMasterProcessor.h"
 #include "ConcurrentSenderInterface.h"
+#include "KeyExchange.h"
 
 namespace fpnn
 {
@@ -75,6 +76,8 @@ namespace fpnn
 		size_t _maxWorkerPoolQueueLength;
 		int64_t _timeoutQuest; //only valid when as a client
 
+		std::set<int> _newSockets;
+		std::set<int> _newSockets6;
 		UDPServerReceiver _receiver;
 		UDPConnectionCache _connectionCache;
 		UDPServerConnectionMap _connectionMap;
@@ -85,6 +88,8 @@ namespace fpnn
 		std::shared_ptr<ParamTemplateThreadPoolArray<UDPRequestPackage *>> _workerPool;
 		std::shared_ptr<TaskThreadPoolArray> _answerCallbackPool;
 
+		bool _encryptEnabled;
+		ECCKeyExchange _keyExchanger;
 		std::atomic<bool> _enableIPWhiteList;
 		IPWhiteList _ipWhiteList;
 		ConnectionReclaimerPtr _reclaimer;
@@ -109,10 +114,11 @@ namespace fpnn
 		void exitEpoll(int socket);
 		const char* createSocket(int socketDomain, const struct sockaddr *addr, socklen_t addrlen, int& newSocket);
 		void initFailClean(const char* fail_info);
-		void createConnections();
-		void createConnections6();
+		void createConnections(int socket);
+		void createConnections6(int socket6);
 		bool checkSourceAddress();
 		void newConnection(int newSocket, bool isIPv4);
+		void recheckNewSockets();
 		void scheduleNewConnections();
 #ifdef __APPLE__
 		void processEvent(struct kevent & event);
@@ -138,7 +144,7 @@ namespace fpnn
 #endif
 			_maxWorkerPoolQueueLength(FPNN_DEFAULT_UDP_WORK_POOL_QUEUE_SIZE),
 			_timeoutQuest(FPNN_DEFAULT_QUEST_TIMEOUT * 1000),
-			_serverMasterProcessor(new UDPServerMasterProcessor()), _enableIPWhiteList(false)
+			_serverMasterProcessor(new UDPServerMasterProcessor()), _encryptEnabled(false), _enableIPWhiteList(false)
 		{
 			_closeNotifyFds[0] = 0;
 			_closeNotifyFds[1] = 0;
@@ -257,7 +263,11 @@ namespace fpnn
 
 		inline void configWorkerThreadPool(int32_t initCount, int32_t perAppendCount, int32_t perfectCount, int32_t maxCount, size_t maxQueueSize)
 		{
-			_workerPool.reset(new ParamTemplateThreadPoolArray<UDPRequestPackage *>(getCPUCount(), _serverMasterProcessor));
+			int arraySize = getCPUCount();
+			if (initCount > 0 && arraySize > initCount)
+				arraySize = initCount;
+
+			_workerPool.reset(new ParamTemplateThreadPoolArray<UDPRequestPackage *>(arraySize, _serverMasterProcessor));
 			_workerPool->init(initCount, perAppendCount, perfectCount, maxCount, maxQueueSize);
 		}
 		inline void enableAnswerCallbackThreadPool(int32_t initCount, int32_t perAppendCount, int32_t perfectCount, int32_t maxCount)
@@ -265,7 +275,11 @@ namespace fpnn
 			if (_answerCallbackPool)
 				return;
 
-			_answerCallbackPool.reset(new TaskThreadPoolArray(getCPUCount()));
+			int arraySize = getCPUCount();
+			if (initCount > 0 && arraySize > initCount)
+				arraySize = initCount;
+			
+			_answerCallbackPool.reset(new TaskThreadPoolArray(arraySize));
 			_answerCallbackPool->init(initCount, perAppendCount, perfectCount, maxCount);
 		}
 		virtual std::string workerPoolStatus()
@@ -281,6 +295,14 @@ namespace fpnn
 				return _answerCallbackPool->infos();
 			}
 			return "{}";
+		}
+
+		static void enableForceEncryption();
+		inline bool encrpytionEnabled() { return _encryptEnabled; }
+		inline bool enableEncryptor(const std::string& curve, const std::string& privateKey)
+		{
+			_encryptEnabled = _keyExchanger.init(curve, privateKey);
+			return _encryptEnabled;
 		}
 
 		inline bool ipWhiteListEnabled() { return _enableIPWhiteList; }

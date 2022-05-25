@@ -9,6 +9,7 @@
 #include "FPWriter.h"
 #include "AutoRelease.h"
 #include "FileSystemUtil.h"
+#include "PEM_DER_SAX.h"
 
 using namespace fpnn;
 
@@ -20,6 +21,52 @@ UDPClient::UDPClient(const std::string& host, int port, bool autoReconnect): Cli
 		else
 			_MTU = Config::UDP::_internet_MTU;
 	}
+
+bool UDPClient::enableEncryptorByDerData(const std::string &derData, bool packageReinforce,
+	bool dataEnhance, bool dataReinforce)
+{
+	EccKeyReader reader;
+
+	X690SAX derSAX;
+	if (derSAX.parse(derData, &reader) == false)
+		return false;
+
+	enableEncryptor(reader.curveName(), reader.rawPublicKey(), packageReinforce, dataEnhance, dataReinforce);
+	return true;
+}
+
+bool UDPClient::enableEncryptorByPemData(const std::string &PemData, bool packageReinforce,
+	bool dataEnhance, bool dataReinforce)
+{
+	EccKeyReader reader;
+
+	PemSAX pemSAX;
+	if (pemSAX.parse(PemData, &reader) == false)
+		return false;
+
+	enableEncryptor(reader.curveName(), reader.rawPublicKey(), packageReinforce, dataEnhance, dataReinforce);
+	return true;
+}
+
+bool UDPClient::enableEncryptorByDerFile(const char *derFilePath, bool packageReinforce,
+	bool dataEnhance, bool dataReinforce)
+{
+	std::string content;
+	if (FileSystemUtil::readFileContent(derFilePath, content) == false)
+		return false;
+	
+	return enableEncryptorByDerData(content, packageReinforce, dataEnhance, dataReinforce);
+}
+
+bool UDPClient::enableEncryptorByPemFile(const char *pemFilePath, bool packageReinforce,
+	bool dataEnhance, bool dataReinforce)
+{
+	std::string content;
+	if (FileSystemUtil::readFileContent(pemFilePath, content) == false)
+		return false;
+
+	return enableEncryptorByPemData(content, packageReinforce, dataEnhance, dataReinforce);
+}
 
 class UDPQuestTask: public ITaskThreadPool::ITask
 {
@@ -122,6 +169,16 @@ bool UDPClient::perpareConnection(ConnectionInfoPtr currConnInfo)
 	
 	if (_untransmittedSeconds != 0)
 		connection->setUntransmittedSeconds(_untransmittedSeconds);
+
+	if (_eccCurve.size() > 0)
+	{
+		if (!connection->entryEncryptMode(_eccCurve, _serverPublicKey, _packageReinforce, _dataEnhance, _dataReinforce))
+		{
+			LOG_ERROR("UDP client entry encryption mode failed. %s", currConnInfo->str().c_str());
+			delete connection;
+			return false;
+		}
+	}
 
 	connected(connection);
 

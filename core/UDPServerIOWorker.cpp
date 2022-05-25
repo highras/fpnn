@@ -185,12 +185,19 @@ void UDPServerConnection::parseCachedRawData(bool& requireClose, bool& requireCo
 			}
 		}
 
+		_connectionInfo->_encrypted = _ioBuffer.isEncrypted();
+		
 		delete rawData;
 	}
 
 	_rawData.clear();
 
 	if (_questCache.size() > 0)
+	{
+		requireConnectedEvent = true;
+		_connectedEventStatus = UDPConnectionEventStatus::Calling;
+	}
+	else if (firstSchedule && _connectionInfo->_encrypted)
 	{
 		requireConnectedEvent = true;
 		_connectedEventStatus = UDPConnectionEventStatus::Calling;
@@ -312,6 +319,8 @@ bool UDPServerConnection::recvData(std::list<FPQuestPtr>& questList, std::list<F
 	bool status = _ioBuffer.recvData();
 	questList.swap(_ioBuffer.getReceivedQuestList());
 	answerList.swap(_ioBuffer.getReceivedAnswerList());
+
+	_connectionInfo->_encrypted = _ioBuffer.isEncrypted();
 
 	//if (questList.size() || answerList.size())
 	//	_activeTime = slack_real_sec();

@@ -258,7 +258,11 @@ namespace fpnn
 		}
 		inline void configWorkerThreadPool(int32_t initCount, int32_t perAppendCount, int32_t perfectCount, int32_t maxCount, size_t maxQueueSize)
 		{
-			_workerPool.reset(new ParamTemplateThreadPoolArray<RequestPackage *>(getCPUCount(), _serverMasterProcessor));
+			int arraySize = getCPUCount();
+			if (initCount > 0 && arraySize > initCount)
+				arraySize = initCount;
+
+			_workerPool.reset(new ParamTemplateThreadPoolArray<RequestPackage *>(arraySize, _serverMasterProcessor));
 			_workerPool->init(initCount, perAppendCount, perfectCount, maxCount, maxQueueSize);
 		}
 		inline void enableAnswerCallbackThreadPool(int32_t initCount, int32_t perAppendCount, int32_t perfectCount, int32_t maxCount)
@@ -266,7 +270,11 @@ namespace fpnn
 			if (_answerCallbackPool)
 				return;
 
-			_answerCallbackPool.reset(new TaskThreadPoolArray(getCPUCount()));
+			int arraySize = getCPUCount();
+			if (initCount > 0 && arraySize > initCount)
+				arraySize = initCount;
+
+			_answerCallbackPool.reset(new TaskThreadPoolArray(arraySize));
 			_answerCallbackPool->init(initCount, perAppendCount, perfectCount, maxCount);
 		}
 

@@ -76,8 +76,16 @@ ClientEngine::ClientEngine(): _epoll_fd(0), _running(false), _started(false), _m
 
 	_questProcessPoolMaxQueueLength = 10 * 10000;
 
-	_answerCallbackPool.config(_cpuCount);
-	_questProcessPool.config(_cpuCount);
+	int workArraySize = Setting::getInt("FPNN.client.work.thread.min.size", _cpuCount);
+	if (workArraySize <= 0 || _cpuCount < workArraySize)
+		workArraySize = _cpuCount;
+
+	int duplexArraySize = Setting::getInt("FPNN.client.duplex.thread.min.size", _cpuCount);
+	if (duplexArraySize <= 0 || _cpuCount < duplexArraySize)
+		duplexArraySize = _cpuCount;
+
+	_answerCallbackPool.config(workArraySize);
+	_questProcessPool.config(duplexArraySize);
 
 	initClientVaribles();
 

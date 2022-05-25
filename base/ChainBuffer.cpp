@@ -354,7 +354,6 @@ int ChainBuffer::find(const char c, int start_pos, int* chunckIndex, int* chunkB
 
 bool ChainBuffer::memcmp(const void* target, int len, int start_pos)
 {
-	int cbIdx = 0;
 	int cbOffset = 0;
 	ChainBlock *cb = _first;
 
@@ -367,7 +366,6 @@ bool ChainBuffer::memcmp(const void* target, int len, int start_pos)
 	while (start_pos > _capacity)
 	{
 		start_pos -= _capacity;
-		cbIdx += 1;
 		cb = cb->_next;
 	}
 

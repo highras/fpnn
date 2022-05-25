@@ -20,6 +20,12 @@ UDP 客户端内部实现了可靠 UDP 连接，可混合发送可靠和不可�
 	public:
 		virtual ~UDPClient() { close(); }
 
+		bool enableEncryptorByDerData(const std::string &derData, bool packageReinforce = false, bool dataEnhance = false, bool dataReinforce = false);
+		bool enableEncryptorByPemData(const std::string &PemData, bool packageReinforce = false, bool dataEnhance = false, bool dataReinforce = false);
+		bool enableEncryptorByDerFile(const char *derFilePath, bool packageReinforce = false, bool dataEnhance = false, bool dataReinforce = false);
+		bool enableEncryptorByPemFile(const char *pemFilePath, bool packageReinforce = false, bool dataEnhance = false, bool dataReinforce = false);
+		inline void enableEncryptor(const std::string& curve, const std::string& peerPublicKey, bool packageReinforce = false, bool dataEnhance = false, bool dataReinforce = false);
+
 		virtual bool connect();
 		virtual void close();
 
@@ -81,6 +87,143 @@ UDPClient 的构造函数为私有成员，无法直接调用。请使用静态�
 ### 成员函数
 
 本文档仅列出基于基类所扩展的成员函数，其余成员函数请参考基类文档 [Client](Client.md)。
+
+#### enableEncryptor
+
+	inline void enableEncryptor(const std::string& curve, const std::string& peerPublicKey, bool packageReinforce = false, bool dataEnhance = false, bool dataReinforce = false);
+
+启用链接加密。
+
+**参数说明**
+
+* **`const std::string& curve`**
+
+	ECDH (椭圆曲线密钥交换) 所用曲线名称。
+
+	可用值：
+
+	+ "secp256k1"
+	+ "secp256r1"
+	+ "secp224r1"
+	+ "secp192r1"
+
+* **`const std::string& peerPublicKey`**
+
+	服务端公钥（二进制数据）。
+
+	**注意**
+
+	该公钥为裸密钥，由 FPNN 框架内置工具 [eccKeyMaker](../../fpnn-tools.md#eccKeyMaker) 生成。
+
+* **`bool packageReinforce = false`**
+
+	UDP 整包加密密钥长度选择：true 表示采用 256 位密钥；false 表示采用 128 位密钥。
+
+* **`bool dataEnhance = false`**
+
+	是否启动数据内容强化加密。
+
+* **`bool dataReinforce = false`**
+
+	数据内容加密密钥长度选择：true 表示采用 256 位密钥；false 表示采用 128 位密钥。
+
+#### enableEncryptorByDerData
+
+	bool enableEncryptorByDerData(const std::string &derData, bool packageReinforce = false, bool dataEnhance = false, bool dataReinforce = false);
+
+启用链接加密。
+
+**参数说明**
+
+* **`const std::string &derData`**
+
+	服务端公钥，DER 格式。
+
+* **`bool packageReinforce = false`**
+
+	UDP 整包加密密钥长度选择：true 表示采用 256 位密钥；false 表示采用 128 位密钥。
+
+* **`bool dataEnhance = false`**
+
+	是否启动数据内容强化加密。
+
+* **`bool dataReinforce = false`**
+
+	数据内容加密密钥长度选择：true 表示采用 256 位密钥；false 表示采用 128 位密钥。
+
+#### enableEncryptorByPemData
+
+	bool enableEncryptorByPemData(const std::string &PemData, bool packageReinforce = false, bool dataEnhance = false, bool dataReinforce = false);
+
+启用链接加密。
+
+**参数说明**
+
+* **`const std::string &PemData`**
+
+	服务端公钥，PEM 格式。
+
+* **`bool packageReinforce = false`**
+
+	UDP 整包加密密钥长度选择：true 表示采用 256 位密钥；false 表示采用 128 位密钥。
+
+* **`bool dataEnhance = false`**
+
+	是否启动数据内容强化加密。
+
+* **`bool dataReinforce = false`**
+
+	数据内容加密密钥长度选择：true 表示采用 256 位密钥；false 表示采用 128 位密钥。
+
+#### enableEncryptorByDerFile
+
+	bool enableEncryptorByDerFile(const char *derFilePath, bool packageReinforce = false, bool dataEnhance = false, bool dataReinforce = false);
+
+启用链接加密。
+
+**参数说明**
+
+* **`const char *derFilePath`**
+
+	存储服务端 DER 格式公钥文件的路径。
+
+* **`bool packageReinforce = false`**
+
+	UDP 整包加密密钥长度选择：true 表示采用 256 位密钥；false 表示采用 128 位密钥。
+
+* **`bool dataEnhance = false`**
+
+	是否启动数据内容强化加密。
+
+* **`bool dataReinforce = false`**
+
+	数据内容加密密钥长度选择：true 表示采用 256 位密钥；false 表示采用 128 位密钥。
+
+
+#### enableEncryptorByPemFile
+
+	bool enableEncryptorByPemFile(const char *pemFilePath, bool packageReinforce = false, bool dataEnhance = false, bool dataReinforce = false);
+
+启用链接加密。
+
+**参数说明**
+
+* **`const char *pemFilePath`**
+
+	存储服务端 PEM 格式公钥文件的路径。
+
+* **`bool packageReinforce = false`**
+
+	UDP 整包加密密钥长度选择：true 表示采用 256 位密钥；false 表示采用 128 位密钥。
+
+* **`bool dataEnhance = false`**
+
+	是否启动数据内容强化加密。
+
+* **`bool dataReinforce = false`**
+
+	数据内容加密密钥长度选择：true 表示采用 256 位密钥；false 表示采用 128 位密钥。
+	
 
 #### sendQuest
 

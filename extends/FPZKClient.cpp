@@ -327,11 +327,13 @@ const FPZKClient::ServiceInfosPtr FPZKClient::checkCacheStatus(const std::string
 		{
 			std::lock_guard<std::mutex> lck(_mutex);
 
-			auto it = _servicesMap.find(serviceName);
-			if (it != _servicesMap.end())
-				return it->second;
-
-			if (_interestServices.find(serviceName) == _interestServices.end())
+			if (_interestServices.find(serviceName) != _interestServices.end())
+			{
+				auto it = _servicesMap.find(serviceName);
+				if (it != _servicesMap.end())
+					return it->second;
+			}
+			else
 			{
 				newInterest = true;
 				_interestServices.insert(serviceName);
@@ -422,10 +424,59 @@ void FPZKClient::adjustSelfPortInfo()
 	}
 }
 
+void FPZKClient::buildGPUData(std::vector<std::vector<unsigned long long>>& GPUData)
+{
+	std::list<struct MachineStatus::GPUCardInfo> GPUInfos;
+			
+	if (MachineStatus::getGPUInfo(GPUInfos) == false)
+		LOG_ERROR("Fetch GPU Info failed.");
+
+	if (GPUInfos.size() > 0)
+	{
+		GPUData.reserve(GPUInfos.size());
+		for (auto& cardInfo: GPUInfos)
+		{
+			std::vector<unsigned long long> cardData;
+			cardData.push_back(cardInfo.index);
+			cardData.push_back(cardInfo.usage);
+			cardData.push_back(cardInfo.memory.usage);
+			cardData.push_back(cardInfo.memory.used);
+			cardData.push_back(cardInfo.memory.total);
+
+			GPUData.push_back(cardData);
+		}
+	}
+}
+
+std::shared_ptr<std::string> FPZKClient::buildExtraData()
+{
+	if (_extraDataCommitCallback)
+	{
+		try
+		{
+			return _extraDataCommitCallback->extraDataCommit();	
+		}
+		catch (const std::exception& ex)
+		{
+			LOG_ERROR("Fatal error occurred when generating extra data. Error: %s.", ex.what());
+		}
+		catch (...)
+		{
+			LOG_ERROR("Fatal unknown error occurred when generating extra data.");
+		}
+	}
+	return nullptr;	
+}
+
 bool FPZKClient::syncSelfStatus(float perCPUUsage)
 {
-	int connNum = 0;
+	int tcpNum = 0;
+	int udpNum = 0;
 	float perCPULoad = 0.;
+	std::vector<std::vector<unsigned long long>> GPUData;
+	std::shared_ptr<std::string> extraData = buildExtraData();
+
+	//-- TODO
 
 	if (_syncPerformanceInfo)
 	{
@@ -434,8 +485,13 @@ bool FPZKClient::syncSelfStatus(float perCPUUsage)
 #else
 		int cpuCount = get_nprocs();
 #endif
-		connNum = MachineStatus::getConnectionCount();
+		tcpNum = MachineStatus::getInusedSocketCount(true, true) + MachineStatus::getInusedSocketCount(false, true);
+		udpNum = MachineStatus::getInusedSocketCount(true, false) + MachineStatus::getInusedSocketCount(false, false);
 		perCPULoad = MachineStatus::getCPULoad()/cpuCount;
+
+#ifdef SUPPORT_CUDA
+		buildGPUData(GPUData);
+#endif
 	}
 
 	FPQuestPtr quest;
@@ -447,11 +503,15 @@ bool FPZKClient::syncSelfStatus(float perCPUUsage)
 
 		if (_registeredName.length())
 		{
-			int totalCount = 23;
+			int totalCount = 26;
 			if (!_syncForPublic)
 				totalCount -= 5;
 			if (!_syncPerformanceInfo)
-				totalCount -= 3;
+				totalCount -= 5;
+			else if (GPUData.empty())
+				totalCount -= 1;
+			if (extraData == nullptr)
+				totalCount -= 1;
 
 			FPQWriter qw(totalCount, "syncServerInfo");
 			qw.param("project", _projectName);
@@ -464,9 +524,15 @@ bool FPZKClient::syncSelfStatus(float perCPUUsage)
 			
 			if (_syncPerformanceInfo)
 			{
-				qw.param("connNum", connNum);
+				qw.param("tcpNum", tcpNum);
+				qw.param("udpNum", udpNum);
 				qw.param("perCPULoad", perCPULoad);
 				qw.param("perCPUUsage", perCPUUsage);
+
+				if (GPUData.size() > 0)
+				{
+					qw.param("GPUInfo", GPUData);
+				}
 			}
 
 			qw.param("online", _online);
@@ -490,6 +556,9 @@ bool FPZKClient::syncSelfStatus(float perCPUUsage)
 				qw.param("sslport", _sslport);
 				qw.param("sslport6", _sslport6);
 			}
+
+			if (extraData)
+				qw.param("extra", *extraData);
 
 			quest = qw.take();
 		}
@@ -530,67 +599,16 @@ bool FPZKClient::syncSelfStatus(float perCPUUsage)
 	}
 
 	std::vector<std::string> services = ar.get("services", std::vector<std::string>());
-	if (services.size() > 0)
-	{
-		//-- FPZKServer 3.0.2 and after
-		for (auto& service: services)
-			queriedServices.erase(service);
+	for (auto& service: services)
+		queriedServices.erase(service);
 
-		std::vector<int64_t> revisions = ar.get("revisions", std::vector<int64_t>());
-		std::vector<int64_t> clusterAlteredTimes = ar.get("clusterAlteredTimes", std::vector<int64_t>());
+	std::vector<int64_t> revisions = ar.get("revisions", std::vector<int64_t>());
+	std::vector<int64_t> clusterAlteredTimes = ar.get("clusterAlteredTimes", std::vector<int64_t>());
 
-		updateChangedAndMonitoredServices(queriedServices, services, revisions, clusterAlteredTimes);
-	}
-	else
-	{
-		//-- FPZKServer 3.0.1 and before
-		std::map<std::string, int64_t> rvMap = ar.get("revisionMap", std::map<std::string, int64_t>());
-		
-		for (auto& revpair: rvMap)
-			queriedServices.erase(revpair.first);
+	updateChangedAndMonitoredServices(queriedServices, services, revisions, clusterAlteredTimes);
 
-		updateChangedAndMonitoredServices(queriedServices, rvMap);
-	}
 
 	return true;
-}
-
-void FPZKClient::updateChangedAndMonitoredServices(const std::set<std::string>& invalidServices, const std::map<std::string, int64_t>& rvMap)
-{
-	std::set<std::string> needUpdateServices;
-	{
-		std::lock_guard<std::mutex> lck(_mutex);
-
-		for (auto& service: invalidServices)
-			_servicesMap.erase(service);
-
-		if (_monitorDetail == false)
-		{
-			for (auto& revpair: rvMap)
-			{
-				auto it = _servicesMap.find(revpair.first);
-				if (it != _servicesMap.end())
-				{
-					if (it->second->revision != revpair.second)
-						needUpdateServices.insert(revpair.first);
-				}
-				else
-					needUpdateServices.insert(revpair.first);
-			}
-
-			needUpdateServices.insert(_detailServices.begin(), _detailServices.end());
-		}
-		else
-			needUpdateServices = _interestServices;
-	}
-
-	for (auto& service: invalidServices)
-	{
-		LOG_INFO("Services %s cluster is empty in FPZK clinet cache!",  service.c_str());
-	}
-
-	if(!needUpdateServices.empty())
-		fetchInterestServices(needUpdateServices);
 }
 
 void FPZKClient::updateChangedAndMonitoredServices(const std::set<std::string>& invalidServices,
@@ -721,6 +739,8 @@ void FPZKClient::updateServicesMapCache(FPReader* reader)
 	std::vector<std::string> nodeInfoFields = reader->want("nodeInfoFields", std::vector<std::string>());
 	std::vector<std::vector<std::vector<std::string>>> srvNodes = reader->want("srvNodes", std::vector<std::vector<std::vector<std::string>>>());
 	std::vector<std::string> invalidServices = reader->get("invalidServices", std::vector<std::string>());
+	std::map<std::string, std::vector<std::vector<unsigned long long>>> GPUInfos;
+	GPUInfos = reader->get("GPUInfo", GPUInfos);
 
 	bool epsExist = false;
 	for (auto& str: nodeInfoFields)
@@ -756,13 +776,15 @@ void FPZKClient::updateServicesMapCache(FPReader* reader)
 			const std::vector<std::string>& nodeInfos = srvNodes[i][j];
 			std::string endpoint;
 			ServiceNode sn;
+			bool requireGPUInfos = false;
 
 			/*
 			  Fields：
 				"endpoint", "region", "srvVersion", "registerTime", "lastMTime", "online",
-				"connNum", "loadAvg", "cpuUsage",
+				"tcpNum", "udpNum", "loadAvg", "cpuUsage",
 				"ipv4", "ipv6", "domain", 
-				"port", "port6", "sslport", "sslport6", "uport", "uport6"
+				"port", "port6", "sslport", "sslport6", "uport", "uport6",
+				"gpu", "extra"
 			*/
 
 			for (int k = 0; k < (int)nodeInfos.size(); k++)
@@ -781,8 +803,10 @@ void FPZKClient::updateServicesMapCache(FPReader* reader)
 				else if(nodeInfoFields[k] =="online")
 					sn.online = (nodeInfos[k] == "true"? true : false);
 
-				else if(nodeInfoFields[k] =="connNum")
-					sn.connCount = stoi(nodeInfos[k]);
+				else if(nodeInfoFields[k] =="tcpNum")
+					sn.tcpCount = stoi(nodeInfos[k]);
+				else if(nodeInfoFields[k] =="udpNum")
+					sn.udpCount = stoi(nodeInfos[k]);
 				else if(nodeInfoFields[k] =="loadAvg")
 					sn.loadAvg = stof(nodeInfos[k]);
 				else if(nodeInfoFields[k] =="cpuUsage")
@@ -810,12 +834,58 @@ void FPZKClient::updateServicesMapCache(FPReader* reader)
 					sn.uport = stoi(nodeInfos[k]);
 				else if(nodeInfoFields[k] =="uport6")
 					sn.uport6 = stoi(nodeInfos[k]);
+
+
+				else if(nodeInfoFields[k] =="gpu" && nodeInfos[k].size() > 0)
+					requireGPUInfos = true;
+				else if(nodeInfoFields[k] =="extra")
+				{
+					sn.extra.reset(new std::string());
+					sn.extra->assign(nodeInfos[k]);
+				}
 			}
 
 			if (endpoint.length())
 			{
 				sip->nodeMap[endpoint] = sn;
 				if (sn.online) sip->onlineCount += 1;
+			}
+
+			if (requireGPUInfos)
+			{
+				std::string host;
+				int port;
+				if (parseAddress(endpoint, host, port))
+				{
+					auto it = GPUInfos.find(host);
+					if (it != GPUInfos.end())
+					{
+						if (it->second.size() > 0)
+						{
+							sn.GPUStatus.reset(new std::vector<MachineStatus::GPUCardInfo>());
+							sn.GPUStatus->reserve(it->second.size());
+
+							for (auto& cardData: it->second)
+							{
+								MachineStatus::GPUCardInfo info;
+								info.index = (unsigned int)cardData[0];
+								info.usage = (unsigned int)cardData[1];
+								info.memory.usage = (unsigned int)cardData[2];
+								info.memory.used = cardData[3];
+								info.memory.total = cardData[4];
+
+								sn.GPUStatus->push_back(info);
+							}
+						}
+						else
+							LOG_ERROR("Empty GPU info on %s when updating service map cache.", host.c_str());
+					}
+					else
+						LOG_ERROR("Cannot find GPU info on %s when updating service map cache.", host.c_str());
+
+				}
+				else
+					LOG_ERROR("Receive invalid endpoint %s when looking up GPU infos for updating service map cache.", endpoint.c_str());
 			}
 		}
 
@@ -831,9 +901,6 @@ void FPZKClient::updateServicesMapCache(FPReader* reader)
 			if (_serviceAlteredCallback)
 			{
 				alteredCb = _serviceAlteredCallback;
-
-				for (auto& service: invalidServices)
-					alteredServices[service] = std::make_shared<ServiceInfos>();
 
 				for (auto& updatedPair: updatedServices)
 				{
@@ -855,12 +922,13 @@ void FPZKClient::updateServicesMapCache(FPReader* reader)
 		}
 	}
 
-	if (alteredCb && alteredServices.size())
+	if (alteredCb && (alteredServices.size() || invalidServices.size()))
 	{
 		ServicesAlteredCallbackTaskPtr t(new ServicesAlteredCallbackTask);
 
 		t->_callback = alteredCb;
 		t->_alteredServices.swap(alteredServices);
+		t->_invalidServices = invalidServices;
 		ClientEngine::wakeUpAnswerCallbackThreadPool(t);
 	}
 

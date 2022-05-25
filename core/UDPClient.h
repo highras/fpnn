@@ -22,6 +22,13 @@ namespace fpnn
 		bool _keepAlive;
 		int _untransmittedSeconds;
 
+		//----------
+		std::string _eccCurve;
+		std::string _serverPublicKey;
+		bool _packageReinforce;
+		bool _dataEnhance;
+		bool _dataReinforce;
+
 	private:
 		int connectIPv4Address(ConnectionInfoPtr currConnInfo);
 		int connectIPv6Address(ConnectionInfoPtr currConnInfo);
@@ -36,6 +43,26 @@ namespace fpnn
 		  Call by framwwork.
 		=============================================================================== */
 		void dealQuest(FPQuestPtr quest, ConnectionInfoPtr connectionInfo);		//-- must done in thread pool or other thread.
+		/*===============================================================================
+		  Call by Developer. Configure Function.
+		=============================================================================== */
+		bool enableEncryptorByDerData(const std::string &derData, bool packageReinforce = false,
+			bool dataEnhance = false, bool dataReinforce = false);
+		bool enableEncryptorByPemData(const std::string &PemData, bool packageReinforce = false,
+			bool dataEnhance = false, bool dataReinforce = false);
+		bool enableEncryptorByDerFile(const char *derFilePath, bool packageReinforce = false,
+			bool dataEnhance = false, bool dataReinforce = false);
+		bool enableEncryptorByPemFile(const char *pemFilePath, bool packageReinforce = false,
+			bool dataEnhance = false, bool dataReinforce = false);
+		inline void enableEncryptor(const std::string& curve, const std::string& peerPublicKey,
+			bool packageReinforce = false, bool dataEnhance = false, bool dataReinforce = false)
+		{
+			_eccCurve = curve;
+			_serverPublicKey = peerPublicKey;
+			_packageReinforce = packageReinforce;
+			_dataEnhance = dataEnhance;
+			_dataReinforce = dataReinforce;
+		}
 		/*===============================================================================
 		  Call by Developer.
 		=============================================================================== */

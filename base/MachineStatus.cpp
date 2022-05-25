@@ -7,13 +7,29 @@
 
 using namespace fpnn;
 
-int MachineStatus::getIPv4ConnectionCount()
+int MachineStatus::getInusedSocketCount(bool IPv4, bool TCP)
 {
-	std::ifstream fin("/proc/net/sockstat");
+	const char* procFile;
+	const char* key;
+	int keyLen;
+	if (IPv4)
+	{
+		procFile = "/proc/net/sockstat";
+		key = TCP ? "TCP:" : "UDP:";
+		keyLen = 4;
+	}
+	else
+	{
+		procFile = "/proc/net/sockstat6";
+		key = TCP ? "TCP6:" : "UDP6:";
+		keyLen = 5;
+	}
+
+	std::ifstream fin(procFile);
 	if (fin.is_open()) {
 		char line[1024];
 		while(fin.getline(line, sizeof(line))){
-			if (strncmp("TCP:", line, 4))
+			if (strncmp(key, line, keyLen))
 				continue;
 
 			std::string sLine(line);
@@ -27,41 +43,7 @@ int MachineStatus::getIPv4ConnectionCount()
 		}
 		fin.close();
 	}
-	return -1;
-}
-
-int MachineStatus::getIPv6ConnectionCount()
-{
-	std::ifstream fin("/proc/net/sockstat6");
-	if (fin.is_open()) {
-		char line[1024];
-		while(fin.getline(line, sizeof(line))){
-			if (strncmp("TCP6:", line, 5))
-				continue;
-
-			std::string sLine(line);
-			std::vector<std::string> items;
-			StringUtil::split(sLine, " ", items);
-			if(items.size() > 3)
-			{
-				fin.close();
-				return std::stoi(items[2]);			// number of inused TCP connections
-			}
-		}
-		fin.close();
-	}
-	return -1;
-}
-
-int MachineStatus::getConnectionCount()
-{
-	int ipv4 = getIPv4ConnectionCount();
-	int ipv6 = getIPv6ConnectionCount();
-
-	if (ipv4 < 0) ipv4 = 0;
-	if (ipv6 < 0) ipv6 = 0;
-
-	return ipv4 + ipv6;
+	return 0;
 }
 
 float MachineStatus::getCPULoad()
@@ -114,3 +96,61 @@ void MachineStatus::getNetworkStatus(uint64_t& recvBytes, uint64_t& sendBytes)
 		fin.close();
 	}
 }
+
+#ifdef SUPPORT_CUDA
+#include "nvml.h"
+
+bool MachineStatus::getGPUInfo(std::list<struct GPUCardInfo>& infos)
+{
+	nvmlReturn_t result;
+	unsigned int device_count, i;
+
+	result = nvmlDeviceGetCount(&device_count);
+	if (NVML_SUCCESS != result)
+		return false;
+
+	for (i = 0; i < device_count; i++)
+	{
+		nvmlDevice_t device;
+		//char name[NVML_DEVICE_NAME_BUFFER_SIZE];
+		result = nvmlDeviceGetHandleByIndex(i, &device);
+		if (NVML_SUCCESS != result)
+			continue;
+
+		nvmlUtilization_t utilization;
+		result = nvmlDeviceGetUtilizationRates(device, &utilization);
+		if (NVML_SUCCESS == result)
+		{
+			GPUCardInfo info;
+			info.index = i;
+			info.usage = utilization.gpu;
+			info.memory.usage = utilization.memory;
+
+			nvmlMemory_t memory;
+			result = nvmlDeviceGetMemoryInfo(device, &memory);
+			if (NVML_SUCCESS == result)
+			{
+				info.memory.used = memory.used;
+				info.memory.total = memory.total;
+			}
+			else
+			{
+				info.memory.used = 0;
+				info.memory.total = 0;
+			}
+
+			infos.push_back(info);
+		}
+	}
+
+	return true;
+}
+
+#else
+
+bool MachineStatus::getGPUInfo(std::list<struct GPUCardInfo>& infos)
+{
+	return false;
+}
+
+#endif

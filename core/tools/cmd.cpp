@@ -69,6 +69,45 @@ bool prepareEncrypt(TCPClientPtr client)
 	return true;
 }
 
+bool prepareEncrypt(UDPClientPtr client)
+{
+	if (CommandLineParser::exist("ecc-pem"))
+	{
+		std::string pemFile = CommandLineParser::getString("ecc-pem");
+		if (client->enableEncryptorByPemFile(pemFile.c_str()) == false)
+		{
+			cout<<"Enable Ecc Encrypt with PEM file "<<pemFile<<" failed."<<endl;
+			return false;
+		}
+	}
+	else if (CommandLineParser::exist("ecc-der"))
+	{
+		std::string derFile = CommandLineParser::getString("ecc-der");
+		if (client->enableEncryptorByDerFile(derFile.c_str()) == false)
+		{
+			cout<<"Enable Ecc Encrypt with DER file "<<derFile<<" failed."<<endl;
+			return false;
+		}
+	}
+	else if (CommandLineParser::exist("ecc-curve"))
+	{
+		std::string curve = CommandLineParser::getString("ecc-curve");
+		if (!checkCurveName(curve))
+			return false;
+
+		std::string rawKeyFile = CommandLineParser::getString("ecc-raw-key");
+
+		std::string key;
+		if (FileSystemUtil::readFileContent(rawKeyFile, key) == false)
+		{
+			cout<<"Read server raw public key file "<<rawKeyFile<<" failed!"<<endl;
+			return false;
+		}
+		client->enableEncryptor(curve, key);
+	}
+	return true;
+}
+
 void tcpCmd(const std::string& ip, int port, ClientPtr& client, FPAnswerPtr& answer, FPQuestPtr quest, int timeout)
 {
 	std::shared_ptr<TCPClient> tcpClient = TCPClient::createClient(ip, port);
@@ -83,6 +122,8 @@ void udpCmd(const std::string& ip, int port, ClientPtr& client, FPAnswerPtr& ans
 {
 	bool discardable = !CommandLineParser::exist("discardable");
 	std::shared_ptr<UDPClient> udpClient = UDPClient::createClient(ip, port);
+	if (!prepareEncrypt(udpClient))
+		return;
 
 	client = udpClient;
 	answer = udpClient->sendQuestEx(quest, discardable, timeout);
@@ -99,7 +140,9 @@ int main(int argc, char* argv[])
 		cout<<"Usage: "<<argv[0]<<" ip port method body(json) [-ecc-pem ecc-pem-file] [-json] [-oneway] [-t timeout]"<<endl;
 		cout<<"Usage: "<<argv[0]<<" ip port method body(json) [-ecc-der ecc-der-file] [-json] [-oneway] [-t timeout]"<<endl;
 		cout<<"Usage: "<<argv[0]<<" ip port method body(json) [-ecc-curve ecc-curve-name -ecc-raw-key ecc-raw-public-key-file] [-json] [-oneway] [-t timeout]"<<endl;
-		cout<<"Usage: "<<argv[0]<<" ip port method body(json) [-udp] [-json] [-oneway] [-discardable] [-t timeout]"<<endl;
+		cout<<"Usage: "<<argv[0]<<" ip port method body(json) [-udp] [-ecc-pem ecc-pem-file] [-json] [-oneway] [-discardable] [-t timeout]"<<endl;
+		cout<<"Usage: "<<argv[0]<<" ip port method body(json) [-udp] [-ecc-der ecc-der-file] [-json] [-oneway] [-discardable] [-t timeout]"<<endl;
+		cout<<"Usage: "<<argv[0]<<" ip port method body(json) [-udp] [-ecc-curve ecc-curve-name -ecc-raw-key ecc-raw-public-key-file] [-json] [-oneway] [-discardable] [-t timeout]"<<endl;
 		return 0;
 	}
 

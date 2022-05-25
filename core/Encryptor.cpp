@@ -19,6 +19,18 @@ void PackageEncryptor::decrypt(uint8_t* dest, uint8_t* src, int len)
 	rijndael_cfb_encrypt(&deCtx, false, src, dest, len, iv, &pos);
 }
 
+void PackageEncryptor::encrypt(uint8_t* dest, uint8_t* src, int len)
+{
+	uint8_t iv[16];
+	memcpy(iv, _iv, 16);
+
+	size_t pos = 0;
+	rijndael_context enCtx;
+	rijndael_setup_encrypt(&enCtx, _key, _keyLen);
+
+	rijndael_cfb_encrypt(&enCtx, true, src, dest, len, iv, &pos);
+}
+
 void PackageEncryptor::encrypt(std::string* buffer)
 {
 	uint8_t iv[16];
@@ -41,6 +53,11 @@ void PackageEncryptor::encrypt(std::string* buffer)
 void StreamEncryptor::decrypt(uint8_t* dest, uint8_t* src, int len)
 {
 	rijndael_cfb_encrypt(&_ctx, false, src, dest, len, _iv, &_pos);
+}
+
+void StreamEncryptor::encrypt(uint8_t* dest, uint8_t* src, int len)
+{
+	rijndael_cfb_encrypt(&_ctx, true, src, dest, len, _iv, &_pos);
 }
 
 void StreamEncryptor::encrypt(std::string* buffer)

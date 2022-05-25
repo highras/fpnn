@@ -6,41 +6,6 @@
 
 namespace fpnn
 {
-	class UDPSimpleCongestionController
-	{
-		struct UnconfirmedRecord
-		{
-			int64_t ts;
-			size_t unconfirmedSize;
-		};
-
-		struct UnconfirmedLoad
-		{
-			int64_t ts;
-			float load;
-		};
-
-		UnconfirmedRecord record;
-		UnconfirmedLoad unconfirmedLoad;
-
-		void updateUnconfirmedIndex();
-
-	private:
-		static const float unconfirmedIndexFactor;
-		static const int64_t timeUnit;
-
-	public:
-		static const float halfLoadThreshold;
-		static const float minLoadThreshold;
-
-	public:
-		UDPSimpleCongestionController();
-		~UDPSimpleCongestionController();
-
-		void updateUnconfirmedSize(int64_t ts, size_t unconfirmedSize);
-		inline float loadIndex() { return unconfirmedLoad.load; }
-	};
-
 	class UDPResendIntervalController
 	{
 		struct RecordUnit

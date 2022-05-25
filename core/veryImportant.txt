@@ -1,6 +1,0 @@
-根据 OpenSSL 官方文档：https://www.openssl.org/docs/man1.0.2/crypto/CRYPTO_set_locking_callback.html
-
-OpenSSL can generally be used safely in multi-threaded applications provided that at least two callback functions are set, the locking_function and threadid_func. Note that OpenSSL is not completely thread-safe, and unfortunately not all global resources have the necessary locks. Further, the thread-safety does not extend to things like multiple threads using the same SSL object at the same time.
-
-OpenSSL 不是完全保证线程安全。
-Note that OpenSSL is not completely thread-safe, and unfortunately not all global resources have the necessary locks.

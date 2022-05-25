@@ -33,22 +33,6 @@ using namespace fpnn;
 std::mutex TCPEpollServer::_sendQueueMutex[FPNN_SEND_QUEUE_MUTEX_COUNT];
 TCPServerPtr TCPEpollServer::_server = nullptr;
 
-static void adjustThreadPoolParams(int &minThread, int &maxThread, int constMin, int constMax)
-{
-	if (minThread < constMin)
-		minThread = constMin;
-	else if (minThread > constMax)
-		minThread = constMax;
-
-	if (maxThread < constMin)
-		maxThread = constMin;
-	else if (maxThread > constMax)
-		maxThread = constMax;
-
-	if (minThread > maxThread)
-		minThread = maxThread;
-}
-
 int TCPEpollServer::getCPUCount()
 {
 	int cpuCount = (int)sysconf(_SC_NPROCESSORS_ONLN);
@@ -134,12 +118,14 @@ bool TCPEpollServer::initServerVaribles(){
 	if (_duplexThreadMin > _duplexThreadMax) _duplexThreadMin = _duplexThreadMax;
 
 	//-- ECC-AES encryption
-	_encryptEnabled = Setting::getBool("FPNN.server.security.ecdh.enable", false);
+	_encryptEnabled = Setting::getBool(std::vector<std::string>{
+		"FPNN.server.tcp.security.ecdh.enable",
+		"FPNN.server.security.ecdh.enable"}, false);
 	if (_encryptEnabled)
 	{
-		if (_keyExchanger.init() == false)
+		if (_keyExchanger.init("tcp") == false)
 		{
-			throw FPNN_ERROR_CODE_FMT(FpnnCoreError, FPNN_EC_CORE_UNKNOWN_ERROR, "Auto config ECC-AES failed.");
+			throw FPNN_ERROR_CODE_FMT(FpnnCoreError, FPNN_EC_CORE_UNKNOWN_ERROR, "Auto config ECC-AES for TCP server failed.");
 		}
 	}
 
@@ -148,7 +134,7 @@ bool TCPEpollServer::initServerVaribles(){
 
 void TCPEpollServer::enableForceEncryption()
 {
-	Config::_server_user_methods_force_encrypted = true;
+	Config::TCP::_server_user_methods_force_encrypted = true;
 }
 
 bool TCPEpollServer::prepare()
@@ -174,7 +160,7 @@ bool TCPEpollServer::prepare()
 		int workThreadMin = Setting::getInt(std::vector<std::string>{"FPNN.server.tcp.work.thread.min.size", "FPNN.server.work.thread.min.size"}, cpuCount);
 		int workThreadMax = Setting::getInt(std::vector<std::string>{"FPNN.server.tcp.work.thread.max.size", "FPNN.server.work.thread.max.size"}, cpuCount);
 
-		adjustThreadPoolParams(workThreadMin, workThreadMax, 2, 256);
+		ServerUtils::adjustThreadPoolParams(workThreadMin, workThreadMax, 2, 256);
 		configWorkerThreadPool(workThreadMin, 1, workThreadMin, workThreadMax, _maxWorkerPoolQueueLength);
 	}
 
@@ -197,7 +183,7 @@ bool TCPEpollServer::prepare()
 			int ioThreadMin = Setting::getInt("FPNN.global.io.thread.min.size", cpuCount);
 			int ioThreadMax = Setting::getInt("FPNN.global.io.thread.max.size", cpuCount);
 
-			adjustThreadPoolParams(ioThreadMin, ioThreadMax, 2, 256);
+			ServerUtils::adjustThreadPoolParams(ioThreadMin, ioThreadMax, 2, 256);
 			_ioPool->init(ioThreadMin, 1, ioThreadMin, ioThreadMax);
 		}
 
@@ -211,13 +197,18 @@ bool TCPEpollServer::prepare()
 
 	if (_answerCallbackPool == nullptr)
 	{
-		if (_duplexThreadMin > 0 && _duplexThreadMax > 0)
-			enableAnswerCallbackThreadPool(_duplexThreadMin, 1, _duplexThreadMin, _duplexThreadMax);
-		else
+		int perfectThreadCount = _duplexThreadMin;
+
+		if (_duplexThreadMax <= 0)
+			_duplexThreadMax = getCPUCount();
+
+		if (_duplexThreadMin <= 0)
 		{
-			int cpuCount = getCPUCount();
-			enableAnswerCallbackThreadPool(0, 1, cpuCount, cpuCount);
+			_duplexThreadMin = 0;
+			perfectThreadCount = _duplexThreadMax;
 		}
+
+		enableAnswerCallbackThreadPool(_duplexThreadMin, 1, perfectThreadCount, _duplexThreadMax);
 	}
 
 	if (!_ipv4.ip.empty())

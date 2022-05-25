@@ -155,7 +155,7 @@ class ParamTemplateThreadPoolArray
 
 		status(normalThreadCount, temporaryThreadCount, busyThreadCount, taskQueueSize, min, max, maxQueueLength);
 
-		return PoolInfo::threadPoolInfo(min, max, normalThreadCount, temporaryThreadCount, busyThreadCount, taskQueueSize,maxQueueLength);
+		return PoolInfo::threadPoolInfo(_array.size(), min, max, normalThreadCount, temporaryThreadCount, busyThreadCount, taskQueueSize,maxQueueLength);
 	}
 
 	inline void setProcessor(std::shared_ptr<typename ParamTemplateThreadPool<K>::IProcessor> processor)

@@ -1,5 +1,5 @@
-#ifndef UDP_ARQ_Protocol_Parser_h
-#define UDP_ARQ_Protocol_Parser_h
+#ifndef FPNN_UDP_Parser_v2_h
+#define FPNN_UDP_Parser_v2_h
 
 #include <stdlib.h>
 #include <string.h>
@@ -9,34 +9,11 @@
 #include <vector>
 #include <atomic>
 #include "FPMessage.h"
+#include "../Config.h"
+#include "UDPCommon.v2.h"
 
 namespace fpnn
 {
-	enum class ARQType: uint8_t
-	{
-		ARQ_COMBINED = 0x80,
-		ARQ_DATA = 0x01,
-		ARQ_ACKS = 0x02,
-		ARQ_UNA = 0x03,
-		ARQ_ECDH = 0x04,
-		ARQ_HEARTBEAT = 0x05,
-		ARQ_FORCESYNC = 0x06,
-		ARQ_CLOSE = 0x0F,
-	};
-
-	struct ARQFlag
-	{
-		static const uint8_t ARQ_Discardable = 0x01;
-		static const uint8_t ARQ_Monitored = 0x02;
-		static const uint8_t ARQ_SegmentedMask = 0x0c;
-		static const uint8_t ARQ_LastSegmentMask = 0x10;
-		static const uint8_t ARQ_FirstPackageMask = 0x20;
-
-		static const uint8_t ARQ_1Byte_SegmentIndex = 0x04;
-		static const uint8_t ARQ_2Bytes_SegmentIndex = 0x08;
-		static const uint8_t ARQ_4Bytes_SegmentIndex = 0x0C;
-	};
-
 	struct ClonedBuffer
 	{
 		uint8_t* data;
@@ -58,10 +35,21 @@ namespace fpnn
 		bool discardable;
 		std::map<uint32_t, ClonedBuffer*> cache;
 
+		UDPUncompletedPackage(): count(0), cachedSegmentSize(0), discardable(false)
+		{
+			createSeconds = slack_real_sec();
+		}
+
 		~UDPUncompletedPackage()
 		{
 			for (auto& p: cache)
 				delete p.second;
+		}
+
+		void cacheClone(uint32_t segmentIndex, const void* srcBuffer, uint32_t length)
+		{
+			cache[segmentIndex] = new ClonedBuffer(srcBuffer, length);
+			cachedSegmentSize += length;
 		}
 	};
 
@@ -80,22 +68,10 @@ namespace fpnn
 			if (lastValidMsec == 0)
 				lastValidMsec = slack_real_msec();
 		}
-		void firstPackageReceived() { threshold = Config::UDP::_max_tolerated_milliseconds_before_valid_package_received; }
+		inline void firstPackageReceived() { threshold = Config::UDP::_max_tolerated_milliseconds_before_valid_package_received; }
+		inline void updateInvalidPackageCount() { invalidCount++; }
 		void updateValidStatus();
-		void updateInvalidPackageCount() { invalidCount++; }
 		bool isInvalid();
-	};
-
-	struct ARQChecksum
-	{
-		uint32_t _preprossedFirstSeq;
-		uint8_t _factor;
-
-	public:
-		ARQChecksum(uint32_t firstSeqBE, uint8_t factor);
-		bool check(uint32_t udpSeqBE, uint8_t checksum);
-		uint8_t genChecksum(uint32_t udpSeqBE);
-		bool isSame(uint8_t factor);
 	};
 
 	struct ParseResult
@@ -108,12 +84,19 @@ namespace fpnn
 		std::vector<uint32_t> receivedUNA;		//-- 批量 parse 重置
 
 		//-- feedback we will send to peer.
+		uint8_t protocolVersion;
 		bool canbeFeedbackUNA;					//-- 单次 parse 重置
 		bool receivedPriorSeqs;
 		bool requireForceSync;
 
-		ParseResult(): canbeFeedbackUNA(false), receivedPriorSeqs(false), requireForceSync(false)
+		ECCKeyExchange* keyExchanger;
+		UDPEncryptor* sendingEncryptor;
+		bool enableDataEncryption;
+
+		ParseResult(): canbeFeedbackUNA(false), receivedPriorSeqs(false), requireForceSync(false),
+			keyExchanger(NULL), sendingEncryptor(NULL), enableDataEncryption(false)
 		{
+			protocolVersion = ARQConstant::Version;
 		}
 
 		void reset()
@@ -125,6 +108,7 @@ namespace fpnn
 			canbeFeedbackUNA = false;
 			receivedPriorSeqs = false;
 			requireForceSync = false;
+			sendingEncryptor = NULL;
 		}
 
 		void receiveUNA(uint32_t una)
@@ -144,7 +128,7 @@ namespace fpnn
 	class ARQParser
 	{
 	public:
-		std::unordered_set<uint32_t> receivedSeqs;		//-- 历史有效, 不含UNA.
+		std::unordered_set<uint32_t> unprocessedReceivedSeqs;		//-- 历史有效, 不含UNA.
 		bool requireClose;						//-- 历史有效
 		bool requireKeepLink;					//-- 历史有效
 		uint32_t lastUDPSeq;					//-- 历史有效
@@ -154,6 +138,8 @@ namespace fpnn
 		ARQChecksum* _arqChecksum;
 		std::map<uint32_t, ClonedBuffer*> _disorderedCache;		//-- 历史有效
 		std::map<uint16_t, UDPUncompletedPackage*> _uncompletedPackages;		//-- 历史有效
+
+		//-- 每次 parse() 调用重置
 		uint8_t* _buffer;						//-- 单次 parse 重置
 		int _bufferLength;						//-- 单次 parse 重置
 		int _bufferOffset;						//-- 单次 parse 重置
@@ -163,8 +149,20 @@ namespace fpnn
 		int _socket;							//-- 历史有效
 		const char* _endpoint;						//-- 历史有效
 
+		bool _unorderedParse;
+		bool _replaceConnectionWhenConnectionReentry;
 		SessionInvalidChecker _invalidChecker;
+		UDPEncryptor* _encryptor;
+		bool _enableDataEnhanceEncrypt;
+		int _decryptedBufferLen;
+		uint8_t* _decryptedBuffer;
+		uint8_t* _decryptedDataBuffer;
 
+		ClonedBuffer* _ecdhCopy;
+		int64_t ecdhCopyExpiredTMS;
+		uint32_t _firstPackageUDPSeq;
+
+		bool processAssembledPackage();
 		bool processPackage(uint8_t type, uint8_t flag);
 		bool parseCOMBINED();
 		bool parseDATA();
@@ -178,14 +176,19 @@ namespace fpnn
 		bool decodeBuffer(uint8_t* buffer, uint32_t len);
 		bool processReliableAndMonitoredPackage(uint8_t type, uint8_t flag);
 		void processCachedPackageFromSeq();
+		void verifyAndProcessCachedPackages();
 		void cacheCurrentUDPPackage(uint32_t packageSeq);
 		void verifyCachedPackage(uint32_t baseUDPSeq);
 		bool dropDiscardableCachedUncompletedPackage();
-		void EndpointQuaternionConflictError(uint8_t factor, uint8_t type, uint8_t flag);
+		bool aheadProcessReliableAndMonitoredPackage(uint8_t type, uint8_t flag, uint32_t packageSeq);
+		void checkLastUDPSeq();
 
 	public:
 		ARQParser(): requireClose(false), requireKeepLink(false), uncompletedPackageSegmentCount(0),
-			_arqChecksum(NULL), _socket(0), _endpoint("<unknown>") {}
+			_arqChecksum(NULL), _socket(0), _endpoint("<unknown>"), _unorderedParse(true),
+			_replaceConnectionWhenConnectionReentry(false), _encryptor(NULL),
+			_enableDataEnhanceEncrypt(false), _decryptedBuffer(NULL), _decryptedDataBuffer(NULL),
+			_ecdhCopy(NULL) {}
 		~ARQParser()
 		{
 			if (_arqChecksum)
@@ -196,8 +199,26 @@ namespace fpnn
 
 			for (auto& pp: _uncompletedPackages)
 				delete pp.second;
+
+			if (_encryptor)
+				delete _encryptor;
+
+			if (_decryptedBuffer)
+				free(_decryptedBuffer);
+
+			if (_decryptedDataBuffer)
+				free(_decryptedDataBuffer);
+
+			if (_ecdhCopy)
+				delete _ecdhCopy;
 		}
 
+		void configPackageEncryptor(uint8_t *key, size_t key_len, uint8_t *iv);
+		void configDataEncryptor(uint8_t *key, size_t key_len, uint8_t *iv);
+		void configUnorderedParse(bool enable);			//-- Retention interface. Current on case using.
+		inline void configConnectionReentry(bool replace) { _replaceConnectionWhenConnectionReentry = replace; }
+
+		inline void setDecryptedBufferLen(int len) { _decryptedBufferLen = len; }
 		inline void changeLogInfo(int socket, const char* endpoint)
 		{
 			_socket = socket;
@@ -208,4 +229,5 @@ namespace fpnn
 		bool invalidSession() { return _invalidChecker.isInvalid(); }
 	};
 }
+
 #endif

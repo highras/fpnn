@@ -15,6 +15,22 @@
 
 using namespace fpnn;
 
+void ServerUtils::adjustThreadPoolParams(int &minThread, int &maxThread, int constMin, int constMax)
+{
+	if (minThread < constMin)
+		minThread = constMin;
+	else if (minThread > constMax)
+		minThread = constMax;
+
+	if (maxThread < constMin)
+		maxThread = constMin;
+	else if (maxThread > constMax)
+		maxThread = constMax;
+
+	if (minThread > maxThread)
+		minThread = maxThread;
+}
+
 std::mutex ServerController::_mutex;
 std::string ServerController::_infosHeader;
 std::shared_ptr<std::string> ServerController::_serverBaseInfos;

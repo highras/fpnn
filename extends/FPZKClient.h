@@ -33,6 +33,8 @@
 
 	FPZK.client.sync.syncPerformanceInfo = false (默认)
 	如果为 true，将额外汇报当前机器连接总数，当前系统按 CPU 平均的负载和使用率。
+	如果 def.mk 中，“CUDA_SUPPORT=true” 启用，则存在显卡的情况下，还会汇报当前机器各张显卡以下信息：
+		索引号、GPU 百分比使用率、显存百分比使用率、显存已用字节数、显存字节总数。
 
 	FPZK.client.sync.syncEndpoint = true
 	配合 FPZK Server v3 使用。当 FPZK.client.sync.externalVisible = true 时，将在各个 region 之间同步服务
@@ -52,6 +54,7 @@
 #include <map>
 #include <set>
 #include <thread>
+#include "MachineStatus.h"
 #include "TaskThreadPool.h"
 #include "TCPClient.h"
 #include "TCPProxyCore.hpp"
@@ -76,7 +79,8 @@ public:
 	struct ServiceNode
 	{
 		bool online;
-		int connCount;
+		int tcpCount;
+		int udpCount;
 		float CPULoad;
 		float loadAvg;  //-- per CPU Usage
 		int64_t registerTime;	//-- in seconds
@@ -94,7 +98,10 @@ public:
 		std::string ipv4;
 		std::string ipv6;
 
-		ServiceNode(): online(true), connCount(0), CPULoad(0.), loadAvg(0.),
+		std::shared_ptr<std::vector<MachineStatus::GPUCardInfo>> GPUStatus;
+		std::shared_ptr<std::string> extra;
+
+		ServiceNode(): online(true), tcpCount(0), udpCount(0), CPULoad(0.), loadAvg(0.),
 			registerTime(0), activedTime(0), port(0), port6(0), sslport(0), sslport6(0), uport(0), uport6(0) {}
 	};
 
@@ -160,20 +167,44 @@ public:
 	{
 	public:
 		virtual ~ServicesAlteredCallback() {}
-		virtual void serviceAltered(std::map<std::string, ServiceInfosPtr>& serviceInfos) = 0;
+		virtual void serviceAltered(const std::map<std::string, ServiceInfosPtr>& serviceInfos, const std::vector<std::string>& invalidServices) = 0;
 	};
 	typedef std::shared_ptr<ServicesAlteredCallback> ServicesAlteredCallbackPtr;
 
 	class FunctionServicesAlteredCallback: public ServicesAlteredCallback
 	{
-		std::function<void (std::map<std::string, ServiceInfosPtr>& serviceInfos)> _function;
+		std::function<void (const std::map<std::string, ServiceInfosPtr>& serviceInfos, const std::vector<std::string>& invalidServices)> _function;
 
 	public:
-		explicit FunctionServicesAlteredCallback(std::function<void (std::map<std::string, ServiceInfosPtr>& serviceInfos)> function): _function(function) {}
+		explicit FunctionServicesAlteredCallback(std::function<void (const std::map<std::string, ServiceInfosPtr>& serviceInfos, const std::vector<std::string>& invalidServices)> function): _function(function) {}
 		virtual ~FunctionServicesAlteredCallback() {}
-		virtual void serviceAltered(std::map<std::string, ServiceInfosPtr>& serviceInfos)
+		virtual void serviceAltered(const std::map<std::string, ServiceInfosPtr>& serviceInfos, const std::vector<std::string>& invalidServices)
 		{
-			_function(serviceInfos);
+			_function(serviceInfos, invalidServices);
+		}
+	};
+
+	//=================================================================//
+	//- Extra data Commit Callbacks
+	//=================================================================//
+	class ExtraDataCommitCallback
+	{
+	public:
+		virtual ~ExtraDataCommitCallback() {}
+		virtual std::shared_ptr<std::string> extraDataCommit() = 0;
+	};
+	typedef std::shared_ptr<ExtraDataCommitCallback> ExtraDataCommitCallbackPtr;
+
+	class FunctionExtraDataCommitCallback: public ExtraDataCommitCallback
+	{
+		std::function<std::shared_ptr<std::string>()> _function;
+
+	public:
+		explicit FunctionExtraDataCommitCallback(std::function<std::shared_ptr<std::string>()> function): _function(function) {}
+		virtual ~FunctionExtraDataCommitCallback() {}
+		virtual std::shared_ptr<std::string> extraDataCommit()
+		{
+			return _function();
 		}
 	};
 
@@ -202,13 +233,14 @@ private:
 		friend class FPZKClient;
 
 		std::map<std::string, ServiceInfosPtr> _alteredServices;
+		std::vector<std::string> _invalidServices;
 		ServicesAlteredCallbackPtr _callback;
 
 	public:
 		~ServicesAlteredCallbackTask() {}
 		virtual void run()
 		{
-			_callback->serviceAltered(_alteredServices);
+			_callback->serviceAltered(_alteredServices, _invalidServices);
 		}
 	};
 	typedef std::shared_ptr<ServicesAlteredCallbackTask> ServicesAlteredCallbackTaskPtr;
@@ -248,6 +280,7 @@ private:
 	bool _syncEndpointForPublic;
 	bool _outputClusterChangeInfo;
 	ServicesAlteredCallbackPtr _serviceAlteredCallback;
+	ExtraDataCommitCallbackPtr _extraDataCommitCallback;
 
 	std::mutex _mutex;
 
@@ -259,12 +292,13 @@ private:
 	void prepareSelfServiceInfo();
 	void adjustSelfPortInfo();
 	void resubscribe();
-	void updateChangedAndMonitoredServices(const std::set<std::string>& invalidServices, const std::map<std::string, int64_t>& rvMap);
 	void updateChangedAndMonitoredServices(const std::set<std::string>& invalidServices, const std::vector<std::string>& services, const std::vector<int64_t>& revisions, const std::vector<int64_t>& clusterAlteredTimes);
+	void buildGPUData(std::vector<std::vector<unsigned long long>>& GPUData);
 	void fetchInterestServices(const std::set<std::string>& serviceNames);
 	void updateServicesMapCache(FPReader* reader);
 	void unregisterSelf();
 	void syncFunc();
+	std::shared_ptr<std::string> buildExtraData();
 
 	inline std::string clusteredServiceName(const std::string& serviceName, const std::string& clusterName)
 	{
@@ -302,10 +336,22 @@ public:
 		_serviceAlteredCallback = callback;
 	}
 
-	inline void setServiceAlteredCallback(std::function<void (std::map<std::string, ServiceInfosPtr>& serviceInfos)> function)
+	inline void setServiceAlteredCallback(std::function<void (const std::map<std::string, ServiceInfosPtr>& serviceInfos, const std::vector<std::string>& invalidServices)> function)
 	{
 		ServicesAlteredCallbackPtr cb(new FunctionServicesAlteredCallback(std::move(function)));
 		setServiceAlteredCallback(cb);
+	}
+
+	inline void setExtraDataCommitCallback(ExtraDataCommitCallbackPtr callback)
+	{
+		std::lock_guard<std::mutex> lck(_mutex);
+		_extraDataCommitCallback = callback;
+	}
+
+	inline void setExtraDataCommitCallback(std::function<std::shared_ptr<std::string>()> function)
+	{
+		ExtraDataCommitCallbackPtr cb(new FunctionExtraDataCommitCallback(std::move(function)));
+		setExtraDataCommitCallback(cb);
 	}
 
 	inline void setOnline(bool online)

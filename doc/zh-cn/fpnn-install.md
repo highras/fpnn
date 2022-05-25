@@ -16,23 +16,55 @@ FPNN 采用 C++11 编写，如果采用其他版本的编译器，需要支持 C
 
 ## 2. 第三方库依赖
 
+必须项：
+
 + gcc
 + g++
 + libcurl
-+ tcmalloc
 + openssl
+
+可选项：
+
++ tcmalloc (默认依赖)
++ nvidia-ml (默认不启用 CUDA 支持则不依赖)
 
 MacOS 平台编译，无需 tcmalloc 库。
 
 
 + 初始化安装环境
 
-	以 centOS 7为例：在一台干净的 CentOS 7 上，执行以下命令，即可初始化 FPNN 编译环境：
+	* CentOS 7:
 
-		yum -y groupinstall 'Development tools'
-		yum install -y libcurl-devel
-		yum install -y openssl-devel
-		yum install -y gperftools
+			yum -y groupinstall 'Development tools'
+			yum install -y libcurl-devel
+			yum install -y openssl-devel
+			yum install -y gperftools
+
+	* CentOS 8:
+
+			dnf install epel-release
+			dnf -y groupinstall 'Development tools'
+			dnf install -y libcurl-devel
+			dnf install -y openssl-devel
+			dnf install -y gperftools
+
+	* Ubuntu:
+
+			apt install build-essential
+			apt install libcurl4-openssl-dev
+			apt install openssl
+			apt install libssl-dev
+			apt install zlib1g-dev
+			apt install -y google-perftools
+
+			ln -s /lib/x86_64-linux-gnu/libtcmalloc.so.4 /lib/x86_64-linux-gnu/libtcmalloc.so
+
+	* MacOS:
+
+		* 安装 XCode
+		* 安装 openssl
+
+				brew install openssl@1.1
 
 
 ## 3. 平台适配

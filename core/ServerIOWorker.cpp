@@ -413,7 +413,7 @@ bool TCPServerIOWorker::deliverQuest(TCPServerConnection * connection, FPQuestPt
 	bool wakeUpResult;
 	if (!prior)
 	{
-		if (Config::_server_user_methods_force_encrypted && !connection->isEncrypted())
+		if (Config::TCP::_server_user_methods_force_encrypted && !connection->isEncrypted())
 		{
 			LOG_WARN("All user methods reuiqre encrypted. Unencrypted connection will visit %s. Connection will be closed by server. %s",
 				questMethod.c_str(), connection->_connectionInfo->str().c_str());

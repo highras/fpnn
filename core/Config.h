@@ -6,7 +6,7 @@
 
 namespace fpnn
 {
-#define FPNN_SERVER_VERSION "1.1.3"
+#define FPNN_SERVER_VERSION "1.2.1"
 
 //in second
 #define FPNN_DEFAULT_QUEST_TIMEOUT (5)
@@ -36,7 +36,8 @@ namespace fpnn
 #define FPNN_UDP_ARQ_MAX_TOLERATED_MSEC_BEFORE_FIRST_PACKAGE (3000)
 #define FPNN_UDP_ARQ_MAX_TOLERATED_MSEC_BEFORE_VALID_PACKAGE (20000)
 #define FPNN_UDP_ARQ_MAX_TOLERATED_COUNT_BEFORE_VALID_PACKAGE (1000)
-
+#define FPNN_UDP_ARQ_ECDH_COPY_RETAINED_MSEC (10*1000)
+	
 	class Config
 	{
 		public:
@@ -59,7 +60,12 @@ namespace fpnn
 			static bool _server_stat;
 			static bool _server_preset_signals;
 			static int32_t _server_perfect_connections;
-			static bool _server_user_methods_force_encrypted;
+		public:
+			class TCP
+			{
+			public:
+				static bool _server_user_methods_force_encrypted;
+			};
 
 		public:
 			//client config
@@ -104,6 +110,12 @@ namespace fpnn
 				static int _max_tolerated_milliseconds_before_first_package_received;
 				static int _max_tolerated_milliseconds_before_valid_package_received;
 				static int _max_tolerated_count_before_valid_package_received;
+
+				static int _ecdh_copy_retained_milliseconds;
+				static bool _server_user_methods_force_encrypted;
+
+				static bool _server_connection_reentry_replace_for_all_ip;
+				static bool _server_connection_reentry_replace_for_private_ip;
 
 				static void initUDPGlobalVaribles();
 			};

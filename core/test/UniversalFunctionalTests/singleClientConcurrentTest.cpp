@@ -187,11 +187,24 @@ void processEncrypt(TCPClientPtr client)
 	}
 }
 
+void processEncrypt(UDPClientPtr client)
+{
+	if (CommandLineParser::exist("ecc-pem"))
+	{
+		std::string pemFile = CommandLineParser::getString("ecc-pem");
+		bool packageReinforce = CommandLineParser::exist("packageReinforce");
+		bool dataEnhance = CommandLineParser::exist("dataEnhance");
+		bool dataReinforce = CommandLineParser::exist("dataReinforce");
+
+		client->enableEncryptorByPemFile(pemFile.c_str(), packageReinforce, dataEnhance, dataReinforce);
+	}
+}
+
 void showUsage(const char* appName)
 {
 	cout<<"Usage: "<<appName<<" ip port [-ssl]"<<endl;
 	cout<<"Usage: "<<appName<<" ip port [-ecc-pem ecc-pem-file [-package|-stream] [-128bits|-256bits]]"<<endl;
-	cout<<"Usage: "<<appName<<" ip port -udp"<<endl;
+	cout<<"Usage: "<<appName<<" ip port -udp [-ecc-pem ecc-pem-file [-packageReinforce] [-dataEnhance [-dataReinforce]]]"<<endl;
 }
 
 int main(int argc, char* argv[])
@@ -206,7 +219,11 @@ int main(int argc, char* argv[])
 
 	std::shared_ptr<Client> client;
 	if (CommandLineParser::exist("udp"))
-		client = Client::createUDPClient(mainParams[0], std::stoi(mainParams[1]));
+	{
+		UDPClientPtr udpClient = Client::createUDPClient(mainParams[0], std::stoi(mainParams[1]));
+		processEncrypt(udpClient);
+		client = udpClient;
+	}
 	else
 	{
 		TCPClientPtr tcpClient = Client::createTCPClient(mainParams[0], std::stoi(mainParams[1]));

@@ -48,6 +48,7 @@ public:
 		enum VisitStateCode visitState;
 		char* errorInfo;
 		std::shared_ptr<ChainBuffer> responseBuffer;
+		std::shared_ptr<ChainBuffer> responseHeaderBuffer;
 
 		Result(): curlHandle(0, curl_easy_cleanup), startTime(0), responseCode(0),
 			curlCode(CURLE_OK), visitState(VISIT_READY), errorInfo(0)
@@ -70,6 +71,7 @@ private:
 		struct curl_slist *_headerChunk;
 		std::string _postBody;
 		ChainBuffer *_dataBuffer;
+		ChainBuffer *_headBuffer;
 		long _responseCode;
 		CURLcode _curlCode;
 		int64_t _expireSeconds;
@@ -109,11 +111,12 @@ private:
 			result->curlCode = _curlCode;
 			result->visitState = _visitState;
 			result->errorInfo = _errorInfo;
-			result->responseBuffer.reset(takeBuffer());
+			result->responseHeaderBuffer.reset(takeHeadBuffer());
+			result->responseBuffer.reset(takeDataBuffer());
 		}
 
 	public:
-		BaiscResultCallback(): _startTime(0), _handle(0), _headerChunk(NULL), _dataBuffer(0),
+		BaiscResultCallback(): _startTime(0), _handle(0), _headerChunk(NULL), _dataBuffer(0), _headBuffer(0),
 			_responseCode(0), _curlCode(CURLE_OK), _expireSeconds(300), _visitState(VISIT_READY),
 			_errorInfo(0) {}
 		virtual ~BaiscResultCallback()
@@ -126,6 +129,9 @@ private:
 
 			if (_dataBuffer)
 				delete _dataBuffer;
+
+			if (_headBuffer)
+				delete _headBuffer;
 		}
 
 		virtual bool syncedCallback() { return false; }
@@ -136,10 +142,16 @@ private:
 			_handle = NULL;
 			return h;
 		}
-		ChainBuffer* takeBuffer()
+		ChainBuffer* takeDataBuffer()
 		{
 			ChainBuffer* b = _dataBuffer;
 			_dataBuffer = 0;
+			return b;
+		}
+		ChainBuffer* takeHeadBuffer()
+		{
+			ChainBuffer* b = _headBuffer;
+			_headBuffer = 0;
 			return b;
 		}
 	};

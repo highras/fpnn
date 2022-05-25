@@ -3,7 +3,7 @@
 
 #include "ParamTemplateThreadPoolArray.h"
 #include "IOWorker.h"
-#include "UDPIOBuffer.h"
+#include "UDP.v2/UDPIOBuffer.v2.h"
 
 namespace fpnn
 {
@@ -28,6 +28,21 @@ namespace fpnn
 		}
 
 		virtual ~UDPClientConnection() {}
+
+		bool entryEncryptMode(const std::string& curve, const std::string& peerPublicKey,
+			bool packageReinforce, bool dataEnhance, bool dataReinforce)
+		{
+			bool rev;
+			if (!dataEnhance)
+				rev = _ioBuffer.enableEncryptorAsInitiator(curve, peerPublicKey, packageReinforce);
+			else
+				rev = _ioBuffer.enableEncryptorAsInitiator(curve, peerPublicKey, packageReinforce, dataReinforce);
+
+			if (rev)
+				_connectionInfo->_encrypted = true;
+
+			return rev;
+		}
 
 		virtual bool waitForAllEvents();
 		virtual enum ConnectionType connectionType() { return BasicConnection::UDPClientConnectionType; }

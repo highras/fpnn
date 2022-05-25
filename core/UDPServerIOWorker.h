@@ -6,7 +6,7 @@
 #include <arpa/inet.h>
 #include "ParamTemplateThreadPoolArray.h"
 #include "IOWorker.h"
-#include "UDPIOBuffer.h"
+#include "UDP.v2/UDPIOBuffer.v2.h"
 
 namespace fpnn
 {
@@ -98,6 +98,12 @@ namespace fpnn
 			_connectionInfo->_mutex = &_mutex;
 			_ioBuffer.initMutex(&_mutex);
 			_ioBuffer.updateEndpointInfo(_connectionInfo->endpoint());
+
+			bool replace = Config::UDP::_server_connection_reentry_replace_for_all_ip
+				|| (Config::UDP::_server_connection_reentry_replace_for_private_ip
+				&& _connectionInfo->isPrivateIP());
+				
+			_ioBuffer.configConnectionReentry(replace);
 		}
 
 		virtual ~UDPServerConnection()
@@ -105,6 +111,9 @@ namespace fpnn
 			for (auto rawData: _rawData)
 				delete rawData;
 		}
+
+		inline bool isEncrypted() { return _ioBuffer.isEncrypted(); }
+		inline void setKeyExchanger(ECCKeyExchange* exchanger) { _ioBuffer.setKeyExchanger(exchanger); }
 
 		virtual bool waitForAllEvents();
 		virtual enum ConnectionType connectionType() { return BasicConnection::UDPServerConnectionType; }

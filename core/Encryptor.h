@@ -25,6 +25,7 @@ namespace fpnn
 		virtual ~Encryptor() {}
 
 		virtual void decrypt(uint8_t* dest, uint8_t* src, int len) = 0;
+		virtual void encrypt(uint8_t* dest, uint8_t* src, int len) = 0;
 		virtual void encrypt(std::string* buffer) = 0;
 	};
 
@@ -36,6 +37,7 @@ namespace fpnn
 		virtual ~PackageEncryptor() {}
 
 		virtual void decrypt(uint8_t* dest, uint8_t* src, int len);
+		virtual void encrypt(uint8_t* dest, uint8_t* src, int len);
 		virtual void encrypt(std::string* buffer);
 	};
 
@@ -54,6 +56,7 @@ namespace fpnn
 		virtual ~StreamEncryptor() {}
 
 		virtual void decrypt(uint8_t* dest, uint8_t* src, int len);
+		virtual void encrypt(uint8_t* dest, uint8_t* src, int len);
 		virtual void encrypt(std::string* buffer);
 	};
 }

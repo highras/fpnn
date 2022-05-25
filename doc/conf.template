@@ -61,16 +61,48 @@ FPNN.server.http.supported = false
 #---------#
 
 # 是否启用 ECC-AES 加密
+# TCP & UDP 服务通用配置
 FPNN.server.security.ecdh.enable = false
 
+# TCP 服务配置项。当该项无配置时，才会读取 FPNN.server.security.ecdh.enable 的配置
+FPNN.server.tcp.security.ecdh.enable = false
+
+# UDP 服务配置项。当该项无配置时，才会读取 FPNN.server.security.ecdh.enable 的配置
+FPNN.server.udp.security.ecdh.enable = false
+
+
 # curve 取值: secp256k1, secp256r1, secp224r1, secp192r1
+# TCP & UDP 服务通用配置
 FPNN.server.security.ecdh.curve = 
 
+# TCP 服务配置项。当该项无配置时，才会读取 FPNN.server.security.ecdh.curve 的配置
+FPNN.server.tcp.security.ecdh.curve =
+
+# UDP 服务配置项。当该项无配置时，才会读取 FPNN.server.security.ecdh.curve 的配置
+FPNN.server.udp.security.ecdh.curve =
+
+
 # privateKey 指向 privateKey (binary format, not Hex) 的文件路径
+# TCP & UDP 服务通用配置
 FPNN.server.security.ecdh.privateKey = 
 
+# TCP 服务配置项。当该项无配置时，才会读取 FPNN.server.security.ecdh.privateKey 的配置
+FPNN.server.tcp.security.ecdh.privateKey =
+
+# UDP 服务配置项。当该项无配置时，才会读取 FPNN.server.security.ecdh.privateKey 的配置
+FPNN.server.udp.security.ecdh.privateKey =
+
+
 # 所有用户接口，是否只允许加密访问
+# TCP & UDP 服务通用配置
 FPNN.server.security.forceEncrypt.userMethods = false
+
+# TCP 服务配置项。当该项无配置时，才会读取 FPNN.server.security.forceEncrypt.userMethods 的配置
+FPNN.server.tcp.security.forceEncrypt.userMethods = false
+
+# UDP 服务配置项。当该项无配置时，才会读取 FPNN.server.security.forceEncrypt.userMethods 的配置
+FPNN.server.udp.security.forceEncrypt.userMethods = false
+
 
 # SSL/TLS 相关
 FPNN.server.tcp.ipv4.ssl.listening.port =
@@ -221,6 +253,8 @@ FPZK.client.sync.externalVisible = true
 FPZK.client.sync.syncPublicInfo = false
 
 # 是否向 FPZKServer 汇报当前机器连接总数，当前系统按 CPU 平均的负载和使用率
+# 如果 def.mk 中，“CUDA_SUPPORT=true” 启用，则存在显卡的情况下，还会汇报当前机器各张显卡以下信息：
+#     索引号、GPU 百分比使用率、显存百分比使用率、显存已用字节数、显存字节总数。
 FPZK.client.sync.syncPerformanceInfo = false
 
 # FPZK.client.sync.externalVisible = true 时，其他区域是否可用本服务的内网地址链接访问本服务
@@ -287,6 +321,13 @@ FPNN.server.udp.work.thread.min.size =
 FPNN.server.udp.work.thread.max.size =
 FPNN.server.udp.duplex.thread.min.size =
 FPNN.server.udp.duplex.thread.max.size =
+
+# 当四元组因网络异常，被单端关闭后复用时，是否允许立刻复用
+# 如果为 true， 则恶意构造四元组冲突包（带有 FirstPackage 标记的首包），将立刻打断已有的对应链接。
+# 因此在非安全环境，该参数强烈建议为 false
+# 注：随着后续版本改进，该配置参数可能被废弃
+FPNN.server.udp.connectionReentry.replaceForAll = false
+FPNN.server.udp.connectionReentry.replaceForPrivateIP = true
 
 #---------#
 # 系统相关 #

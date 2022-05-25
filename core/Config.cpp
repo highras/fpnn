@@ -24,7 +24,7 @@ bool Config::_server_http_close_after_answered(false);
 bool Config::_server_stat(true);
 bool Config::_server_preset_signals(true);
 int32_t Config::_server_perfect_connections(FPNN_PERFECT_CONNECTIONS);
-bool Config::_server_user_methods_force_encrypted(false);
+bool Config::TCP::_server_user_methods_force_encrypted(false);
 
 //client config
 bool Config::_log_client_quest(false);
@@ -55,6 +55,11 @@ int Config::UDP::_max_tolerated_milliseconds_before_first_package_received(FPNN_
 int Config::UDP::_max_tolerated_milliseconds_before_valid_package_received(FPNN_UDP_ARQ_MAX_TOLERATED_MSEC_BEFORE_VALID_PACKAGE);
 int Config::UDP::_max_tolerated_count_before_valid_package_received(FPNN_UDP_ARQ_MAX_TOLERATED_COUNT_BEFORE_VALID_PACKAGE);
 // int Config::UDP::_arq_una_include_rate(FPNN_UDP_ARQ_UNA_INCLUDE_RATE);
+int Config::UDP::_ecdh_copy_retained_milliseconds(FPNN_UDP_ARQ_ECDH_COPY_RETAINED_MSEC);
+bool Config::UDP::_server_user_methods_force_encrypted(false);
+
+bool Config::UDP::_server_connection_reentry_replace_for_all_ip(false);
+bool Config::UDP::_server_connection_reentry_replace_for_private_ip(true);
 
 static std::mutex configLock;
 static bool systemVariablesConfigured(false);
@@ -140,7 +145,10 @@ void Config::initServerVaribles(){
 	_server_preset_signals = Setting::getBool("FPNN.server.preset.signal", true);
 	_max_recv_package_length = Setting::getInt("FPNN.global.max.package.len", FPNN_DEFAULT_MAX_PACKAGE_LEN);
 	_server_perfect_connections = Setting::getInt("FPNN.server.perfect.connections", FPNN_PERFECT_CONNECTIONS);
-    _server_user_methods_force_encrypted = Setting::getBool("FPNN.server.security.forceEncrypt.userMethods", false);
+
+    TCP::_server_user_methods_force_encrypted = Setting::getBool(std::vector<std::string>{
+        "FPNN.server.tcp.security.forceEncrypt.userMethods",
+        "FPNN.server.security.forceEncrypt.userMethods"}, false);
 
     UDP::initUDPGlobalVaribles();
 
@@ -190,6 +198,13 @@ void Config::UDP::initUDPGlobalVaribles()
 
 //    UDP::_arq_una_include_rate = Setting::getInt("FPNN.global.udp.arq.UNA.interpolationRate", FPNN_UDP_ARQ_UNA_INCLUDE_RATE);
 
+    UDP::_server_user_methods_force_encrypted = Setting::getBool(std::vector<std::string>{
+        "FPNN.server.udp.security.forceEncrypt.userMethods",
+        "FPNN.server.security.forceEncrypt.userMethods"}, false);
+
+    UDP::_server_connection_reentry_replace_for_all_ip = Setting::getBool("FPNN.server.udp.connectionReentry.replaceForAll", false);
+    UDP::_server_connection_reentry_replace_for_private_ip = Setting::getBool("FPNN.server.udp.connectionReentry.replaceForPrivateIP", true);
+    
     if (UDP::_arq_urgent_seqs_sync_triggered_threshold > UDP::_unconfiremed_package_limitation)
         UDP::_arq_urgent_seqs_sync_triggered_threshold = UDP::_unconfiremed_package_limitation;
 

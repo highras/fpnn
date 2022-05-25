@@ -5,6 +5,7 @@
 #include "UDPClient.h"
 #include "StringUtil.h"
 #include "FileSystemUtil.h"
+#include "CommandLineUtil.h"
 #include "linenoise.h"
 
 using namespace std;
@@ -13,11 +14,14 @@ using namespace fpnn;
 void showUsage(const char* appName)
 {
 	cout<<"Usage: "<<appName<<" ip port"<<endl;
-	cout<<"Usage: "<<appName<<" ip port -udp"<<endl;
 	cout<<"Usage: "<<appName<<" ip port -ssl"<<endl;
-	cout<<"Usage: "<<appName<<" ip port -pem pem-file [encrypt-mode-opt] [encrypt-strength-opt]"<<endl;
-	cout<<"Usage: "<<appName<<" ip port -der der-file [encrypt-mode-opt] [encrypt-strength-opt]"<<endl;
-	cout<<"Usage: "<<appName<<" ip port ecc-curve raw-public-key-file [encrypt-mode-opt] [encrypt-strength-opt]"<<endl;
+	cout<<"Usage: "<<appName<<" ip port -pem pem-file [-encrypt-mode encrypt-mode-opt] [-reinforce]"<<endl;
+	cout<<"Usage: "<<appName<<" ip port -der der-file [-encrypt-mode encrypt-mode-opt] [-reinforce]"<<endl;
+	cout<<"Usage: "<<appName<<" ip port -curve ecc-curve -rawKey raw-public-key-file [-encrypt-mode encrypt-mode-opt] [-reinforce]"<<endl;
+	cout<<"Usage: "<<appName<<" ip port -udp"<<endl;
+	cout<<"Usage: "<<appName<<" ip port -udp -pem pem-file [-packageReinforce] [-dataEnhance [-dataReinforce]]"<<endl;
+	cout<<"Usage: "<<appName<<" ip port -udp -der der-file [-packageReinforce] [-dataEnhance [-dataReinforce]]"<<endl;
+	cout<<"Usage: "<<appName<<" ip port -udp -curve ecc-curve -rawKey raw-public-key-file [-packageReinforce] [-dataEnhance [-dataReinforce]]"<<endl;
 
 	cout<<"\tecc-curve:"<<endl;
 	cout<<"\t\tsecp192r1"<<endl;
@@ -29,11 +33,7 @@ void showUsage(const char* appName)
 	cout<<"\t\tstream"<<endl;
 	cout<<"\t\tpackage"<<endl;
 	cout<<endl;
-	cout<<"\tencrypt-strength-opt:"<<endl;
-	cout<<"\t\t128bits"<<endl;
-	cout<<"\t\t256bits"<<endl;
-	cout<<endl;
-	cout<<"Default encrypt mode: package, default encrypt strength: 128bits."<<endl;
+	cout<<"Default encrypt mode: package."<<endl;
 
 	exit(0);
 }
@@ -53,84 +53,137 @@ bool checkCurveName(const char* name)
 	return false;
 }
 
-ClientPtr buildClient(int argc, const char* argv[])
+ClientPtr buildTCPClient(const char* ip, int port)
 {
-	if (argc < 3 || argc > 7)
-	{
-		showUsage(argv[0]);
-		return 0;
-	}
+	TCPClientPtr client = TCPClient::createClient(ip, port);
 
-	if (argc == 4 && strcmp(argv[3], "-udp") == 0)
-	{
-		UDPClientPtr client = UDPClient::createClient(argv[1], atoi(argv[2]));
-		return client;
-	}
-
-	TCPClientPtr client = TCPClient::createClient(argv[1], atoi(argv[2]));
-	if (argc == 3)
-		return client;
-
-	if (argc == 4 && strcmp(argv[3], "-ssl") == 0)
+	if (CommandLineParser::exist("ssl"))
 	{
 		client->enableSSL();
 		return client;
 	}
 
-	if (argc < 5)
+	bool reinforce = CommandLineParser::getBool("reinforce", false);
+	std::string mode = CommandLineParser::getString("encrypt-mode");
+	bool package = true;
+	if (mode == "package")
+		package = true;
+	else if (mode == "stream")
+		package = false;
+	
+	if (CommandLineParser::exist("pem"))
+	{
+		std::string pemFile = CommandLineParser::getString("pem");
+		if (client->enableEncryptorByPemFile(pemFile.c_str(), package, reinforce) == false)
+		{
+			cout<<"Invalid PEM file: "<<pemFile<<endl;
+			return 0;
+		}
+	}
+	else if (CommandLineParser::exist("der"))
+	{
+		std::string derFile = CommandLineParser::getString("der");
+		if (client->enableEncryptorByDerFile(derFile.c_str(), package, reinforce) == false)
+		{
+			cout<<"Invalid DER file: "<<derFile<<endl;
+			return 0;
+		}
+	}
+	else if (CommandLineParser::exist("curve") && CommandLineParser::exist("rawKey"))
+	{
+		std::string curve = CommandLineParser::getString("curve");
+		if (checkCurveName(curve.c_str()) == false)
+		{
+			cout<<"Invalid curve: "<<curve<<endl;
+			return 0;
+		}
+
+		std::string key;
+		std::string rawKeyFile = CommandLineParser::getString("rawKey");
+		if (FileSystemUtil::readFileContent(rawKeyFile, key) == false)
+		{
+			cout<<"Read server public key file "<<rawKeyFile<<" failed!"<<endl;
+			return 0;
+		}
+
+		client->enableEncryptor(curve, key, package, reinforce);
+	}
+	else if (CommandLineParser::getRestParams().size() > 0)
+	{
+		cout<<"Bad parameters."<<endl;
+		return 0;
+	}
+
+	return client;
+}
+
+ClientPtr buildUDPClient(const char* ip, int port)
+{
+	UDPClientPtr client = UDPClient::createClient(ip, port);
+
+	bool packageReinforce = CommandLineParser::getBool("packageReinforce", false);
+	bool dataReinforce = CommandLineParser::getBool("dataReinforce", false);
+	bool dataEnhance = CommandLineParser::getBool("dataEnhance", false);
+
+	if (CommandLineParser::exist("pem"))
+	{
+		std::string pemFile = CommandLineParser::getString("pem");
+		if (client->enableEncryptorByPemFile(pemFile.c_str(), packageReinforce, dataEnhance, dataReinforce) == false)
+		{
+			cout<<"Invalid PEM file: "<<pemFile<<endl;
+			return 0;
+		}
+	}
+	else if (CommandLineParser::exist("der"))
+	{
+		std::string derFile = CommandLineParser::getString("der");
+		if (client->enableEncryptorByDerFile(derFile.c_str(), packageReinforce, dataEnhance, dataReinforce) == false)
+		{
+			cout<<"Invalid DER file: "<<derFile<<endl;
+			return 0;
+		}
+	}
+	else if (CommandLineParser::exist("curve") && CommandLineParser::exist("rawKey"))
+	{
+		std::string curve = CommandLineParser::getString("curve");
+		if (checkCurveName(curve.c_str()) == false)
+		{
+			cout<<"Invalid curve: "<<curve<<endl;
+			return 0;
+		}
+
+		std::string key;
+		std::string rawKeyFile = CommandLineParser::getString("rawKey");
+		if (FileSystemUtil::readFileContent(rawKeyFile, key) == false)
+		{
+			cout<<"Read server public key file "<<rawKeyFile<<" failed!"<<endl;
+			return 0;
+		}
+
+		client->enableEncryptor(curve, key, packageReinforce, dataEnhance, dataReinforce);
+	}
+	else if (CommandLineParser::getRestParams().size() > 0)
+	{
+		cout<<"Bad parameters."<<endl;
+		return 0;
+	}
+
+	return client;
+}
+
+ClientPtr buildClient(int argc, const char* argv[])
+{
+	if (argc < 3 || argc > 11)
 	{
 		showUsage(argv[0]);
 		return 0;
 	}
 
-	bool package = true;
-	bool reinforce = false;
-	for (int i = 5; i < argc; i++)
-	{
-		if (strcmp(argv[i], "package") == 0)
-			package = true;
-		else if (strcmp(argv[i], "stream") == 0)
-			package = false;
-		else if (strcmp(argv[i], "128bits") == 0)
-			reinforce = false;
-		else if (strcmp(argv[i], "256bits") == 0)
-			reinforce = true;
-		else
-		{
-			cout<<"Bad parameter: "<<argv[i]<<endl;
-			showUsage(argv[0]);
-			return 0;
-		}
-	}
-
-	if (strcmp("-pem", argv[3]) == 0)
-	{
-		if (client->enableEncryptorByPemFile(argv[4], package, reinforce) == false)
-			return 0;
-	}
-	else if (strcmp("-der", argv[3]) == 0)
-	{
-		if (client->enableEncryptorByDerFile(argv[4], package, reinforce) == false)
-			return 0;
-	}
+	CommandLineParser::init(argc, argv, 3);
+	if (CommandLineParser::exist("udp"))
+		return buildUDPClient(argv[1], atoi(argv[2]));
 	else
-	{
-		if (checkCurveName(argv[3]) == false)
-		{
-			showUsage(argv[0]);
-			return 0;
-		}
-		std::string key;
-		if (FileSystemUtil::readFileContent(argv[4], key) == false)
-		{
-			cout<<"Read server public key file "<<argv[4]<<" failed!"<<endl;
-			return 0;
-		}
-
-		client->enableEncryptor(argv[3], key, package, reinforce);
-	}
-	
-	return client;
+		return buildTCPClient(argv[1], atoi(argv[2]));
 }
 
 bool executeCommand(ClientPtr client, const std::string& cmd)
@@ -185,9 +238,11 @@ bool executeCommand(ClientPtr client, const std::string& cmd)
 
 int main(int argc, const char* argv[])
 {
-	cout<<"FPNN Secure Shell v1.1"<<endl;
-
 	ClientPtr client = buildClient(argc, argv);
+	if (!client)
+		return 0;
+
+	cout<<"FPNN Secure Shell v1.1"<<endl;
 	cout<<"Command format: method json-body [oneway] [timeout=xxx]"<<endl<<endl;
 
 	char *rawline;
