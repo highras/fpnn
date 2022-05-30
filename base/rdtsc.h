@@ -7,6 +7,7 @@
 extern "C" {
 #endif
 
+#ifndef __arm__
 
 extern uint64_t xs_cpu_frequency;
 
@@ -22,6 +23,8 @@ uint64_t get_cpu_frequency(unsigned int milliseconds);
 
 
 uint64_t cpu_frequency();
+
+#endif
 
 
 #ifdef __cplusplus

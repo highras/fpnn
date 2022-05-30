@@ -2,6 +2,8 @@
 #define __STDC_LIMIT_MACROS	1
 #endif
 
+#ifndef __arm__
+
 #include "rdtsc.h"
 #include <sys/time.h>
 #include <unistd.h>
@@ -165,4 +167,5 @@ int main()
 	return 0;
 }
 
+#endif
 #endif
