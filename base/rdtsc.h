@@ -7,7 +7,19 @@
 extern "C" {
 #endif
 
-#ifndef __arm__
+#ifdef __arm__
+#define __FPNN_ARM__
+#endif
+
+#ifdef __arm64__
+#define __FPNN_ARM__
+#endif
+
+#ifdef __aarch64__
+#define __FPNN_ARM__
+#endif
+
+#ifndef __FPNN_ARM__
 
 extern uint64_t xs_cpu_frequency;
 

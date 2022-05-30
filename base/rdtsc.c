@@ -2,9 +2,10 @@
 #define __STDC_LIMIT_MACROS	1
 #endif
 
-#ifndef __arm__
-
 #include "rdtsc.h"
+
+#ifndef __FPNN_ARM__
+
 #include <sys/time.h>
 #include <unistd.h>
 #include <poll.h>
