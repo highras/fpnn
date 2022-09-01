@@ -6,7 +6,7 @@
 
 namespace fpnn
 {
-#define FPNN_SERVER_VERSION "1.2.1"
+#define FPNN_SERVER_VERSION "1.3.0"
 
 //in second
 #define FPNN_DEFAULT_QUEST_TIMEOUT (5)
@@ -83,6 +83,12 @@ namespace fpnn
 					static int pingInterval;			//-- In milliseconds
 					static int maxPingRetryCount;
 				};
+			};
+
+			class RawClient
+			{
+			public:
+				static bool log_received_raw_data;
 			};
 
 		public:

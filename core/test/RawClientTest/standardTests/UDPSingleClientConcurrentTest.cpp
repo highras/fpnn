@@ -2,10 +2,8 @@
 #include <vector>
 #include <thread>
 #include "msec.h"
-#include "TCPClient.h"
-#include "UDPClient.h"
-#include "IQuestProcessor.h"
-#include "CommandLineUtil.h"
+#include "../../../IQuestProcessor.h"
+#include "../ProtocolClient/FpnnUDPClient.h"
 
 using namespace std;
 using namespace fpnn;
@@ -69,14 +67,14 @@ FPQuestPtr genQuest(){
 	return qw.take();
 }
 
-void testThread(ClientPtr client, int count)
+void testThread(FpnnUDPClient* client, int count)
 {
 	int act = 0;
 	for (int i = 0; i < count; i++)
 	{
 		if (i % 200 == 0)
 			cout<<endl;
-
+		
 		int64_t index = (slack_real_msec() + i + ((int64_t)(&i) >> 16)) % 64;
 		if (i >= 10)
 		{
@@ -160,14 +158,14 @@ void testThread(ClientPtr client, int count)
 	}
 }
 
-void test(ClientPtr client, int threadCount, int questCount)
+void test(FpnnUDPClient& client, int threadCount, int questCount)
 {
 	cout<<"========[ Test: thread "<<threadCount<<", per thread quest: "<<questCount<<" ]=========="<<endl;
 
 	std::vector<std::thread> _threads;
 
 	for(int i = 0 ; i < threadCount; i++)
-		_threads.push_back(std::thread(testThread, client, questCount));
+		_threads.push_back(std::thread(testThread, &client, questCount));
 
 	sleep(5);
 
@@ -177,64 +175,19 @@ void test(ClientPtr client, int threadCount, int questCount)
 	cout<<endl<<endl;
 }
 
-void processEncrypt(TCPClientPtr client)
-{
-	if (CommandLineParser::exist("ssl"))
-		client->enableSSL();
-	else if (CommandLineParser::exist("ecc-pem"))
-	{
-		bool packageMode = CommandLineParser::exist("package");
-		bool reinforce = CommandLineParser::exist("256bits");
-		std::string pemFile = CommandLineParser::getString("ecc-pem");
-		client->enableEncryptorByPemFile(pemFile.c_str(), packageMode, reinforce);
-	}
-}
-
-void processEncrypt(UDPClientPtr client)
-{
-	if (CommandLineParser::exist("ecc-pem"))
-	{
-		std::string pemFile = CommandLineParser::getString("ecc-pem");
-		bool packageReinforce = CommandLineParser::exist("packageReinforce");
-		bool dataEnhance = CommandLineParser::exist("dataEnhance");
-		bool dataReinforce = CommandLineParser::exist("dataReinforce");
-
-		client->enableEncryptorByPemFile(pemFile.c_str(), packageReinforce, dataEnhance, dataReinforce);
-	}
-}
-
-void showUsage(const char* appName)
-{
-	cout<<"Usage: "<<appName<<" ip port [-ssl]"<<endl;
-	cout<<"Usage: "<<appName<<" ip port [-ecc-pem ecc-pem-file [-package|-stream] [-128bits|-256bits]]"<<endl;
-	cout<<"Usage: "<<appName<<" ip port -udp [-ecc-pem ecc-pem-file [-packageReinforce] [-dataEnhance [-dataReinforce]]]"<<endl;
-}
-
 int main(int argc, char* argv[])
 {
-	CommandLineParser::init(argc, argv);
-	std::vector<std::string> mainParams = CommandLineParser::getRestParams();
-	if (mainParams.size() != 2)
+	if (argc != 3)
 	{
-		showUsage(argv[0]);
+		cout<<"Usage: "<<argv[0]<<" ip port"<<endl;
 		return 0;
 	}
 
-	std::shared_ptr<Client> client;
-	if (CommandLineParser::exist("udp"))
-	{
-		UDPClientPtr udpClient = Client::createUDPClient(mainParams[0], std::stoi(mainParams[1]));
-		processEncrypt(udpClient);
-		client = udpClient;
-	}
-	else
-	{
-		TCPClientPtr tcpClient = Client::createTCPClient(mainParams[0], std::stoi(mainParams[1]));
-		processEncrypt(tcpClient);
-		client = tcpClient;
-	}
+	std::string endpoint(argv[1]);
+	endpoint.append(":").append(argv[2]);
 
-	client->setQuestProcessor(std::make_shared<Processor>());
+	FpnnUDPClient client(endpoint);
+	client.setQuestProcessor(std::make_shared<Processor>());
 	FPLog::init("std::cout", "FPNN.TEST", "FATAL", "SingleClientConcurrentTest");
 
 	showSignDesc();
@@ -246,7 +199,7 @@ int main(int argc, char* argv[])
 	test(client, 50, 30000);
 	test(client, 60, 30000);
 
-	cout<<"----[ All tests are done. ]-------"<<endl;
+	cout<<endl<<"Single Concurrent Test done."<<endl;
 
 	return 0;
 }

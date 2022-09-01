@@ -16,6 +16,7 @@
 #include "Setting.h"
 #include "msec.h"
 #include "Config.h"
+#include "RawTransmission/RawClientInterface.h"
 
 //-- For unused the returned values of pipe() & write() in ClientEngine::stop().
 #pragma GCC diagnostic ignored "-Wunused-result"
@@ -154,11 +155,13 @@ void ClientEngine::prepare()
 
 	_tcpIOWorker.reset(new TCPClientIOWorker);
 	_udpIOWorker.reset(new UDPClientIOWorker);
+	_rawIOWorker.reset(new RawClientIOWorker);
 	
 	if (_ioPool == nullptr)
 	{
 		_ioPool = GlobalIOPool::instance();
 		_ioPool->setClientIOWorker(_tcpIOWorker, _udpIOWorker);
+		_ioPool->setRawClientIOWorker(_rawIOWorker);
 		/** 
 			Just ensure io Pool is inited. If is inited, it will not reconfig or reinit. */
 		_ioPool->init(_ioThreadMin, 1, _ioThreadMin, _ioThreadMax);
@@ -361,7 +364,7 @@ void ClientEngine::processEvent(struct kevent & event)
 		exitEpoll(orgConn);
 		clearConnectionQuestCallbacks(orgConn, FPNN_EC_CORE_CONNECTION_CLOSED);
 
-		if (orgConn->connectionType() != BasicConnection::UDPClientConnectionType)
+		if (orgConn->connectionType() == BasicConnection::TCPClientConnectionType)
 		{
 			TCPClientConnection* conn = (TCPClientConnection*)orgConn;
 			TCPClientPtr client = conn->client();
@@ -371,7 +374,7 @@ void ClientEngine::processEvent(struct kevent & event)
 				return;
 			}
 		}
-		else
+		else if (orgConn->connectionType() == BasicConnection::UDPClientConnectionType)
 		{
 			UDPClientConnection* conn = (UDPClientConnection*)orgConn;
 			UDPClientPtr client = conn->client();
@@ -397,6 +400,16 @@ void ClientEngine::processEvent(struct kevent & event)
 				return;
 			}
 		}
+		else
+		{
+			RawClientBasicConnection* conn = (RawClientBasicConnection*)orgConn;
+			RawClientPtr client = conn->client();
+			if (client)
+			{
+				client->willClose(conn);
+				return;
+			}
+		}
 
 		LOG_ERROR("This codes (Engine::close) is impossible touched. This is just a safety inspection. If this ERROR triggered, please tell swxlion to add old CloseErrorTask class back, and fix it.");
 		ConnectionReclaimTaskPtr task(new ConnectionReclaimTask(orgConn));
@@ -415,7 +428,7 @@ void ClientEngine::processEvent(struct kevent & event)
 		exitEpoll(orgConn);
 		clearConnectionQuestCallbacks(orgConn, FPNN_EC_CORE_UNKNOWN_ERROR);
 
-		if (orgConn->connectionType() != BasicConnection::UDPClientConnectionType)
+		if (orgConn->connectionType() == BasicConnection::TCPClientConnectionType)
 		{
 			TCPClientConnection* conn = (TCPClientConnection*)orgConn;
 			TCPClientPtr client = conn->client();
@@ -425,7 +438,7 @@ void ClientEngine::processEvent(struct kevent & event)
 				return;
 			}
 		}
-		else
+		else if (orgConn->connectionType() == BasicConnection::UDPClientConnectionType)
 		{
 			UDPClientConnection* conn = (UDPClientConnection*)orgConn;
 			UDPClientPtr client = conn->client();
@@ -448,6 +461,16 @@ void ClientEngine::processEvent(struct kevent & event)
 					ConnectionReclaimTaskPtr task(new ConnectionReclaimTask(conn));
 					_reclaimer->reclaim(task);
 				}
+				return;
+			}
+		}
+		else
+		{
+			RawClientBasicConnection* conn = (RawClientBasicConnection*)orgConn;
+			RawClientPtr client = conn->client();
+			if (client)
+			{
+				client->errorAndWillBeClosed(conn);
 				return;
 			}
 		}

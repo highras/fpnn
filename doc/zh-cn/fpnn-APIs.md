@@ -115,6 +115,10 @@ FPNN 提供的 API 分成 4 个模块类别：
 | TCPEpollServer | FPNN TCP 服务器 | [TCPEpollServer.h](../../core/TCPEpollServer.h)  | [TCPEpollServer](APIs/core/TCPEpollServer.md) |
 | UDPClient | FPNN UDP 客户端 | [UDPClient.h](../../core/UDPClient.h)  | [UDPClient](APIs/core/UDPClient.md) |
 | UDPEpollServer | FPNN UDP 服务器 | [UDPEpollServer.h](../../core/UDPEpollServer.h)  | [UDPEpollServer](APIs/core/UDPEpollServer.md) |
+| IRawDataProcessor | 未包含协议处理模块的原始客户端的数据处理基类 | [RawTransmissionCommon.h](../../core/RawTransmission/RawTransmissionCommon.h)  | [IRawDataProcessor](APIs/core/IRawDataProcessor.md) |
+| RawClient | 未包含协议处理模块的原始客户端基类 | [RawClientInterface.h](../../core/RawTransmission/RawClientInterface.h)  | [RawClient](APIs/core/RawClient.md) |
+| RawTCPClient | 未包含协议处理模块的原始 TCP 客户端 | [RawTCPClient.h](../../core/RawTransmission/RawTCPClient.h)  | [RawTCPClient](APIs/core/RawTCPClient.md) |
+| RawUDPClient | 未包含协议处理模块的原始 UDP 客户端 | [RawUDPClient.h](../../core/RawTransmission/RawUDPClient.h)  | [RawUDPClient](APIs/core/RawUDPClient.md) |
 
 
 ## extends API Index

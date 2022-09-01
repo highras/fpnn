@@ -13,10 +13,10 @@ namespace fpnn
 			std::string sign;
 			std::string content;
 			std::string ext;
-			int32_t size;
-			int32_t atime;
-			int32_t mtime;
-			int32_t ctime;
+			int64_t size;
+			int64_t atime;
+			int64_t mtime;
+			int64_t ctime;
 		};
 
 		bool fetchFileContentInLines(const std::string& filename, std::vector<std::string>& lines, bool ignoreEmptyLine = true, bool trimLine = true);

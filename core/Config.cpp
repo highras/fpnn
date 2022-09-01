@@ -35,6 +35,8 @@ bool Config::Client::KeepAlive::defaultEnable(false);
 int Config::Client::KeepAlive::pingInterval(20*1000);
 int Config::Client::KeepAlive::maxPingRetryCount(3);
 
+bool Config::RawClient::log_received_raw_data(false);
+
 //UDP
 int Config::UDP::_LAN_MTU(FPNN_UDP_LAN_MTU);
 int Config::UDP::_internet_MTU(FPNN_UDP_Internet_MTU);
@@ -164,6 +166,8 @@ void Config::initClientVaribles(){
     Config::Client::KeepAlive::defaultEnable = Setting::getBool("FPNN.client.keepAlive.defaultEnable", false);
     Config::Client::KeepAlive::pingInterval = Setting::getInt("FPNN.client.keepAlive.pingInterval", 20) * 1000;
     Config::Client::KeepAlive::maxPingRetryCount = Setting::getInt("FPNN.client.keepAlive.maxPingRetryCount", 3);
+
+    Config::RawClient::log_received_raw_data = Setting::getBool("FPNN.rawClient.receiving.log", false);
 
     std::unique_lock<std::mutex> lck(configLock);
     UDP::initUDPGlobalVaribles();

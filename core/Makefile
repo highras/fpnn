@@ -7,7 +7,9 @@ OBJS_CXX = ClientEngine.o ConnectionReclaimer.o ClientIOWorker.o GlobalIOPool.o 
 			ServerController.o OpenSSLModule.o UDPClient.o UDPServerIOWorker.o UDPClientConnection.o ClientInterface.o \
 			UDPCongestionControl.o \
 			UDP.v2/UDPCommon.v2.o UDP.v2/UDPAssembler.v2.o UDP.v2/UDPParser.v2.o UDP.v2/UDPIOBuffer.v2.o \
-			UDP.v2/UDPUnconformedMap.v2.o
+			UDP.v2/UDPUnconformedMap.v2.o \
+			RawTransmission/RawTransmissionCommon.o RawTransmission/RawClientInterface.o \
+			RawTransmission/RawClientIOWorker.o RawTransmission/RawTCPClient.o RawTransmission/RawUDPClient.o
 
 # Static 
 LIBFPNN_A = libfpnn.a

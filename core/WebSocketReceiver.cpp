@@ -179,7 +179,7 @@ bool WebSocketReceiver::processHeader()
 		Temporarily cover the _dataCompleted field if the control frame appeared between a continued fragemented data.
 		The fetch() func will not clear the _fragmentedDataList if the current frame is control frame.
 	*/
-	_dataCompleted = (_header & 0x8000);
+	_dataCompleted = (_currBuf[0] & 0x80);
 	_opCode = _currBuf[0] & 0xf;
 
 	uint8_t payloadSize = _currBuf[1] & 0x7f;

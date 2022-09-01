@@ -45,6 +45,9 @@ namespace fpnn
 		friend class UDPEpollServer;
 		friend class UDPClient;
 		friend class Client;
+		friend class RawClient;
+		friend class RawTCPClient;
+		friend class RawUDPClient;
 
 		std::mutex* _mutex;		//-- only for sync quest to set answer map.
 		uint64_t _uniqueId;

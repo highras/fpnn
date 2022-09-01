@@ -17,7 +17,10 @@ namespace fpnn
 			TCPServerConnectionType,
 			TCPClientConnectionType,
 			UDPServerConnectionType,
-			UDPClientConnectionType
+			UDPClientConnectionType,
+			RawClientConnectionType
+			//RawTCPClientConnectionType,
+			//RawUDPClientConnectionType
 		};
 
 	public:

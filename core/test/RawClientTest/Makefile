@@ -1,4 +1,4 @@
-dirs = AutoDistributedTest tcp-test udp-test TCP.vs.UDP UniversalFunctionalTests RawClientTest
+dirs = ProtocolClient testTools standardTests
 
 all:
 	for x in $(dirs); do (cd $$x; make -j4) || exit 1; done

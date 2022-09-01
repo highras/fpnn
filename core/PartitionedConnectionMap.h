@@ -21,6 +21,7 @@
 #include "msec.h"
 #include "ClientIOWorker.h"
 #include "UDPClientConnection.h"
+#include "RawTransmission/RawClientIOWorker.h"
 
 namespace fpnn
 {

@@ -7,6 +7,7 @@
 #include "ClientIOWorker.h"
 #include "ServerIOWorker.h"
 #include "FPLog.h"
+#include "RawTransmission/RawClientIOWorker.h"
 
 namespace fpnn
 {
@@ -16,6 +17,7 @@ namespace fpnn
 		std::shared_ptr<TCPClientIOWorker> _TCPClientIOWorker;
 		std::shared_ptr<UDPClientIOWorker> _UDPClientIOWorker;
 		std::shared_ptr<UDPServerIOWorker> _UDPServerIOWorker;
+		std::shared_ptr<RawClientIOWorker> _RawClientIOWorker;
 
 	public:
 		virtual void run(BasicConnection * connection)
@@ -26,8 +28,10 @@ namespace fpnn
 				_UDPServerIOWorker->run((UDPServerConnection*)connection);
 			else if (connection->connectionType() == BasicConnection::TCPClientConnectionType)
 				_TCPClientIOWorker->run((TCPClientConnection*)connection);
-			else
+			else if (connection->connectionType() == BasicConnection::UDPClientConnectionType)
 				_UDPClientIOWorker->run((UDPClientConnection*)connection);
+			else
+				_RawClientIOWorker->run((RawClientBasicConnection*)connection);
 		}
 
 		/** All safe without locker.
@@ -41,6 +45,10 @@ namespace fpnn
 		{
 			_TCPClientIOWorker = tcpClientIOWorker;
 			_UDPClientIOWorker = udpClientIOWorker;
+		}
+		void setRawClientIOWorker(std::shared_ptr<RawClientIOWorker> rawClientIOWorker)
+		{
+			_RawClientIOWorker = rawClientIOWorker;
 		}
 	};
 
@@ -67,6 +75,8 @@ namespace fpnn
 					{ _ioWorker->setServerIOWorker(serverIOWorker); }
 		inline void setClientIOWorker(std::shared_ptr<TCPClientIOWorker> tcpClientIOWorker, std::shared_ptr<UDPClientIOWorker> udpClientIOWorker)
 					{ _ioWorker->setClientIOWorker(tcpClientIOWorker, udpClientIOWorker); }
+		inline void setRawClientIOWorker(std::shared_ptr<RawClientIOWorker> rawClientIOWorker)
+					{ _ioWorker->setRawClientIOWorker(rawClientIOWorker); }
 
 		inline void init(int32_t initCount, int32_t perAppendCount, int32_t perfectCount, int32_t maxCount)
 		{

@@ -14,7 +14,9 @@ FPNN 通用命令行客户端。可以发送任何 fpnn 命令，调用任何 fp
 	Usage: ./cmd ip port method body(json) [-ecc-pem ecc-pem-file] [-json] [-oneway] [-t timeout]
 	Usage: ./cmd ip port method body(json) [-ecc-der ecc-der-file] [-json] [-oneway] [-t timeout]
 	Usage: ./cmd ip port method body(json) [-ecc-curve ecc-curve-name -ecc-raw-key ecc-raw-public-key-file] [-json] [-oneway] [-t timeout]
-	Usage: ./cmd ip port method body(json) [-udp] [-json] [-oneway] [-discardable] [-t timeout]
+	Usage: ./cmd ip port method body(json) [-udp] [-ecc-pem ecc-pem-file] [-json] [-oneway] [-discardable] [-t timeout]
+	Usage: ./cmd ip port method body(json) [-udp] [-ecc-der ecc-der-file] [-json] [-oneway] [-discardable] [-t timeout]
+	Usage: ./cmd ip port method body(json) [-udp] [-ecc-curve ecc-curve-name -ecc-raw-key ecc-raw-public-key-file] [-json] [-oneway] [-discardable] [-t timeout]
 
 + 接口参数须以 json 形式表示。
 
@@ -66,15 +68,17 @@ FPNN 加密链接的秘钥对生成器。
 FPNN Secure Shell，FPNN 加密交互式命令行终端。
 
 	Usage: ./fss ip port
-	Usage: ./fss ip port -udp
 	Usage: ./fss ip port -ssl
-	Usage: ./fss ip port -pem pem-file [encrypt-mode-opt] [encrypt-strength-opt]
-	Usage: ./fss ip port -der der-file [encrypt-mode-opt] [encrypt-strength-opt]
-	Usage: ./fss ip port ecc-curve raw-public-key-file [encrypt-mode-opt] [encrypt-strength-opt]
+	Usage: ./fss ip port -pem pem-file [-encrypt-mode encrypt-mode-opt] [-reinforce]
+	Usage: ./fss ip port -der der-file [-encrypt-mode encrypt-mode-opt] [-reinforce]
+	Usage: ./fss ip port -curve ecc-curve -rawKey raw-public-key-file [-encrypt-mode encrypt-mode-opt] [-reinforce]
+	Usage: ./fss ip port -udp
+	Usage: ./fss ip port -udp -pem pem-file [-packageReinforce] [-dataEnhance [-dataReinforce]]
+	Usage: ./fss ip port -udp -der der-file [-packageReinforce] [-dataEnhance [-dataReinforce]]
+	Usage: ./fss ip port -udp -curve ecc-curve -rawKey raw-public-key-file [-packageReinforce] [-dataEnhance [-dataReinforce]]
 
 + ecc-curve：secp192r1、secp224r1、secp256r1、secp256k1 四者之一。
 + encrypt-mode-opt：stream 或 package
-+ encrypt-strength-opt：128bits 或 256bits
 
 
 

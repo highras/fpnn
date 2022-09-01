@@ -14,6 +14,7 @@
 #include "ConnectionReclaimer.h"
 #include "PartitionedConnectionMap.h"
 #include "GlobalIOPool.h"
+#include "RawTransmission/RawClientIOWorker.h"
 
 namespace fpnn
 {
@@ -63,6 +64,7 @@ namespace fpnn
 		PartitionedConnectionMap _connectionMap;
 		std::shared_ptr<TCPClientIOWorker> _tcpIOWorker;
 		std::shared_ptr<UDPClientIOWorker> _udpIOWorker;
+		std::shared_ptr<RawClientIOWorker> _rawIOWorker;
 
 		GlobalIOPoolPtr _ioPool;
 		TaskThreadPoolArray _answerCallbackPool;		//-- answer callback & error/close event.

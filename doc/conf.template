@@ -135,6 +135,8 @@ FPNN.client.quest.log = false
 FPNN.client.answer.log = false
 #作为client的时候,是否记录 slow 日志
 FPNN.client.slow.log = false
+#原始客户端（原始TCP客户端和原始UDP客户端）的数据接收日志
+FPNN.rawClient.receiving.log = false
 
 #是否将状态信息定时写入日志(WARN 级别)
 FPNN.server.status.logStatusInfos = false

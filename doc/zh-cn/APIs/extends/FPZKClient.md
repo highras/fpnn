@@ -623,7 +623,8 @@ FPZKServer 客户端。服务发现客户端。
 	inline void setExtraDataCommitCallback(ExtraDataCommitCallbackPtr callback);
 	inline void setExtraDataCommitCallback(std::function<std::shared_ptr<std::string>()> function);
 
-设置自定义数据的提交前事件回调。
+设置自定义数据的提交前事件回调。  
+一般情况下，2 秒会被触发一次。
 
 **参数说明**
 
