@@ -1,0 +1,54 @@
+=========[ Compiling flags ]============
+
+gprof:
+	-pg
+
+perf:
+	-fno-omit-frame-pointer
+
+=========[ 性能监控 ]============
+
+perf record -e cpu-clock -g -p <pid>
+
+perf record -e cpu-clock -g ./serverTest fp.conf
+
+valgrind --tool=callgrind --separate-threads=yes ./serverTest fp.conf
+
+----[ cmds ]-----
+
+./asyncStressClient 10.63.2.28 13011 100 50000
+
+sudo ./massiveAsyncClientTest 10.63.2.28 13011 100 10000 2 10
+
+=========[ 性能监控分析 ]============
+
+perf report -g
+
+gprof -A -b -q -p serverTest gmon.out > gmon.txt
+
+--[ gprof 可选 ]--
+sudo gprof ./serverTest  > gprof.log
+
+python ~/gprof2dot.py -n0 -e0 -s gprof.log > gmon.dot
+
+--[ valgrind ]--
+python ~/gprof2dot.py -f callgrind -n10 -s callgrind.out.31113 > valgrind.dot
+
+dot -Tpng gmon.dot -o gmon.png
+
+=========[ 火焰图 ]============
+
+git clone https://github.com/brendangregg/FlameGraph.git
+
+perf script -i perf.data &> perf.unfold
+~/FlameGraph/stackcollapse-perf.pl perf.unfold &> perf.folded
+~/FlameGraph/flamegraph.pl perf.folded > perf.svg
+
+
+=========[ 内存泄漏 ]============
+
+valgrind --tool=memcheck --leak-check=full ./HttpBenchmark http://10.63.2.219
+
+=========[ 竞争分析 ]============
+
+valgrind --tool=helgrind ./HttpBenchmark http://10.63.2.219

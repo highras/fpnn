@@ -1,0 +1,13 @@
+
+Tools：
+
+g++ -fsanitize=address -fno-omit-frame-pointer -static-libasan
+
+addr2line -a 0x53c51b -e serverTest
+
+CXXFLAGS += -fsanitize=address -fno-omit-frame-pointer
+LIBS += -lasan
+LIBS += -static-libasan
+
+
+yum install libasan

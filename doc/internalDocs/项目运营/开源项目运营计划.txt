@@ -1,0 +1,33 @@
+开源项目运营计划：
+
+=========
+草稿：
+=========
+
+项目矩阵：
+	
+	五大干线：
+
+	FPNN
+	RTM
+	DBProxy
+	FPZK
+	LogServer
+
+宣传文档：
+
+	FPNN 最佳实践
+	FPNN 设计原理
+	FPNN 设计理念（每一个主题一篇文章）
+	FPNN 专利
+
+	RTM 最佳实践
+	RTM 专利
+
+	DBProxy 最佳实践
+
+	FPZK 最佳实践
+	FPZK 设计原理
+	FPZK 专利
+
+	LogServer 最佳实践

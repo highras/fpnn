@@ -1,0 +1,249 @@
+===============================
+ 标准压力测试
+===============================
+
+nohup ./DATDeployer -h 10.65.5.229:13666 &
+nohup ./DATMonitor 10.65.5.229:13666 &
+
+~/DATActorUploader localhost 13666 ../StressActor/FPNNStandardUDPStressActor 
+~/DATDeployController -e localhost:13666 --actor FPNNStandardUDPStressActor --region cn-northwest
+
+~/DATStatus localhost:13666
+~/DATMachineStatus localhost:13666
+
+~/DATAction localhost:13666 FPNNStandardUDPStressActor-wewwe 10.65.5.12:37625 15412 beginStress '{"endpoint":"10.65.5.118:13611", "connections":20, "totalQPS":40000 }'
+~/DATAction localhost:13666 FPNNStandardUDPStressActor-wewwe 10.65.5.12:37625 1541 stopStress '{"taskId":17855}'
+~/DATActionAll localhost:13666 FPNNStandardTCPStressActor-wewwe quit {}
+
+
+------------------------------------------------------------------------------------------------------------------------
+NX m5
+
+UDP:
+nohup ./UDPStressController --contorlCenterEndpoint 10.65.5.229:13666 --testEndpoint 10.65.5.38:13611 --stopPerCPULoad 2.1 --stopTimeCostMsec 800 --perStressConnections 100 --perStressQPS 10000 --output udp.stress.aws.38.m5.xlarge.100.1w.csv &
+[Done]
+
+nohup ./UDPStressController --contorlCenterEndpoint 10.65.5.229:13666 --testEndpoint 10.65.5.38:13611 --stopPerCPULoad 2.1 --stopTimeCostMsec 800 --perStressConnections 10 --perStressQPS 20000 --output udp.stress.aws.38.m5.xlarge.10.2w.csv &
+[Done]
+
+nohup ./UDPStressController --contorlCenterEndpoint 10.65.5.229:13666 --testEndpoint 10.65.5.38:13611 --stopPerCPULoad 2.1 --stopTimeCostMsec 800 --perStressConnections 100 --perStressQPS 50000 --output udp.stress.aws.38.m5.xlarge.100.5w.csv &
+[Done]
+
+nohup ./UDPStressController --contorlCenterEndpoint 10.65.5.229:13666 --testEndpoint 10.65.5.38:13611 --stopPerCPULoad 2.1 --stopTimeCostMsec 800 --perStressConnections 1000 --perStressQPS 50000 --output udp.stress.aws.38.m5.xlarge.1000.5w.csv &
+[Done]
+
+
+TCP:
+nohup ./TCPStressController --contorlCenterEndpoint 10.65.5.229:13666 --testEndpoint 10.65.5.38:13611 --stopPerCPULoad 2.1 --stopTimeCostMsec 800 --perStressConnections 100 --perStressQPS 10000 --output tcp.stress.aws.38.m5.xlarge.100.1w.csv &
+[Done]
+
+nohup ./TCPStressController --contorlCenterEndpoint 10.65.5.229:13666 --testEndpoint 10.65.5.38:13611 --stopPerCPULoad 2.1 --stopTimeCostMsec 800 --perStressConnections 10 --perStressQPS 20000 --output tcp.stress.aws.38.m5.xlarge.10.2w.csv &
+[Done]
+
+nohup ./TCPStressController --contorlCenterEndpoint 10.65.5.229:13666 --testEndpoint 10.65.5.38:13611 --stopPerCPULoad 2.1 --stopTimeCostMsec 800 --perStressConnections 100 --perStressQPS 50000 --output tcp.stress.aws.38.m5.xlarge.100.5w.csv &
+[Done]
+
+nohup ./TCPStressController --contorlCenterEndpoint 10.65.5.229:13666 --testEndpoint 10.65.5.38:13611 --stopPerCPULoad 2.1 --stopTimeCostMsec 800 --perStressConnections 1000 --perStressQPS 50000 --output tcp.stress.aws.38.m5.xlarge.1000.5w.csv &
+[Done]
+
+------------------------------------------------------------------------------------------------------------------------
+
+NX m4
+
+TCP:
+nohup ./TCPStressController --contorlCenterEndpoint 10.65.5.229:13666 --testEndpoint 10.65.5.104:13611 --stopPerCPULoad 2.1 --stopTimeCostMsec 800 --perStressConnections 100 --perStressQPS 10000 --output tcp.stress.aws.104.m4.xlarge.100.1w.csv &
+[Done]
+
+nohup ./TCPStressController --contorlCenterEndpoint 10.65.5.229:13666 --testEndpoint 10.65.5.104:13611 --stopPerCPULoad 2.1 --stopTimeCostMsec 800 --perStressConnections 10 --perStressQPS 20000 --output tcp.stress.aws.104.m4.xlarge.10.2w.csv &
+[Done]
+
+nohup ./TCPStressController --contorlCenterEndpoint 10.65.5.229:13666 --testEndpoint 10.65.5.104:13611 --stopPerCPULoad 2.1 --stopTimeCostMsec 800 --perStressConnections 100 --perStressQPS 50000 --output tcp.stress.aws.104.m4.xlarge.100.5w.csv &
+[Done]
+
+nohup ./TCPStressController --contorlCenterEndpoint 10.65.5.229:13666 --testEndpoint 10.65.5.104:13611 --stopPerCPULoad 2.1 --stopTimeCostMsec 800 --perStressConnections 1000 --perStressQPS 50000 --output tcp.stress.aws.104.m4.xlarge.1000.5w.csv &
+[Done]
+
+------------------------------------------------------------------------------------------------------------------------
+
+
+------------------------------------------------------------------------------------------------------------------------
+Intl m5
+
+UDP:
+nohup ./UDPStressController --contorlCenterEndpoint 10.18.240.46:13666 --testEndpoint 10.13.240.90:13611 --stopPerCPULoad 2.1 --stopTimeCostMsec 800 --perStressConnections 100 --perStressQPS 10000 --output udp.stress.aws.m5.xlarge.100.1w.csv &
+[Done]
+
+nohup ./UDPStressController --contorlCenterEndpoint 10.18.240.46:13666 --testEndpoint 10.13.240.90:13611 --stopPerCPULoad 2.1 --stopTimeCostMsec 800 --perStressConnections 10 --perStressQPS 20000 --output udp.stress.aws.m5.xlarge.10.2w.csv &
+[Done]
+
+nohup ./UDPStressController --contorlCenterEndpoint 10.18.240.46:13666 --testEndpoint 10.13.240.90:13611 --stopPerCPULoad 2.1 --stopTimeCostMsec 800 --perStressConnections 100 --perStressQPS 50000 --output udp.stress.aws.m5.xlarge.100.5w.csv &
+[Done]
+
+nohup ./UDPStressController --contorlCenterEndpoint 10.18.240.46:13666 --testEndpoint 10.13.240.90:13611 --stopPerCPULoad 2.1 --stopTimeCostMsec 800 --perStressConnections 1000 --perStressQPS 50000 --output udp.stress.aws.m5.xlarge.1000.5w.csv &
+[Done]
+
+
+TCP:
+nohup ./TCPStressController --contorlCenterEndpoint 10.18.240.46:13666 --testEndpoint 10.13.240.90:13611 --stopPerCPULoad 2.1 --stopTimeCostMsec 800 --perStressConnections 100 --perStressQPS 10000 --output tcp.stress.aws.m5.xlarge.100.1w.csv &
+[Done]
+
+nohup ./TCPStressController --contorlCenterEndpoint 10.18.240.46:13666 --testEndpoint 10.13.240.90:13611 --stopPerCPULoad 2.1 --stopTimeCostMsec 800 --perStressConnections 10 --perStressQPS 20000 --output tcp.stress.aws.m5.xlarge.10.2w.csv &
+[Done]
+
+nohup ./TCPStressController --contorlCenterEndpoint 10.18.240.46:13666 --testEndpoint 10.13.240.90:13611 --stopPerCPULoad 2.1 --stopTimeCostMsec 800 --perStressConnections 100 --perStressQPS 50000 --output tcp.stress.aws.m5.xlarge.100.5w.csv &
+[Done]
+
+nohup ./TCPStressController --contorlCenterEndpoint 10.18.240.46:13666 --testEndpoint 10.13.240.90:13611 --stopPerCPULoad 2.1 --stopTimeCostMsec 800 --perStressConnections 1000 --perStressQPS 50000 --output tcp.stress.aws.m5.xlarge.1000.5w.csv &
+[Done]
+
+------------------------------------------------------------------------------------------------------------------------
+
+Intl m4
+
+TCP:
+nohup ./TCPStressController --contorlCenterEndpoint 10.18.240.46:13666 --testEndpoint 10.13.240.189:13611 --stopPerCPULoad 2.1 --stopTimeCostMsec 800 --perStressConnections 100 --perStressQPS 10000 --output tcp.stress.aws.m4.xlarge.100.1w.csv &
+[Done]
+
+nohup ./TCPStressController --contorlCenterEndpoint 10.18.240.46:13666 --testEndpoint 10.13.240.189:13611 --stopPerCPULoad 2.1 --stopTimeCostMsec 800 --perStressConnections 10 --perStressQPS 20000 --output tcp.stress.aws.m4.xlarge.10.2w.csv &
+[Done]
+
+nohup ./TCPStressController --contorlCenterEndpoint 10.18.240.46:13666 --testEndpoint 10.13.240.189:13611 --stopPerCPULoad 2.1 --stopTimeCostMsec 800 --perStressConnections 100 --perStressQPS 50000 --output tcp.stress.aws.m4.xlarge.100.5w.csv &
+[Done]
+
+nohup ./TCPStressController --contorlCenterEndpoint 10.18.240.46:13666 --testEndpoint 10.13.240.189:13611 --stopPerCPULoad 2.1 --stopTimeCostMsec 800 --perStressConnections 1000 --perStressQPS 50000 --output tcp.stress.aws.m4.xlarge.1000.5w.csv &
+[Done]
+
+------------------------------------------------------------------------------------------------------------------------
+
+ ~/DATActorUploader localhost 13666 ../StressActor/FPNNStandardUDPStressActor
+ ~/DATDeployController -e localhost:13666 --actor FPNNStandardUDPStressActor --region cn-northwest
+
+nohup ./FPNNStandardUDPStressActor 10.65.5.229:13666 --uniqueId wewwe &
+
+ sar -ubqr -n DEV -n SOCK -n UDP 1 >sar.log &
+
+
+perf record -e cpu-clock -g ./FPNNStandardUDPStressActor 10.65.5.229:13666 --uniqueId wewwe
+perf script -i perf.data &> perf.unfold
+~/FlameGraph/stackcollapse-perf.pl perf.unfold &> perf.folded
+~/FlameGraph/flamegraph.pl perf.folded > perf.svg
+~/FlameGraph/flamegraph.pl perf.folded > 12-4.3-1.1.perf.svg
+
+
+===============================
+ 百万连接压力测试
+===============================
+
+FPNN.server.log.level = ERROR
+FPNN.server.idle.timeout = 150
+FPNN.server.rlimit.max.nofile = 2230000
+FPNN.server.max.connections = 2230000
+
+一定要关闭 serverTest 的链接建立和关闭事件
+
+
+------------------------------------------------------------------------------------------------------------------------
+UDP M5
+
+m5.xlarge
+---------------
+
+nohup ./UDPMassConnController --contorlCenterEndpoint 10.13.240.67:13666 --testEndpoint 10.13.240.90:13611 --stopPerCPULoad 2.1 --stopTimeCostMsec 800 --massThreadCount 100 --clientCount 10000 --perClientQPS 0.04 --output udp.massClient.m5.xlarge.100.1w.0.04.v1.csv --extraWaitTime 10 &
+[]
+
+nohup ./UDPMassConnController --contorlCenterEndpoint 10.13.240.67:13666 --testEndpoint 10.13.240.90:13611 --stopPerCPULoad 2.1 --stopTimeCostMsec 800 --massThreadCount 100 --clientCount 10000 --perClientQPS 0.07 --output udp.massClient.m5.xlarge.100.1w.0.07.v1.csv --extraWaitTime 10 &
+[]
+
+nohup ./UDPMassConnController --contorlCenterEndpoint 10.13.240.67:13666 --testEndpoint 10.13.240.90:13611 --stopPerCPULoad 2.1 --stopTimeCostMsec 800 --massThreadCount 100 --clientCount 10000 --perClientQPS 0.1 --output udp.massClient.m5.xlarge.100.1w.0.1.v1.csv --extraWaitTime 10 &
+[]
+
+nohup ./UDPMassConnController --contorlCenterEndpoint 10.13.240.67:13666 --testEndpoint 10.13.240.90:13611 --stopPerCPULoad 2.1 --stopTimeCostMsec 800 --massThreadCount 100 --clientCount 10000 --perClientQPS 0.5 --output udp.massClient.m5.xlarge.100.1w.0.5.v1.csv --extraWaitTime 10 &
+[]
+
+nohup ./UDPMassConnController --contorlCenterEndpoint 10.13.240.67:13666 --testEndpoint 10.13.240.90:13611 --stopPerCPULoad 2.1 --stopTimeCostMsec 800 --massThreadCount 100 --clientCount 10000 --perClientQPS 1 --output udp.massClient.m5.xlarge.100.1w.1.0.v1.csv --extraWaitTime 10 &
+[]
+
+
+m5.2xlarge
+---------------
+
+nohup ./UDPMassConnController --contorlCenterEndpoint 10.13.240.67:13666 --testEndpoint 10.13.240.152:13611 --stopPerCPULoad 2.1 --stopTimeCostMsec 800 --massThreadCount 10 --clientCount 1000 --perClientQPS 0.04 --output udp.massClient.m5.2xlarge.10.1k.0.04.new.v1.csv --extraWaitTime 10 &
+[Done]
+
+nohup ./UDPMassConnController --contorlCenterEndpoint 10.13.240.67:13666 --testEndpoint 10.13.240.152:13611 --stopPerCPULoad 2.1 --stopTimeCostMsec 800 --massThreadCount 10 --clientCount 1000 --perClientQPS 0.07 --output udp.massClient.m5.2xlarge.10.1k.0.07.new.v1.csv --extraWaitTime 10 &
+[]
+
+nohup ./UDPMassConnController --contorlCenterEndpoint 10.13.240.67:13666 --testEndpoint 10.13.240.152:13611 --stopPerCPULoad 2.1 --stopTimeCostMsec 800 --massThreadCount 10 --clientCount 1000 --perClientQPS 0.1 --output udp.massClient.m5.2xlarge.10.1k.0.1.new.v1.csv --extraWaitTime 10 &
+[]
+
+nohup ./UDPMassConnController --contorlCenterEndpoint 10.13.240.67:13666 --testEndpoint 10.13.240.152:13611 --stopPerCPULoad 2.1 --stopTimeCostMsec 800 --massThreadCount 10 --clientCount 1000 --perClientQPS 0.5 --output udp.massClient.m5.2xlarge.10.1k.0.5.new.v1.csv --extraWaitTime 10 &
+[]
+
+nohup ./UDPMassConnController --contorlCenterEndpoint 10.13.240.67:13666 --testEndpoint 10.13.240.152:13611 --stopPerCPULoad 2.1 --stopTimeCostMsec 800 --massThreadCount 10 --clientCount 1000 --perClientQPS 1 --output udp.massClient.m5.2xlarge.10.1k.1.0.new.v1.csv --extraWaitTime 10 &
+[Doing]
+
+------------------------------------------------------------------------------------------------------------------------
+TCP M5
+
+m5.xlarge
+---------------
+
+nohup ./TCPMassConnController --contorlCenterEndpoint 10.13.240.67:13666 --testEndpoint 10.13.240.90:13611 --stopPerCPULoad 2.1 --stopTimeCostMsec 800 --massThreadCount 100 --clientCount 10000 --perClientQPS 0.04 --output tcp.massClient.m5.xlarge.100.1w.0.04.v1.csv --extraWaitTime 10 &
+[]
+
+nohup ./TCPMassConnController --contorlCenterEndpoint 10.13.240.67:13666 --testEndpoint 10.13.240.90:13611 --stopPerCPULoad 2.1 --stopTimeCostMsec 800 --massThreadCount 100 --clientCount 10000 --perClientQPS 0.07 --output tcp.massClient.m5.xlarge.100.1w.0.07.v1.csv --extraWaitTime 10 &
+[]
+
+nohup ./TCPMassConnController --contorlCenterEndpoint 10.13.240.67:13666 --testEndpoint 10.13.240.90:13611 --stopPerCPULoad 2.1 --stopTimeCostMsec 800 --massThreadCount 100 --clientCount 10000 --perClientQPS 0.1 --output tcp.massClient.m5.xlarge.100.1w.0.1.v1.csv --extraWaitTime 10 &
+[]
+
+nohup ./TCPMassConnController --contorlCenterEndpoint 10.13.240.67:13666 --testEndpoint 10.13.240.90:13611 --stopPerCPULoad 2.1 --stopTimeCostMsec 800 --massThreadCount 100 --clientCount 10000 --perClientQPS 0.5 --output tcp.massClient.m5.xlarge.100.1w.0.5.v1.csv --extraWaitTime 10 &
+[]
+
+nohup ./TCPMassConnController --contorlCenterEndpoint 10.13.240.67:13666 --testEndpoint 10.13.240.90:13611 --stopPerCPULoad 2.1 --stopTimeCostMsec 800 --massThreadCount 100 --clientCount 10000 --perClientQPS 1 --output tcp.massClient.m5.xlarge.100.1w.1.0.v1.csv --extraWaitTime 10 &
+[]
+
+
+m5.2xlarge
+---------------
+
+nohup ./TCPMassConnController --contorlCenterEndpoint 10.13.240.67:13666 --testEndpoint 10.13.240.152:13611 --stopPerCPULoad 2.1 --stopTimeCostMsec 800 --massThreadCount 100 --clientCount 10000 --perClientQPS 0.04 --output tcp.massClient.m5.2xlarge.100.1w.0.04.v1.csv --extraWaitTime 10 &
+[Done]
+
+nohup ./TCPMassConnController --contorlCenterEndpoint 10.13.240.67:13666 --testEndpoint 10.13.240.152:13611 --stopPerCPULoad 2.1 --stopTimeCostMsec 800 --massThreadCount 100 --clientCount 10000 --perClientQPS 0.07 --output tcp.massClient.m5.2xlarge.100.1w.0.07.v1.csv --extraWaitTime 10 &
+[Done]
+
+nohup ./TCPMassConnController --contorlCenterEndpoint 10.13.240.67:13666 --testEndpoint 10.13.240.152:13611 --stopPerCPULoad 2.1 --stopTimeCostMsec 800 --massThreadCount 100 --clientCount 10000 --perClientQPS 0.1 --output tcp.massClient.m5.2xlarge.100.1w.0.1.v1.csv --extraWaitTime 10 &
+[Done]
+
+nohup ./TCPMassConnController --contorlCenterEndpoint 10.13.240.67:13666 --testEndpoint 10.13.240.152:13611 --stopPerCPULoad 2.1 --stopTimeCostMsec 800 --massThreadCount 100 --clientCount 10000 --perClientQPS 0.5 --output tcp.massClient.m5.2xlarge.100.1w.0.5.v1.csv --extraWaitTime 10 &
+[Done]
+
+nohup ./TCPMassConnController --contorlCenterEndpoint 10.13.240.67:13666 --testEndpoint 10.13.240.152:13611 --stopPerCPULoad 2.1 --stopTimeCostMsec 800 --massThreadCount 100 --clientCount 10000 --perClientQPS 1 --output tcp.massClient.m5.2xlarge.100.1w.1.0.v1.csv --extraWaitTime 10 &
+[Done]
+
+------------------------------------------------------------------------------------------------------------------------
+TCP M4
+
+nohup ./TCPMassConnController --contorlCenterEndpoint 10.13.240.67:13666 --testEndpoint 10.13.240.189:13611 --stopPerCPULoad 2.1 --stopTimeCostMsec 800 --massThreadCount 100 --clientCount 10000 --perClientQPS 0.04 --output tcp.massClient.m4.xlarge.100.1w.0.04.v1.csv --extraWaitTime 10 &
+[]
+
+nohup ./TCPMassConnController --contorlCenterEndpoint 10.13.240.67:13666 --testEndpoint 10.13.240.189:13611 --stopPerCPULoad 2.1 --stopTimeCostMsec 800 --massThreadCount 100 --clientCount 10000 --perClientQPS 0.07 --output tcp.massClient.m4.xlarge.100.1w.0.07.v1.csv --extraWaitTime 10 &
+[]
+
+nohup ./TCPMassConnController --contorlCenterEndpoint 10.13.240.67:13666 --testEndpoint 10.13.240.189:13611 --stopPerCPULoad 2.1 --stopTimeCostMsec 800 --massThreadCount 100 --clientCount 10000 --perClientQPS 0.1 --output tcp.massClient.m4.xlarge.100.1w.0.1.v1.csv --extraWaitTime 10 &
+[]
+
+nohup ./TCPMassConnController --contorlCenterEndpoint 10.13.240.67:13666 --testEndpoint 10.13.240.189:13611 --stopPerCPULoad 2.1 --stopTimeCostMsec 800 --massThreadCount 100 --clientCount 10000 --perClientQPS 0.5 --output tcp.massClient.m4.xlarge.100.1w.0.5.v1.csv --extraWaitTime 10 &
+[]
+
+nohup ./TCPMassConnController --contorlCenterEndpoint 10.13.240.67:13666 --testEndpoint 10.13.240.189:13611 --stopPerCPULoad 2.1 --stopTimeCostMsec 800 --massThreadCount 100 --clientCount 10000 --perClientQPS 1 --output tcp.massClient.m4.xlarge.100.1w.1.0.v1.csv --extraWaitTime 10 &
+[]
+
+------------------------------------------------------------------------------------------------------------------------
+
+
+
+
+
+

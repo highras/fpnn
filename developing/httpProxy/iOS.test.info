@@ -1,0 +1,9 @@
+Platform
+iOS, macOS, tvOS, watchOS
+App ID Prefix
+85Q2285229 (Team ID)
+Description
+iOS capacity demo
+You cannot use special characters such as @, &, *, ', ", -, .
+Bundle ID
+com.ilivedata.ios.net.ext.testApp (explicit)

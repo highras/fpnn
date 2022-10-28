@@ -1,0 +1,19 @@
+=> http { method:%s, url:%s, header:[%s], body:%B }
+<= { header:{%s, %s}, httpCode:%d, body:%B }
+
+
+
+=> initHttps { host:%s }
+<= { sessionId:%d }
+
+=> https { sessionId:%d, data:%B, seq:%d }
+<= {}
+
+=> httpsClose { sessionId:%d }
+<= {}
+
+=============
+  push
+=============
+=> httpsResponse { sessionId:%d, data:%B, seq:%d }
+<= {}

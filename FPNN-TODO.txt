@@ -1,0 +1,6 @@
+
+UDPv2: close 数据包需要验证当前连接的指纹。否则当对端四元组重用时，可能会引发错误的关闭。
+
+UDP v2: map 阵列测试
+
+DBProxy: dataname.tablename 方式执行，比 先use db，然后执行 快很多

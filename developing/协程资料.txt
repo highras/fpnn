@@ -1,0 +1,14 @@
+协程资料
+
+https://github.com/hnes/libaco
+https://github.com/hnes/libaco/blob/master/README_zh.md
+
+A Portable C++ Library for Coroutine Sequencing:
+http://akira.ruc.dk/~keld/research/COROUTINE/COROUTINE-1.0/DOC/COROUTINE_REPORT.pdf
+
+https://github.com/tencent/libco
+
+
+
+Go 作者之前的协程库
+https://swtch.com/libtask/

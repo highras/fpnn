@@ -1,0 +1,52 @@
+路线图：
+
+开放 TCP-Nodelay 配置。允许启用 TCP_NODELAY，文档中注明只有低压力时，能提升响应速度，高压力时会阻塞网络。
+
+client  异步
+{
+	TCPClient Async Connecting:
+	*. _connected 状态
+	*. 注意 joinEpoll() 和 exitEpoll() 对 noBlock 和 _connected, _connStatus 的处理
+	*. close(), sendQuest(), connect() 等函数，协助处理 _connStatus 状态，避免重入
+	*. connect(), sendQuest() 等，如果 _connStatus == connecting or keyExchanging，需要等待 _connected
+	*. 清理 各个 proxy 的 getClient() 函数
+
+	*. join epoll 的时候监听可写事件，和现在的监听可读刚好相反。
+
+	perpare connect 异常
+	connecting epoll error 异常
+	connecting timeout 异常
+	connected perpare exchange 异常
+	connected exchange timeout 异常
+	connected exchange result 异常 
+
+	异步 dns 查询：
+	http://www.choudan.net/2015/02/20/异步DNS解析.html
+	http://blog.csdn.net/lx_shudong/article/details/72638704?utm_source=itdadao&utm_medium=referral
+	http://www.th7.cn/Program/c/201512/721658.shtml
+}
+
+非 I/O 线程中，关闭已经应答的 HTTP 连接。
+
+
+FPNN 2.5:
+
+	收包不完整时，动态缩小等待时间，不等 idle 超时
+	TCPClient 异步连接
+	合并 ConnectionMap
+	默认启动 Duplex，如果没有配置的情况下，init 和 perfect 是 0，max 是 cpu count。
+
+	全局配置中心
+	ResourceReclaimer
+	[Done] ResourceCenter
+
+	备选：
+	消息染色／消息追踪
+	MultiCURLEngine v2
+		统一使用 ITaskThreadPool接口
+	TCPProxyCore
+		统一使用 ITaskThreadPool接口
+
+
+--------------------------------------------------------------------------
+

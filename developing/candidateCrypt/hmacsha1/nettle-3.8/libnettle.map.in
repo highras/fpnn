@@ -1,0 +1,26 @@
+# libnettle.map.in -- linker version script.           -*- ld-script -*-
+
+#
+# The symbol version must be updated on every nettle
+# library major number change. That is taken care by
+# auto-generating the file.
+
+NETTLE_@LIBNETTLE_MAJOR@
+{
+  global:
+    nettle_*;
+
+  local:
+    *;
+};
+
+# Internal symbols which are to be used only for unit or other
+# testing. Compatibility may break across releases.
+NETTLE_INTERNAL_@LIBNETTLE_MAJOR@_@LIBNETTLE_MINOR@
+{
+  global:
+    _nettle_*;
+
+  local:
+    *;
+};

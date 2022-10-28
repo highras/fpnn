@@ -1,0 +1,31 @@
+===================
+ Server Interface
+===================
+
+=> up { path:%s, blockSize:%d, count:%d }
+<= { taskId:%d }
+
+=> data { taskId:%d, seq:%d, data:%B }
+<= {}
+
+=> dl { path:%s, taskId:%d, blockSize:%d, ?concurrentCount:%d, ?maxRetryCount:%d, ?timeout:%d }
+<= { count:%d }
+
+=> ls { path:%d, all:true }
+<= { list:[%s] }
+
+=> ls { path:%d, onlyDir:true }
+<= { subDirs:[%s] }
+
+=> ls { path:%d, onlyFile:true }
+<= { files:{ %s:%d } }
+
+=> stream { streamId:%d, seq:%d, data:%d }
+<= { size:%d }
+
+==============
+ Server Push
+==============
+
+=> data { taskId:%d, seq:%d, data:%B }
+<= {}

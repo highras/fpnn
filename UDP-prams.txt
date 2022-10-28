@@ -1,0 +1,39 @@
+TCP
+
+../Client/dlTest 10.15.240.24:13678 /data/AC/XKCMAV.zip /root/data/AC/XKCMAV.zip -c 32 -t 20 
+
+80 Mb
+
+S
+load average: 0.02, 0.03, 0.04
+%Cpu(s):  0.3 us,  0.8 sy,  0.0 ni, 98.2 id,  0.0 wa,  0.5 hi,  0.3 si,  0.0 st
+
+C
+load average: 0.06, 0.01, 0.00
+%Cpu(s):  0.6 us,  1.2 sy,  0.0 ni, 97.9 id,  0.0 wa,  0.1 hi,  0.3 si,  0.0 st
+
+----------------------
+
+UDP
+
+25 Mb
+
+S
+load average: 0.10, 0.06, 0.04
+%Cpu(s):  0.4 us,  0.8 sy,  0.0 ni, 98.4 id,  0.0 wa,  0.4 hi,  0.0 si,  0.0 st
+
+C
+load average: 0.08, 0.06, 0.01
+%Cpu(s):  0.2 us,  0.4 sy,  0.0 ni, 99.1 id,  0.0 wa,  0.2 hi,  0.1 si,  0.0 st
+
+
+56~60Mb
+===========================
+#FPNN.global.udp.arq.reAckInterval = 8
+#FPNN.global.udp.arq.syncInterval = 50
+
+#FPNN.global.udp.arq.urgentSync.triggeredThreshold = 800
+FPNN.global.udp.arq.unconfiremedPackage.maxCount = 1200
+
+FPNN.global.udp.arq.resentPerSecondLimitation = 2400
+FPNN.global.udp.arq.maxSendCountPerConnectionSecond = 20000

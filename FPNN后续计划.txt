@@ -1,0 +1,38 @@
+UDP 后续计划：
+ 3. 匿源
+ 4. 二次重定向/代理
+ 5. 连接接管（四元组冲突）
+ 6. 连接在多个ARQ上面漂移/接续
+
+ *. [跟随计划] UDP Server 软中断过高优化
+ *. [跟随计划] UDP Server Accept 线程独立，与 epoll 独立。
+
+
+FPNN 开发计划:
+
+1.2:
+
+	TCP链接事件是否采用双队列？
+	TCP多链接建立事件是否正序化？
+	TCP连接建立时，是否直接wait epoll，而不是等到connected事件完成？在此时，cache 收到的quest？
+
+1.5/6/7/?:
+
+	分布式链路追踪（支持 含环 有向 图）
+	可能的参考：brpc/rpcz, taobao 鹰眼系统
+
+2.2.0:
+	
+	TCP async connect
+	动态 nodelay 设置
+
+
+其他问题：
+3. UDP Client close 没有真正释放链接。
+
+
+其他 infra：
+	dbproxy 标准版发布
+	UGPlus
+	TableCache cluster版
+	FPManager desuign

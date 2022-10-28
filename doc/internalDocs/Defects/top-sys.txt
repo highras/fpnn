@@ -1,0 +1,12 @@
+
+当高压力时，sys、idle 和 软中断过大。
+
+%Cpu(s): 10.3 us, 24.7 sy,  0.0 ni, 51.5 id,  0.0 wa,  0.0 hi, 10.4 si,  3.1 st
+	
+Tasks: 109 total,   2 running, 107 sleeping,   0 stopped,   0 zombie
+%Cpu0  : 10.8 us, 24.2 sy,  0.0 ni, 52.3 id,  0.0 wa,  0.0 hi, 10.5 si,  2.2 st
+%Cpu1  : 12.6 us, 24.4 sy,  0.0 ni, 47.0 id,  0.0 wa,  0.0 hi, 12.2 si,  3.7 st
+%Cpu2  :  9.2 us, 23.4 sy,  0.0 ni, 53.8 id,  0.0 wa,  0.0 hi, 10.3 si,  3.3 st
+%Cpu3  :  9.0 us, 22.3 sy,  0.0 ni, 53.2 id,  0.0 wa,  0.0 hi, 11.9 si,  3.6 st
+	
+	

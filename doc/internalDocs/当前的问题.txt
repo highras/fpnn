@@ -1,0 +1,13 @@
+
+==================================================================================
+1. 在 GCP 上，rtm 运行 20 天左右，会出现数个 core，堆栈为：
+～～～～～～～～～～～～～～～～～～～～～～～～～～～～～～～～～～～
+
+(gdb) bt
+#0  0x0000000000000000 in ?? ()
+#1  0x00000000004c3482 in fpnn::ConnectionReclaimer::reclaimer_thread (this=0x227a000) at ConnectionReclaimer.h:48
+#2  0x00007f131a9fd070 in ?? () from /lib64/libstdc++.so.6
+#3  0x00007f131a4cae25 in start_thread () from /lib64/libpthread.so.0
+#4  0x00007f13196d1bad in clone () from /lib64/libc.so.6
+
+但之前几年均未出现该状况，具体情况有待观察

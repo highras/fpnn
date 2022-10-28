@@ -1,0 +1,13 @@
+SHA-3 之前名為Keccak。
+SHA-3 在2015年8月5日由 NIST 通過 FIPS 202 正式發表。
+
+
+https://github.com/mjosaarinen/tiny_sha3
+Start 180
+MIT License
+
+
+
+https://keccak.team/software.html
+https://github.com/XKCP/XKCP
+Start 470

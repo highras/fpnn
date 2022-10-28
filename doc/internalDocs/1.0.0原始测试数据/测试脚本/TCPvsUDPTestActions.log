@@ -1,0 +1,159 @@
+
+jump:
+ssh -i ~/Documents/Development/swxlion_key/wangxing.shi.pem wangxing.shi@52.11.68.38
+
+ AP:
+ 10.15.240.24   CentOS 8		54.169.68.213
+
+ 10.15.240.167   CentOS 7
+ 10.15.240.200   CentOS 7
+
+ EU:
+ 10.18.240.46   CentOS 8		3.120.186.43
+
+ US:
+ 10.13.240.90   CentOS 8		35.162.37.179
+
+
+ NX:
+ 10.65.5.38		CentOS 8		161.189.52.224
+
+===========
+NX -> EU:
+===========
+---------------------------------------------------------------------------------------------------
+./cmd localhost 13611 start '{"tcp":"3.120.186.43:13611", "udp":"3.120.186.43:13612", "count":20000, "qps":100, "rate":25}'
+
+Return:{"taskId":1616741232932}
+Caller:
+Return:{"count":20000, "qps":100, "mixRate":25, "tcp":{"avg":267, "max":420, "min":165, "timeout":0}, "udp(ARQ)":{"avg":132, "max":223, "min":132, "timeout":0}, "udp(Nake)":{"avg":164, "max":255, "min":164, "timeout":0}, "udp(mix)":{"avg":166, "max":167, "min":166, "timeout":0}}
+Peer:
+Return:{"count":20000, "qps":0, "mixRate":0, "tcp":{"avg":267, "max":379, "min":177, "timeout":0}, "udp(ARQ)":{"avg":113, "max":116, "min":113, "timeout":0}, "udp(Nake)":{"avg":177, "max":179, "min":176, "timeout":0}, "udp(mix)":{"avg":177, "max":179, "min":176, "timeout":0}}
+
+
+---------------------------------------------------------------------------------------------------
+./cmd localhost 13611 start '{"tcp":"3.120.186.43:13611", "udp":"3.120.186.43:13612", "count":100000, "qps":1000, "rate":25}'
+
+Caller:
+Return:{"count":100000, "qps":1000, "mixRate":25, "tcp":{"avg":144, "max":270, "min":133, "timeout":0}, "udp(ARQ)":{"avg":166, "max":395, "min":164, "timeout":0}, "udp(Nake)":{"avg":165, "max":255, "min":164, "timeout":0}, "udp(mix)":{"avg":126, "max":216, "min":125, "timeout":0}}
+
+Peer:
+Return:{"count":100000, "qps":0, "mixRate":0, "tcp":{"avg":124, "max":320, "min":114, "timeout":0}, "udp(ARQ)":{"avg":179, "max":623, "min":177, "timeout":0}, "udp(Nake)":{"avg":177, "max":180, "min":177, "timeout":0}, "udp(mix)":{"avg":99, "max":101, "min":98, "timeout":0}}
+
+---------------------------------------------------------------------------------------------------
+./cmd localhost 13611 start '{"tcp":"3.120.186.43:13611", "udp":"3.120.186.43:13612", "count":200000, "qps":2000, "rate":25}'
+
+Caller:
+Return:{"count":200000, "qps":2000, "mixRate":25, "tcp":{"avg":141, "max":347, "min":134, "timeout":0}, "udp(ARQ)":{"avg":130, "max":248, "min":124, "timeout":82484}, "udp(Nake)":{"avg":129, "max":369, "min":125, "timeout":720}, "udp(mix)":{"avg":129, "max":314, "min":125, "timeout":6856}}
+
+Peer:
+Return:{"count":200000, "qps":0, "mixRate":0, "tcp":{"avg":122, "max":426, "min":115, "timeout":0}, "udp(ARQ)":{"avg":117, "max":444, "min":98, "timeout":74736}, "udp(Nake)":{"avg":99, "max":179, "min":98, "timeout":4}, "udp(mix)":{"avg":102, "max":180, "min":98, "timeout":28}}
+
+===========
+EU -> NX:
+===========
+---------------------------------------------------------------------------------------------------
+./cmd localhost 13611 start '{"tcp":"161.189.52.224:13611", "udp":"161.189.52.224:13612", "count":20000, "qps":100, "rate":25}'
+
+Caller:
+Return:{"count":20000, "qps":100, "mixRate":25, "tcp":{"avg":272, "max":510, "min":165, "timeout":0}, "udp(ARQ)":{"avg":164, "max":254, "min":164, "timeout":0}, "udp(Nake)":{"avg":166, "max":171, "min":166, "timeout":1}, "udp(mix)":{"avg":125, "max":216, "min":125, "timeout":0}}
+
+Peer:
+Return:{"count":20000, "qps":0, "mixRate":0, "tcp":{"avg":239, "max":471, "min":149, "timeout":0}, "udp(ARQ)":{"avg":148, "max":329, "min":148, "timeout":0}, "udp(Nake)":{"avg":152, "max":154, "min":152, "timeout":1}, "udp(mix)":{"avg":148, "max":329, "min":148, "timeout":0}}
+
+
+---------------------------------------------------------------------------------------------------
+./cmd localhost 13611 start '{"tcp":"161.189.52.224:13611", "udp":"161.189.52.224:13612", "count":100000, "qps":1000, "rate":25}'
+
+Caller:
+Return:{"count":100000, "qps":1000, "mixRate":25, "tcp":{"avg":144, "max":295, "min":133, "timeout":0}, "udp(ARQ)":{"avg":162, "max":222, "min":162, "timeout":0}, "udp(Nake)":{"avg":166, "max":332, "min":164, "timeout":0}, "udp(mix)":{"avg":164, "max":289, "min":164, "timeout":1}}
+
+Peer:
+Return:{"count":100000, "qps":0, "mixRate":0, "tcp":{"avg":159, "max":415, "min":149, "timeout":0}, "udp(ARQ)":{"avg":148, "max":265, "min":147, "timeout":0}, "udp(Nake)":{"avg":150, "max":175, "min":148, "timeout":0}, "udp(mix)":{"avg":148, "max":151, "min":147, "timeout":1}}
+
+---------------------------------------------------------------------------------------------------
+./cmd localhost 13611 start '{"tcp":"161.189.52.224:13611", "udp":"161.189.52.224:13612", "count":200000, "qps":2000, "rate":25}'
+
+Caller:
+Return:{"count":200000, "qps":2000, "mixRate":25, "tcp":{"avg":139, "max":416, "min":133, "timeout":0}, "udp(ARQ)":{"avg":128, "max":344, "min":124, "timeout":7714}, "udp(Nake)":{"avg":130, "max":301, "min":126, "timeout":1441}, "udp(mix)":{"avg":129, "max":253, "min":125, "timeout":2526}}
+
+Peer:
+Return:{"count":200000, "qps":0, "mixRate":0, "tcp":{"avg":155, "max":497, "min":148, "timeout":0}, "udp(ARQ)":{"avg":157, "max":587, "min":147, "timeout":1713}, "udp(Nake)":{"avg":152, "max":155, "min":148, "timeout":10}, "udp(mix)":{"avg":148, "max":153, "min":147, "timeout":11}}
+
+===========
+NX -> AP:
+===========
+---------------------------------------------------------------------------------------------------
+./cmd localhost 13611 start '{"tcp":"54.169.68.213:13611", "udp":"54.169.68.213:13612", "count":20000, "qps":100, "rate":25}'
+
+Caller:
+Return:{"count":20000, "qps":100, "mixRate":25, "tcp":{"avg":159, "max":580, "min":57, "timeout":0}, "udp(ARQ)":{"avg":86, "max":359, "min":50, "timeout":0}, "udp(Nake)":{"avg":89, "max":259, "min":62, "timeout":0}, "udp(mix)":{"avg":70, "max":219, "min":48, "timeout":0}}
+
+
+Peer:
+Return:{"count":20000, "qps":0, "mixRate":0, "tcp":{"avg":131, "max":270, "min":69, "timeout":0}, "udp(ARQ)":{"avg":69, "max":71, "min":68, "timeout":0}, "udp(Nake)":{"avg":98, "max":159, "min":95, "timeout":0}, "udp(mix)":{"avg":69, "max":71, "min":68, "timeout":0}}
+
+
+---------------------------------------------------------------------------------------------------
+./cmd localhost 13611 start '{"tcp":"54.169.68.213:13611", "udp":"54.169.68.213:13612", "count":100000, "qps":1000, "rate":25}'
+
+Caller:
+Return:{"count":100000, "qps":1000, "mixRate":25, "tcp":{"avg":384, "max":1171, "min":53, "timeout":0}, "udp(ARQ)":{"avg":82, "max":195, "min":51, "timeout":0}, "udp(Nake)":{"avg":108, "max":257, "min":63, "timeout":0}, "udp(mix)":{"avg":92, "max":224, "min":59, "timeout":0}}
+
+Peer:
+Return:{"count":100000, "qps":0, "mixRate":0, "tcp":{"avg":79, "max":104, "min":68, "timeout":0}, "udp(ARQ)":{"avg":69, "max":71, "min":68, "timeout":0}, "udp(Nake)":{"avg":98, "max":110, "min":97, "timeout":0}, "udp(mix)":{"avg":90, "max":101, "min":90, "timeout":0}}
+
+---------------------------------------------------------------------------------------------------
+./cmd localhost 13611 start '{"tcp":"54.169.68.213:13611", "udp":"54.169.68.213:13612", "count":200000, "qps":2000, "rate":25}'
+
+Caller:
+{"count":200000, "qps":2000, "mixRate":25, "tcp":{"avg":691, "max":1715, "min":58, "timeout":0}, "udp(ARQ)":{"avg":370, "max":2682, "min":71, "timeout":166588}, "udp(Nake)":{"avg":100, "max":257, "min":49, "timeout":0}, "udp(mix)":{"avg":84, "max":229, "min":60, "timeout":0}}
+
+Peer:
+Return:{"count":200000, "qps":0, "mixRate":0, "tcp":{"avg":92, "max":164, "min":86, "timeout":0}, "udp(ARQ)":{"avg":99, "max":191, "min":95, "timeout":0}, "udp(Nake)":{"avg":69, "max":71, "min":68, "timeout":0}, "udp(mix)":{"avg":88, "max":108, "min":86, "timeout":0}}
+
+
+修改参数：
+-------------------
+FPNN.global.udp.arq.urgentSync.triggeredThreshold = 360 FPNN.global.udp.arq.unconfiremedPackage.maxCount = 400
+FPNN.global.udp.arq.maxSendCountPerConnectionSecond = 8000
+FPNN.global.udp.arq.resentPerSecondLimitation = 1200 UDP.Con.m2.maxIntervalMS = 120
+-------------------
+Caller:
+Return:{"count":200000, "qps":2000, "mixRate":25, "tcp":{"avg":1791, "max":2853, "min":102, "timeout":92739}, "udp(ARQ)":{"avg":148, "max":341, "min":58, "timeout":0}, "udp(Nake)":{"avg":159, "max":353, "min":63, "timeout":0}, "udp(mix)":{"avg":324, "max":2844, "min":94, "timeout":157447}}
+
+Peer:
+Return:{"count":200000, "qps":0, "mixRate":0, "tcp":{"avg":675, "max":3131, "min":135, "timeout":0}, "udp(ARQ)":{"avg":85, "max":223, "min":79, "timeout":0}, "udp(Nake)":{"avg":91, "max":128, "min":89, "timeout":0}, "udp(mix)":{"avg":170, "max":727, "min":150, "timeout":17445}}
+
+===========
+AP -> NX:
+===========
+---------------------------------------------------------------------------------------------------
+./cmd localhost 13611 start '{"tcp":"161.189.52.224:13611", "udp":"161.189.52.224:13612", "count":20000, "qps":100, "rate":25}'
+
+Caller:
+Return:{"count":20000, "qps":100, "mixRate":25, "tcp":{"avg":203, "max":1020, "min":71, "timeout":0}, "udp(ARQ)":{"avg":114, "max":429, "min":59, "timeout":0}, "udp(Nake)":{"avg":58, "max":70, "min":51, "timeout":1642}, "udp(mix)":{"avg":64, "max":226, "min":57, "timeout":883}}
+
+Peer:
+Return:{"count":20000, "qps":0, "mixRate":0, "tcp":{"avg":181, "max":1942, "min":30, "timeout":0}, "udp(ARQ)":{"avg":136, "max":768, "min":28, "timeout":0}, "udp(Nake)":{"avg":43, "max":66, "min":28, "timeout":1642}, "udp(mix)":{"avg":41, "max":365, "min":28, "timeout":883}}
+
+
+---------------------------------------------------------------------------------------------------
+./cmd localhost 13611 start '{"tcp":"161.189.52.224:13611", "udp":"161.189.52.224:13612", "count":100000, "qps":1000, "rate":25}'
+
+Caller:
+Return:{"count":100000, "qps":1000, "mixRate":25, "tcp":{"avg":855, "max":2955, "min":60, "timeout":23765}, "udp(ARQ)":{"avg":106, "max":260, "min":64, "timeout":0}, "udp(Nake)":{"avg":55, "max":60, "min":51, "timeout":2972}, "udp(mix)":{"avg":57, "max":188, "min":52, "timeout":1550}}
+
+Peer:
+Return:{"count":100000, "qps":0, "mixRate":0, "tcp":{"avg":2653, "max":6760, "min":33, "timeout":0}, "udp(ARQ)":{"avg":110, "max":401, "min":27, "timeout":0}, "udp(Nake)":{"avg":36, "max":45, "min":27, "timeout":2972}, "udp(mix)":{"avg":41, "max":303, "min":32, "timeout":1550}}
+
+---------------------------------------------------------------------------------------------------
+./cmd localhost 13611 start '{"tcp":"161.189.52.224:13611", "udp":"161.189.52.224:13612", "count":200000, "qps":2000, "rate":25}'
+
+Caller:
+Return:{"count":200000, "qps":2000, "mixRate":25, "tcp":{"avg":1185, "max":2943, "min":61, "timeout":185059}, "udp(ARQ)":{"avg":92, "max":275, "min":60, "timeout":0}, "udp(Nake)":{"avg":52, "max":60, "min":49, "timeout":4955}, "udp(mix)":{"avg":55, "max":190, "min":50, "timeout":5781}}
+
+Peer:
+Return:{"count":200000, "qps":0, "mixRate":0, "tcp":{"avg":19081, "max":34312, "min":41, "timeout":57369}, "udp(ARQ)":{"avg":93, "max":455, "min":32, "timeout":0}, "udp(Nake)":{"avg":36, "max":51, "min":27, "timeout":4955}, "udp(mix)":{"avg":37, "max":308, "min":27, "timeout":5781}}
+
+

@@ -1,0 +1,77 @@
+UDP v2 Design
+
+* [Done] 加密
+	加密默认对UDP整包做块加密。
+	因为小状态包的存在，对Data单独的流加密强化是必要的
+	一个 ecdh，通过 uint16_t 的 IV mask 处理 secret 得到第二个 secret。
+	加密深度：选择整个package body，或者仅 Data 部分
+	可丢弃包深度加密采用块加密，非可丢弃包深度加密采用流加密
+
+	** 因为深度加密影响性能和提前拆解包，所以暂时保留，不实现 **
+
+* 可丢弃包的指纹验证
+	可丢弃包也需要验证指纹
+	可丢弃包序号依旧随机。
+	当第一个可靠包到达的3秒（可毫秒级配置）后，所有收到的可丢弃包君需要验证。
+
+* 链接迁移
+	预埋链接迁移标志？
+
+	先把其他完成，v2.5 再开发。
+	每个包携带 session ID。
+
+	第一个数据包使用特定头，指明原始链接。该加密加密
+
+* _activeCloseStatus = ActiveCloseStep::GenPackage;
+
+	发送后等待500ms再关闭。
+
+* 优化
+
+	NX 的带宽消耗高于洲际。怀疑是因响应延迟在微秒级别，导致 流控 internal 为 0，然后立刻频繁重发导致。
+
+-----------------------
+
+收尾注意事项：
+
+* 目前提前拆解包没有开放配置接口。默认开启。只有启用了数据强化加密才会被关闭。
+  但数据强化加密会影响效率和性能。
+
+* 目前没有提供 answer 的重发过期时间配置。默认为：
+	Server 正常发送：UDPServer 的 timeout 配置时间
+	Server 提前返回：UDPServer 的 timeout 配置时间
+	Client 正常发送：UDPClient 的 timeout 配置时间
+	Client 提前返回：ClientEngine 的 timeout 配置时间
+
+
+对比测试：
+	阿里巴巴 XQUIC https://github.com/alibaba/xquic
+
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+* 其他
+
+	iOS 编译器对 class IQuestPtocessor virtual void connection(ci) = delete; 的支持有问题，
+	可以临时改为 {} 实现，但对已经放出去的 C++ SDK 会有问题。需要有完整方案。（放到 private 里面能封锁继承吗？）
+
+===========================================================
+
+* Parse 四元组冲突，新链接重入问题
+
+	parser 反馈到 UDPIOBuffer
+	UDPIOBuffer 反馈到 UDPServerConnection
+	UDPServerConnection 触发 UDPServerIOWorker 链接重入准备
+	UDPServerIOWorker 调用 UDPEpollServer 触发 链接重入和连接替换
+
+
+* FPNN Server
+
+	是否提供配置项，处理链接建立事件前插的问题？
+
+* 黑名单功能
+
+===========================================================
+
+* 抗 DDoS：
+
+	重定向包没有必要，使用重定向网关（重定向前端堡垒机），配合链接迁移就行

@@ -1,0 +1,3 @@
+#! /bin/sh
+
+rm -rf testkey.priv testkey.pub testtmp testsignature testsignature2

@@ -1,0 +1,20 @@
+1. 服务进程退出时，主线程中，TCP/UDP server 的 run 正在调用 processEvent 等函数，这些函数正在 malloc 日志等内存时，
+   ctrl + C 触发信号处理函数。而信号处理函数会启动新线程，启动新线程会导致 alloc，这样在系统库 libc 中，malloc/alloc
+   内部锁死锁。导致进程无法退出。
+
+   解决：考虑使用 ServerCtroller::ServerController::startTimeoutCheckThread() 启动的线程，检查信号处理函数修改的
+   标志状态，从而在 200 ms 左右的周期内，触发 server::stop() 线程的调用。
+
+
+2. TCPEpollServer 考虑将连接的建立事件和关闭事件使用 hash 分配线程池，也就是 priorWakeUp(int hint, K task) 接口，
+   避免在 server 停止时，极低概率，发生同一链接的链接建立事件还没执行完，链接关闭事件就被触发的情况。
+   比如一个链接刚刚accept，然后server就停止，被强制触发链接关闭事件。
+
+   2.1. 补充：
+      在服务器空闲时，链接闪断，且链接建立事件耗时较长时，也可能触发。
+      如果：链接建立事件分配到的线程池为单一线程线程池，且前置任务很慢，但其他线程池很快空闲。在闪断时，将导致链接关闭先于连接建立发生。
+
+   以上将采取类似于 C++ SDK 客户端采用的事件执行权限状态，和建立关闭事件联动的处理，不采用 int hint 接口，因为如果 hash 到的线程池是个动态增长线程池，hash 也避免不了以上问题。
+
+
+3. UDP Client close 没有真正释放链接。
