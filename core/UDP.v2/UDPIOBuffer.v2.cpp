@@ -522,10 +522,21 @@ bool UDPIOBuffer::prepareResentPackage_normalMode()
 	UDPPackage* package;
 	if (_protocolVersion > 1)
 	{
-		if (_unconformedMap.prepareSendingBuffer(_MTU, _resendThreshold, _currentSendingBuffer))
+		bool requireSingleResending;
+		if (_unconformedMap.prepareSendingBuffer(_MTU, _resendThreshold, _currentSendingBuffer, requireSingleResending))
 		{
 			_resentCount -= (int)(_currentSendingBuffer->assembledPackages.size());
 			return true;
+		}
+		else if (requireSingleResending)
+		{
+			package = _unconformedMap.fetchFirstResendPackage(_resendThreshold, seqNum);
+			if (package)
+			{
+				_currentSendingBuffer->resendPackage(seqNum, package);
+				_resentCount -= 1;
+				return true;
+			}
 		}
 	}
 	else

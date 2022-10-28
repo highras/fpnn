@@ -67,10 +67,13 @@ void UDPUnconformedMap::insert(uint32_t seqNum, UDPPackage* package)
 	_sentQueue.push_back(node);
 }
 
-void UDPUnconformedMap::fetchResendPackages(int freeSpace, int64_t threshold, std::list<UDPUnconformedMap::PackageNode*>& canbeAssembledPackages)
+void UDPUnconformedMap::fetchResendPackages(int freeSpace, int64_t threshold, bool& checkRequireSingleResending, std::list<UDPUnconformedMap::PackageNode*>& canbeAssembledPackages)
 {
 	const int assembledSectionExtraBytes = ARQConstant::AssembledPackageLengthFieldSize - 1;	//-- 1: version field size.
 	const int mimimumSpaceRequire = assembledSectionExtraBytes + ARQConstant::PackageMimimumLength;
+
+	bool requireChekSingleResending = checkRequireSingleResending;
+	checkRequireSingleResending = false;
 
 	if (freeSpace < ARQConstant::PackageMimimumLength + assembledSectionExtraBytes)
 		return;
@@ -98,7 +101,15 @@ void UDPUnconformedMap::fetchResendPackages(int freeSpace, int64_t threshold, st
 						break;
 				}
 				else
+				{
+					if (requireChekSingleResending && canbeAssembledPackages.empty())
+					{
+						checkRequireSingleResending = true;
+						return;
+					}
+
 					it++;
+				}
 			}
 			else
 				break;
@@ -127,6 +138,7 @@ void UDPUnconformedMap::assemblePackages(UDPPackage* package,
 		sendingBuffer->assemblePackage(node->package);
 }
 
+/*
 void UDPUnconformedMap::assemblePackages(std::set<UDPUnconformedMap::PackageNode*>& selectedPackages,
 	std::list<UDPUnconformedMap::PackageNode*>& supplementaryPackages, CurrentSendingBuffer* sendingBuffer)
 {
@@ -139,13 +151,15 @@ void UDPUnconformedMap::assemblePackages(std::set<UDPUnconformedMap::PackageNode
 	for (auto node: supplementaryPackages)
 		sendingBuffer->assemblePackage(node->package);
 }
+*/
 
 bool UDPUnconformedMap::prepareSendingBuffer(int MTU, int64_t threshold, UDPPackage* package, CurrentSendingBuffer* sendingBuffer)
 {
 	int freeSpace = MTU - ARQConstant::AssembledPackageHeaderSize - (int)(package->len);
 
+	bool checkRequireSingleResending = false;
 	std::list<UDPUnconformedMap::PackageNode*> canbeAssembledPackages;
-	fetchResendPackages(freeSpace, threshold, canbeAssembledPackages);
+	fetchResendPackages(freeSpace, threshold, checkRequireSingleResending, canbeAssembledPackages);
 	if (canbeAssembledPackages.empty())
 		return false;
 
@@ -153,14 +167,19 @@ bool UDPUnconformedMap::prepareSendingBuffer(int MTU, int64_t threshold, UDPPack
 	return true;
 }
 
-bool UDPUnconformedMap::prepareSendingBuffer(int MTU, int64_t threshold, CurrentSendingBuffer* sendingBuffer)
+bool UDPUnconformedMap::prepareSendingBuffer(int MTU, int64_t threshold, CurrentSendingBuffer* sendingBuffer, bool& requireSingleResending)
 {
 	int freeSpace = MTU - ARQConstant::AssembledPackageHeaderSize;
 
+	requireSingleResending = false;
+	bool checkRequireSingleResending = true;
 	std::list<UDPUnconformedMap::PackageNode*> canbeAssembledPackages;
-	fetchResendPackages(freeSpace, threshold, canbeAssembledPackages);
+	fetchResendPackages(freeSpace, threshold, checkRequireSingleResending, canbeAssembledPackages);
 	if (canbeAssembledPackages.empty())
+	{
+		requireSingleResending = checkRequireSingleResending;
 		return false;
+	}
 
 	assemblePackages(NULL, canbeAssembledPackages, sendingBuffer);
 	return true;
@@ -218,7 +237,7 @@ void UDPUnconformedMap::cleanByAcks(const std::unordered_set<uint32_t>& acks, in
 	}
 }
 
-UDPPackage* UDPUnconformedMap::v1_fetchResentPackage_normalMode(int64_t threshold, uint32_t& seqNum)
+UDPPackage* UDPUnconformedMap::fetchFirstResendPackage(int64_t threshold, uint32_t& seqNum)
 {
 	PackageNode* target = NULL;
 	for (auto it = _sentQueue.begin(); it != _sentQueue.end(); )

@@ -6,7 +6,7 @@
 
 namespace fpnn
 {
-#define FPNN_SERVER_VERSION "1.3.0"
+#define FPNN_SERVER_VERSION "1.3.1"
 
 //in second
 #define FPNN_DEFAULT_QUEST_TIMEOUT (5)

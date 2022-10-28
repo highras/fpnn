@@ -213,14 +213,6 @@ bool Timer::initEpoll()
 
 void Timer::stopEpoll()
 {
-	if (_eventNotifyFds[0])
-	{
-		close(_eventNotifyFds[1]);
-		close(_eventNotifyFds[0]);
-		_eventNotifyFds[0] = 0;
-		_eventNotifyFds[1] = 0;
-	}
-	
 	if (_epoll_fd)
 	{
 		close(_epoll_fd);

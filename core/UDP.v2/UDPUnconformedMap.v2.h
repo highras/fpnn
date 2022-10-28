@@ -46,11 +46,17 @@ namespace fpnn
 		ResendTracer _resendTracer;
 		bool _enableExpireCheck;
 
-		void fetchResendPackages(int freeSpace, int64_t threshold, std::list<PackageNode*>& canbeAssembledPackages);
+		/*
+			* checkRequireSingleResending:
+				in: check first resendable package is full size or not. If which is full size, it requiring to be single resent.
+				out: if in parameter is set true: first resendable package is required to be single resent or not;
+					 when in parameter is set false, out patameter will be ignored.
+		*/
+		void fetchResendPackages(int freeSpace, int64_t threshold, bool& checkRequireSingleResending, std::list<PackageNode*>& canbeAssembledPackages);
 		void assemblePackages(UDPPackage* package, std::list<PackageNode*>& canbeAssembledPackages,
 			CurrentSendingBuffer* sendingBuffer);
-		void assemblePackages(std::set<PackageNode*>& selectedPackages,
-			std::list<PackageNode*>& supplementaryPackages, CurrentSendingBuffer* sendingBuffer);
+		//void assemblePackages(std::set<PackageNode*>& selectedPackages,
+		//	std::list<PackageNode*>& supplementaryPackages, CurrentSendingBuffer* sendingBuffer);
 		
 	public:
 		UDPUnconformedMap(): _enableExpireCheck(true) {}
@@ -67,13 +73,14 @@ namespace fpnn
 		//-- Only can insert reliable package.
 		void insert(uint32_t seqNum, UDPPackage* package);
 		bool prepareSendingBuffer(int MTU, int64_t threshold, UDPPackage* package, CurrentSendingBuffer* sendingBuffer);
-		bool prepareSendingBuffer(int MTU, int64_t threshold, CurrentSendingBuffer* sendingBuffer);
+		bool prepareSendingBuffer(int MTU, int64_t threshold, CurrentSendingBuffer* sendingBuffer, bool& requireSingleResending);
 
 		void cleanByUNA(uint32_t una, int64_t now, int &count, int64_t &totalDelay);
 		void cleanByAcks(const std::unordered_set<uint32_t>& acks, int64_t now, int &count, int64_t &totalDelay);
 
+		UDPPackage* fetchFirstResendPackage(int64_t threshold, uint32_t& seqNum);
 		//-- Compatible for protocol version 1.
-		UDPPackage* v1_fetchResentPackage_normalMode(int64_t threshold, uint32_t& seqNum);
+		UDPPackage* v1_fetchResentPackage_normalMode(int64_t threshold, uint32_t& seqNum) { return fetchFirstResendPackage(threshold, seqNum); }
 	};
 }
 
